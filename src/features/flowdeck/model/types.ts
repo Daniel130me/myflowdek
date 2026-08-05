@@ -1,0 +1,320 @@
+/* ---------------------------------- Team ---------------------------------- */
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  color: string;
+}
+
+/* ---------------------------------- Project ---------------------------------- */
+export interface Project {
+  id: string;
+  name: string;
+  color: string;
+  start: string;
+  end: string;
+  /* #36 */ description?: string;
+  /* #37 */ members?: string[];
+  /* #38 */ isFavorite?: boolean;
+  /* #39 */ isArchived?: boolean;
+}
+
+/* ---------------------------------- Tag ---------------------------------- */
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+}
+
+/* ---------------------------------- Reaction ---------------------------------- */
+export interface Reaction {
+  emoji: string;
+  userIds: string[];
+}
+
+/* ---------------------------------- Comment ---------------------------------- */
+export interface Comment {
+  id: string;
+  taskId: string;
+  authorId: string;
+  text: string;
+  createdAt: string;
+  /* #43 */ reactions?: Reaction[];
+  /* #44 */ edited?: boolean;
+  /* #45 */ parentId?: string | null;
+}
+
+/* ---------------------------------- Activity ---------------------------------- */
+export interface ActivityEntry {
+  id: string;
+  taskId: string;
+  type: 'status_change' | 'assignee_change' | 'comment' | 'created' | 'completed' | 'reopened' | 'priority_change' | 'due_date_change' | 'tag_added' | 'tag_removed' | 'progress_change';
+  description: string;
+  authorId: string;
+  timestamp: string;
+}
+
+/* ---------------------------------- Search ---------------------------------- */
+export interface SearchFilters {
+  assignees: string[];
+  statuses: string[];
+  priorities: string[];
+  tags: string[];
+  dueBefore: string | null;
+  dueAfter: string | null;
+}
+
+export const EMPTY_FILTERS: SearchFilters = {
+  assignees: [], statuses: [], priorities: [], tags: [],
+  dueBefore: null, dueAfter: null,
+};
+
+/* ---------------------------------- Task ---------------------------------- */
+export type TaskStatus = 'backlog' | 'in_progress' | 'review' | 'done';
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface Task {
+  id: string;
+  name: string;
+  description?: string;
+  status: string;
+  assignee: string;
+  start: string;
+  duration: number;
+  dueDate?: string;
+  progress: number;
+  priority: string;
+  deps: string[];
+  tags?: string[];
+  followers?: string[];
+  parentId?: string | null;
+  level?: number;
+  bold?: boolean;
+  color?: string | null;
+  milestone?: boolean;
+  recurrence?: string | null;
+  customFields?: Record<string, string>;
+  storyPoints?: number;
+  createdAt?: string;
+  sectionId?: string | null;
+}
+
+/* ---------------------------------- Files ---------------------------------- */
+export interface FileItem {
+  id: string;
+  name: string;
+  size: number;
+  uploadedBy: string;
+  uploadedAt: string;
+  linkedTaskId: string | null;
+  url?: string;
+  thumbnailUrl?: string;
+}
+
+/* ---------------------------------- RAID ---------------------------------- */
+export interface RaidItem {
+  id: string;
+  type: string;
+  description: string;
+  owner: string;
+  impact: string;
+  status: string;
+  dateRaised: string;
+}
+
+/* ---------------------------------- Project Template ---------------------------------- */
+export interface ProjectTemplate {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  taskCount: number;
+  tags: { name: string; color: string }[];
+  customCols: CustomColumn[];
+  generateTasks: (projectId: string, start: string) => Task[];
+}
+
+/* ---------------------------------- Time Log ---------------------------------- */
+export interface TimeLog {
+  id: string;
+  taskId: string;
+  userId: string;
+  minutes: number;
+  note: string;
+  loggedAt: string;
+}
+
+/* ---------------------------------- Custom Column ---------------------------------- */
+export interface CustomColumn {
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'select';
+  options?: string[]; // for select type
+}
+
+/* ---------------------------------- Section ---------------------------------- */
+export interface Section {
+  id: string;
+  projectId: string;
+  name: string;
+  position: number;
+  collapsed?: boolean;
+}
+
+/* ---------------------------------- Project Status Update ---------------------------------- */
+export interface ProjectStatusUpdate {
+  id: string;
+  projectId: string;
+  authorId: string;
+  text: string;
+  color: 'green' | 'yellow' | 'red';
+  createdAt: string;
+}
+
+/* ---------------------------------- Goal / OKR ---------------------------------- */
+export interface Goal {
+  id: string;
+  title: string;
+  description?: string;
+  status: 'on_track' | 'at_risk' | 'off_track' | 'not_started';
+  startDate: string;
+  endDate: string;
+  parentId?: string | null;
+  linkedProjectIds?: string[];
+}
+
+export interface KeyResult {
+  id: string;
+  goalId: string;
+  title: string;
+  targetValue: number;
+  currentValue: number;
+  unit: string;
+}
+
+/* ---------------------------------- Saved Filter ---------------------------------- */
+export interface SavedFilter {
+  id: string;
+  name: string;
+  filters: SearchFilters;
+  createdAt: string;
+  isPinned?: boolean;
+}
+
+/* ---------------------------------- Notification ---------------------------------- */
+export interface NotificationItem {
+  id: string;
+  type: 'comment' | 'assignment' | 'due_date' | 'status_change' | 'completed' | 'mentioned';
+  taskId: string;
+  projectId: string;
+  message: string;
+ actorId: string;
+  read: boolean;
+  createdAt: string;
+}
+
+/* ---------------------------------- Automation Rule ---------------------------------- */
+export interface AutomationRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  trigger: AutomationTrigger;
+  actions: AutomationAction[];
+  createdAt: string;
+}
+
+export interface AutomationTrigger {
+  type: 'status_change' | 'assignee_change' | 'priority_change' | 'due_date_approaching' | 'task_created' | 'task_completed';
+  field?: string;
+  value?: string;
+  operator?: 'equals' | 'not_equals' | 'contains' | 'is_empty' | 'is_not_empty';
+  daysBefore?: number;
+}
+
+export interface AutomationAction {
+  type: 'set_status' | 'set_priority' | 'set_assignee' | 'add_tag' | 'remove_tag' | 'add_comment' | 'set_due_date' | 'notify';
+  value?: string;
+  field?: string;
+}
+
+/* ---------------------------------- Form / Request Intake ---------------------------------- */
+export interface Form {
+  id: string;
+  projectId: string;
+  name: string;
+  description?: string;
+  fields: FormField[];
+  createdAt: string;
+  isActive: boolean;
+}
+
+export interface FormField {
+  id: string;
+  label: string;
+  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'email';
+  required: boolean;
+  options?: string[];
+}
+
+export interface FormSubmission {
+  id: string;
+  formId: string;
+  projectId: string;
+  data: Record<string, string>;
+  submittedAt: string;
+  submittedBy?: string;
+  convertedTaskId?: string;
+}
+
+/* ---------------------------------- Approval ---------------------------------- */
+export interface ApprovalRequest {
+  id: string;
+  taskId: string;
+  projectId: string;
+  requesterId: string;
+  approverId: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: string;
+  resolvedAt?: string;
+  comment?: string;
+}
+
+/* ---------------------------------- Budget & Expense ---------------------------------- */
+export interface Budget {
+  id: string;
+  projectId: string;
+  name: string;
+  totalBudget: number;
+  spent: number;
+  currency: string;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+}
+
+export interface Expense {
+  id: string;
+  budgetId: string;
+  projectId: string;
+  description: string;
+  amount: number;
+  category: string;
+  date: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+/* ---------------------------------- Timesheet ---------------------------------- */
+export interface TimesheetEntry {
+  id: string;
+  userId: string;
+  projectId: string;
+  taskId: string;
+  date: string;
+  hours: number;
+  note: string;
+  submitted: boolean;
+  approved: boolean;
+  createdAt: string;
+}
