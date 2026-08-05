@@ -2,6 +2,7 @@ import type { ProjectRepository, CreateProjectInput, UpdateProjectInput } from '
 import type { Project } from '@/features/flowdeck/model';
 import { INITIAL_PROJECTS } from '@/features/flowdeck/model/data';
 import { loadPersistedState, savePersistedState } from '../local-storage/storageAdapter';
+import { defaultIdGenerator } from '@/shared/utils/id';
 
 export class MockProjectRepository implements ProjectRepository {
   private projects: Record<string, Project>;
@@ -28,7 +29,7 @@ export class MockProjectRepository implements ProjectRepository {
   }
 
   async create(input: CreateProjectInput): Promise<Project> {
-    const id = 'p' + Math.random().toString(36).slice(2, 7);
+    const id = defaultIdGenerator.generate('p');
     const newProject: Project = {
       id,
       name: input.name,

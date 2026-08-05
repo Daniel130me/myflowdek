@@ -2,6 +2,7 @@ import type { TaskRepository, CreateTaskInput, UpdateTaskInput, TaskListOptions 
 import type { Task } from '@/features/flowdeck/model';
 import { initialTasks } from '@/features/flowdeck/model/data';
 import { loadPersistedState, savePersistedState } from '../local-storage/storageAdapter';
+import { defaultIdGenerator } from '@/shared/utils/id';
 
 export class MockTaskRepository implements TaskRepository {
   private tasksByProject: Record<string, Task[]>;
@@ -38,7 +39,7 @@ export class MockTaskRepository implements TaskRepository {
 
   async create(projectId: string, input: CreateTaskInput): Promise<Task> {
     const newTask: Task = {
-      id: 't' + Math.random().toString(36).slice(2, 9),
+      id: defaultIdGenerator.generate('t'),
       name: input.name,
       description: input.description || '',
       status: input.status || 'backlog',

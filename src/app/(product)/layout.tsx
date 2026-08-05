@@ -6,6 +6,7 @@ import { FONT_FAMILY as FF } from '@/features/flowdeck/model';
 import { useViewport } from '@/features/flowdeck/hooks/useViewport';
 import { useKeyboardShortcuts } from '@/features/flowdeck/hooks/useKeyboardShortcuts';
 import { ThemeProvider, useTheme } from '@/features/flowdeck/hooks/useTheme';
+import { FlowdekDataProvider } from '@/providers/FlowdekDataProvider';
 import { useAuth } from '@/features/flowdeck/components/auth';
 import {
   Sidebar, MobileSidebar, TopBar, MobileSearchRow, BottomNav, MoreMenu,
@@ -16,7 +17,7 @@ import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { routes, getRouteForView, getViewFromPathname } from '@/shared/navigation/routes';
 import type { TopBarHandle } from '@/features/flowdeck/components/layout/TopBar';
 
-export default function ProductLayout({ children }: { children: React.ReactNode }) {
+export default function ProductLayout({ children, modal }: { children: React.ReactNode; modal?: React.ReactNode }) {
   const auth = useAuth();
   const router = useRouter();
 
@@ -40,14 +41,16 @@ export default function ProductLayout({ children }: { children: React.ReactNode 
 
   return (
     <ThemeProvider>
-      <ProductShellInner onLogout={auth.logout}>
-        {children}
-      </ProductShellInner>
+      <FlowdekDataProvider>
+        <ProductShellInner onLogout={auth.logout} modal={modal}>
+          {children}
+        </ProductShellInner>
+      </FlowdekDataProvider>
     </ThemeProvider>
   );
 }
 
-function ProductShellInner({ children, onLogout }: { children: React.ReactNode; onLogout: () => void }) {
+function ProductShellInner({ children, modal, onLogout }: { children: React.ReactNode; modal?: React.ReactNode; onLogout: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const params = useParams();
@@ -283,6 +286,7 @@ function ProductShellInner({ children, onLogout }: { children: React.ReactNode; 
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, paddingBottom: bottomNavHeight }}>
           {children}
         </div>
+        {modal}
 
         {isMobile && (
           <BottomNav activeView={activeView} onNav={mobileNavTo} />
@@ -292,144 +296,7 @@ function ProductShellInner({ children, onLogout }: { children: React.ReactNode; 
         )}
       </div>
 
-      {/* Overlays / Modals */}
-      {isNewProjectRoute && (
-        <NewProjectModal
-          onClose={() => handleCloseModal(routes.projects())}
-          onCreate={p => {
-            state.createProject(p);
-            handleCloseModal(routes.projects());
-          }}
-          onCreateFromTemplate={(tid, name, color, start, end) => {
-            state.createProjectFromTemplate(tid, name, color, start, end);
-            handleCloseModal(routes.projects());
-          }}
-        />
-      )}
-
-      {isNewTaskRoute && (
-        <NewTaskModal
-          projectStart={project?.start || ''}
-          tasks={tasks}
-          tags={state.tags}
-          onClose={() => handleCloseModal()}
-          onCreate={task => {
-            state.addTask(task);
-            handleCloseModal();
-          }}
-        />
-      )}
-
-      {activeSelectedTask && (
-        <TaskDetailPanel
-          task={activeSelectedTask}
-          allTasks={tasks}
-          files={state.files}
-          tags={state.tags}
-          comments={state.taskComments}
-          activity={state.taskActivity}
-          parentTask={parentTask}
-          onClose={() => handleCloseModal()}
-          onUpdate={patch => state.updateTask(activeSelectedTask.id, patch)}
-          onAddSubtask={parentId => router.push(routes.newTask(routeProjectId))}
-          onNavigateToTask={taskId => router.push(routes.task(routeProjectId, taskId))}
-          onToggleTaskTag={state.toggleTaskTag}
-          onAddTag={state.addTag}
-          onRemoveTag={state.removeTag}
-          onAddComment={state.addComment}
-          onDeleteComment={state.deleteComment}
-          onEditComment={state.editComment}
-          onToggleReaction={state.toggleReaction}
-          onToggleFollower={state.toggleFollower}
-          timeLogs={state.taskTimeLogs}
-          onAddTimeLog={state.addTimeLog}
-          onDeleteTimeLog={state.deleteTimeLog}
-          currentUserId={state.currentUserId}
-          customCols={state.customCols}
-          onViewFile={fileId => router.push(routes.file(routeProjectId, fileId))}
-          onRemoveFile={state.removeFile}
-          onAddFiles={state.addFiles}
-          onDuplicateTaskWithOptions={state.duplicateTaskWithOptions}
-          onMoveToProject={state.moveTaskToProject}
-        />
-      )}
-
-      {isShareRoute && project && (
-        <ShareModal
-          project={project}
-          onClose={() => handleCloseModal()}
-        />
-      )}
-
-      {activeViewingFile && (
-        <FileViewerModal
-          file={activeViewingFile}
-          allFiles={state.files}
-          allTasks={tasks}
-          onClose={() => handleCloseModal(routes.projectFiles(routeProjectId))}
-          onNavigateFile={fileId => router.push(routes.file(routeProjectId, fileId))}
-        />
-      )}
-
-      {isCustomFieldsRoute && (
-        <CustomFieldsModal
-          columns={state.customCols}
-          onAdd={state.addColumn}
-          onRemove={state.removeColumn}
-          onClose={() => handleCloseModal()}
-        />
-      )}
-
-      {isShortcutsRoute && (
-        <KeyboardShortcutsModal
-          open={true}
-          onClose={() => handleCloseModal()}
-        />
-      )}
-
-      {isCommandRoute && (
-        <CommandPalette
-          open={true}
-          onOpenChange={open => {
-            if (!open) handleCloseModal();
-          }}
-          activeView={activeView}
-          onNavigate={view => {
-            handleCloseModal(getRouteForView(view, routeProjectId));
-          }}
-          projects={projects}
-          onOpenProject={id => {
-            state.openProject(id);
-            handleCloseModal(routes.projectOverview(id));
-          }}
-          onNewProject={() => handleCloseModal(routes.newProject())}
-          tasksByProject={state.tasksByProject}
-          onOpenTask={id => {
-            handleCloseModal(routes.task(routeProjectId, id));
-          }}
-          onNewTask={() => handleCloseModal(routes.newTask(routeProjectId))}
-          onUndo={gridActions.onUndo}
-          onRedo={gridActions.onRedo}
-          canUndo={gridActions.canUndo}
-          canRedo={gridActions.canRedo}
-          onToggleTheme={() => {}}
-        />
-      )}
-
-      {duplicateDialogTask && (
-        <DuplicateTaskDialog
-          taskName={duplicateDialogTask.name}
-          hasSubtasks={Boolean(duplicateDialogTask.parentId || state.tasks.some(t => t.parentId === duplicateDialogTask.id))}
-          hasComments={Boolean(state.commentsByProject[routeProjectId]?.some(c => c.taskId === duplicateDialogTask.id))}
-          hasAttachments={Boolean(state.files.some(f => f.linkedTaskId === duplicateDialogTask.id))}
-          onCancel={() => handleCloseModal()}
-          onConfirm={opts => {
-            state.duplicateTaskWithOptions(duplicateDialogTask.id, opts);
-            handleCloseModal();
-          }}
-        />
-      )}
-
+      {/* Global Selection Action Bar */}
       {state.selectedIds.size > 0 && (
         <BulkActionBar
           count={state.selectedIds.size}

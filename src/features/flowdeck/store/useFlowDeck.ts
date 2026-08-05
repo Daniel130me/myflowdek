@@ -15,6 +15,7 @@ import {
 } from '@/features/flowdeck/model';
 import type { GridActions } from '../components/toolbar/types';
 import type { ProjectStatusUpdate } from '@/features/flowdeck/model';
+import { useOptionalFlowdekData } from '@/providers/FlowdekDataProvider';
 
 /* ---- LocalStorage persistence ---- */
 const STORAGE_KEY = 'flowdeck-state-v1';
@@ -235,7 +236,7 @@ export interface FlowDeckState {
   deleteTimesheetEntry: (id: string) => void;
 }
 
-export function useFlowDeck(): FlowDeckState {
+export function useFlowDeckStore(): FlowDeckState {
   /* ---- Hydration-safe initial state (useEffect will load from localStorage) ---- */
   const persistedRef = useRef<Record<string, unknown> | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -1580,4 +1581,10 @@ export function useFlowDeck(): FlowDeckState {
     setShowNewTask, setShowNewProject, setProjectMenuOpen, setShareOpen,
     setSidebarOpen, setMoreMenuOpen, setSelectedIds,
   } as FlowDeckState;
+}
+
+export function useFlowDeck(): FlowDeckState {
+  const context = useOptionalFlowdekData();
+  if (context) return context;
+  throw new Error('useFlowDeck must be used within a FlowdekDataProvider');
 }

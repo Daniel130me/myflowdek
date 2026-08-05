@@ -75,15 +75,16 @@ export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 export interface Task {
   id: string;
+  projectId?: string;
   name: string;
   description?: string;
-  status: string;
+  status: TaskStatus | string;
   assignee: string;
   start: string;
   duration: number;
   dueDate?: string;
   progress: number;
-  priority: string;
+  priority: TaskPriority | string;
   deps: string[];
   tags?: string[];
   followers?: string[];
@@ -102,6 +103,7 @@ export interface Task {
 /* ---------------------------------- Files ---------------------------------- */
 export interface FileItem {
   id: string;
+  projectId?: string;
   name: string;
   size: number;
   uploadedBy: string;

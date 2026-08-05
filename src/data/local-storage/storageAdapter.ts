@@ -1,36 +1,35 @@
+import { z } from 'zod';
 import { INITIAL_PROJECTS, initialTasks, initialFiles, initialRaid } from '@/features/flowdeck/model/data';
 
 export const STORAGE_KEY = 'flowdeck-state-v1';
 export const STORAGE_VERSION = 1;
 
-export interface PersistedState {
-  version?: number;
-  projects?: Record<string, any>;
-  tasksByProject?: Record<string, any[]>;
-  filesByProject?: Record<string, any[]>;
-  raidByProject?: Record<string, any[]>;
-  customColsByProject?: Record<string, any[]>;
-  tagsByProject?: Record<string, any[]>;
-  commentsByProject?: Record<string, any[]>;
-  activityByProject?: Record<string, any[]>;
-  tasks?: any[];
-  files?: any[];
-  raidItems?: any[];
-  goals?: any[];
-  keyResults?: any[];
-  automations?: any[];
-  forms?: any[];
-  approvals?: any[];
-  budgets?: any[];
-  expenses?: any[];
-  timesheets?: any[];
-  submissions?: any[];
-  tags?: any[];
-  customCols?: any[];
-  timeLogs?: any[];
-  currentProjectId?: string;
-  userProfile?: any;
-}
+export const PersistedStateSchema = z.object({
+  version: z.number().optional().default(STORAGE_VERSION),
+  projects: z.record(z.string(), z.any()).optional(),
+  tasksByProject: z.record(z.string(), z.array(z.any())).optional(),
+  filesByProject: z.record(z.string(), z.array(z.any())).optional(),
+  raidByProject: z.record(z.string(), z.array(z.any())).optional(),
+  tasks: z.array(z.any()).optional(),
+  files: z.array(z.any()).optional(),
+  raidItems: z.array(z.any()).optional(),
+  goals: z.array(z.any()).optional(),
+  keyResults: z.array(z.any()).optional(),
+  automations: z.array(z.any()).optional(),
+  forms: z.array(z.any()).optional(),
+  approvals: z.array(z.any()).optional(),
+  budgets: z.array(z.any()).optional(),
+  expenses: z.array(z.any()).optional(),
+  timesheets: z.array(z.any()).optional(),
+  submissions: z.array(z.any()).optional(),
+  tags: z.array(z.any()).optional(),
+  customCols: z.array(z.any()).optional(),
+  timeLogs: z.array(z.any()).optional(),
+  currentProjectId: z.string().nullable().optional(),
+  userProfile: z.any().optional(),
+});
+
+export type PersistedState = z.infer<typeof PersistedStateSchema>;
 
 export function loadPersistedState(): PersistedState | null {
   if (typeof window === 'undefined') return null;
@@ -59,32 +58,68 @@ export function savePersistedState(state: Partial<PersistedState>): void {
   }
 }
 
-export function migrateState(rawState: any): PersistedState {
-  // Ensure valid object structure and add default fallback arrays/records if fields are missing
-  const migrated: PersistedState = {
-    version: rawState.version || STORAGE_VERSION,
-    projects: rawState.projects && typeof rawState.projects === 'object' ? rawState.projects : INITIAL_PROJECTS,
-    tasksByProject: rawState.tasksByProject && typeof rawState.tasksByProject === 'object' ? rawState.tasksByProject : initialTasks,
-    filesByProject: rawState.filesByProject && typeof rawState.filesByProject === 'object' ? rawState.filesByProject : initialFiles,
-    raidByProject: rawState.raidByProject && typeof rawState.raidByProject === 'object' ? rawState.raidByProject : initialRaid,
-    tasks: Array.isArray(rawState.tasks) ? rawState.tasks : Object.values(rawState.tasksByProject || initialTasks).flat(),
-    files: Array.isArray(rawState.files) ? rawState.files : Object.values(rawState.filesByProject || initialFiles).flat(),
-    raidItems: Array.isArray(rawState.raidItems) ? rawState.raidItems : Object.values(rawState.raidByProject || initialRaid).flat(),
-    goals: Array.isArray(rawState.goals) ? rawState.goals : [],
-    keyResults: Array.isArray(rawState.keyResults) ? rawState.keyResults : [],
-    automations: Array.isArray(rawState.automations) ? rawState.automations : [],
-    forms: Array.isArray(rawState.forms) ? rawState.forms : [],
-    approvals: Array.isArray(rawState.approvals) ? rawState.approvals : [],
-    budgets: Array.isArray(rawState.budgets) ? rawState.budgets : [],
-    expenses: Array.isArray(rawState.expenses) ? rawState.expenses : [],
-    timesheets: Array.isArray(rawState.timesheets) ? rawState.timesheets : [],
-    submissions: Array.isArray(rawState.submissions) ? rawState.submissions : [],
-    tags: Array.isArray(rawState.tags) ? rawState.tags : [],
-    customCols: Array.isArray(rawState.customCols) ? rawState.customCols : [],
-    timeLogs: Array.isArray(rawState.timeLogs) ? rawState.timeLogs : [],
-    currentProjectId: rawState.currentProjectId || 'p1',
-    userProfile: rawState.userProfile || null,
-  };
+export function migrateState(rawState: unknown): PersistedState {
+  if (typeof rawState !== 'object' || rawState === null) {
+    return createDefaultPersistedState();
+  }
 
-  return migrated;
+  const result = PersistedStateSchema.safeParse(rawState);
+  if (!result.success) {
+    console.warn('[Flowdek] Persisted state validation failed, falling back to safe state:', result.error);
+    return createDefaultPersistedState();
+  }
+
+  const validated = result.data;
+
+  return {
+    version: validated.version ?? STORAGE_VERSION,
+    projects: validated.projects && Object.keys(validated.projects).length > 0 ? validated.projects : INITIAL_PROJECTS,
+    tasksByProject: validated.tasksByProject ?? initialTasks,
+    filesByProject: validated.filesByProject ?? initialFiles,
+    raidByProject: validated.raidByProject ?? initialRaid,
+    tasks: Array.isArray(validated.tasks) ? validated.tasks : Object.values(validated.tasksByProject || initialTasks).flat(),
+    files: Array.isArray(validated.files) ? validated.files : Object.values(validated.filesByProject || initialFiles).flat(),
+    raidItems: Array.isArray(validated.raidItems) ? validated.raidItems : Object.values(validated.raidByProject || initialRaid).flat(),
+    goals: Array.isArray(validated.goals) ? validated.goals : [],
+    keyResults: Array.isArray(validated.keyResults) ? validated.keyResults : [],
+    automations: Array.isArray(validated.automations) ? validated.automations : [],
+    forms: Array.isArray(validated.forms) ? validated.forms : [],
+    approvals: Array.isArray(validated.approvals) ? validated.approvals : [],
+    budgets: Array.isArray(validated.budgets) ? validated.budgets : [],
+    expenses: Array.isArray(validated.expenses) ? validated.expenses : [],
+    timesheets: Array.isArray(validated.timesheets) ? validated.timesheets : [],
+    submissions: Array.isArray(validated.submissions) ? validated.submissions : [],
+    tags: Array.isArray(validated.tags) ? validated.tags : [],
+    customCols: Array.isArray(validated.customCols) ? validated.customCols : [],
+    timeLogs: Array.isArray(validated.timeLogs) ? validated.timeLogs : [],
+    currentProjectId: validated.currentProjectId ?? null,
+    userProfile: validated.userProfile ?? null,
+  };
+}
+
+export function createDefaultPersistedState(): PersistedState {
+  return {
+    version: STORAGE_VERSION,
+    projects: INITIAL_PROJECTS,
+    tasksByProject: initialTasks,
+    filesByProject: initialFiles,
+    raidByProject: initialRaid,
+    tasks: Object.values(initialTasks).flat(),
+    files: Object.values(initialFiles).flat(),
+    raidItems: Object.values(initialRaid).flat(),
+    goals: [],
+    keyResults: [],
+    automations: [],
+    forms: [],
+    approvals: [],
+    budgets: [],
+    expenses: [],
+    timesheets: [],
+    submissions: [],
+    tags: [],
+    customCols: [],
+    timeLogs: [],
+    currentProjectId: null,
+    userProfile: null,
+  };
 }
