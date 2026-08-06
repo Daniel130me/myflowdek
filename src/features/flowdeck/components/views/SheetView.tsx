@@ -8,6 +8,7 @@ import { GridToolbar, type GridActions } from '../toolbar';
 import { useViewport } from '../../hooks/useViewport';
 
 interface SheetViewProps {
+  projectId: string;
   tasks: Task[];
   onUpdate: (id: string, patch: Partial<Task>) => void;
   onAdd: (task: Task) => void;
@@ -18,7 +19,7 @@ interface SheetViewProps {
   onToggleComplete: (id: string) => void;
 }
 
-export function SheetView({ tasks, onUpdate, onAdd, onRemove, grid, onReorder, onQuickAdd, onToggleComplete }: SheetViewProps) {
+export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, onReorder, onQuickAdd, onToggleComplete }: SheetViewProps) {
   const { isMobile } = useViewport();
   const allColumns = [...SHEET_COLUMNS, ...grid.customCols.map(c => ({ ...c, width: 140 } as const))];
   const [widths, setWidths] = useState<Record<string, number>>(() => Object.fromEntries(allColumns.map(c => [c.key, c.width])));
@@ -163,7 +164,7 @@ export function SheetView({ tasks, onUpdate, onAdd, onRemove, grid, onReorder, o
         .fd-row:hover .fd-grip-handle { opacity: 1; }
         .fd-row:hover .fd-grip-handle:active { cursor: grabbing; }
       `}</style>
-      <GridToolbar tasks={tasks} grid={grid} />
+      <GridToolbar projectId={projectId} tasks={tasks} grid={grid} />
       <SectionHeader title="Sheet" subtitle="Every cell is editable — drag column edges to resize, just like a spreadsheet" />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: COLORS.paper, border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: '6px 10px', width: isMobile ? '100%' : 220 }}>

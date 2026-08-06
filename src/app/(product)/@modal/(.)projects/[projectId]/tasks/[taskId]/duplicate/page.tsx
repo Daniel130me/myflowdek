@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, notFound } from 'next/navigation';
 import { DuplicateTaskDialog } from '@/features/flowdeck/components/ui';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useCloseOverlay } from '@/shared/navigation/useCloseOverlay';
@@ -13,6 +13,11 @@ export default function InterceptedDuplicateTaskPage() {
   const projectId = getSingleParam(params.projectId);
   const taskId = getSingleParam(params.taskId);
   const state = useFlowDeck();
+
+  if (!projectId || !taskId) {
+    notFound();
+  }
+
   const close = useCloseOverlay(routes.projectTasks(projectId));
 
   const projectTasks = state.tasksByProject[projectId] ?? [];
@@ -20,7 +25,9 @@ export default function InterceptedDuplicateTaskPage() {
   const projectComments = state.commentsByProject[projectId] ?? [];
 
   const task = projectTasks.find(t => t.id === taskId);
-  if (!task) return null;
+  if (!task) {
+    notFound();
+  }
 
   return (
     <DuplicateTaskDialog
@@ -30,7 +37,7 @@ export default function InterceptedDuplicateTaskPage() {
       hasAttachments={Boolean(projectFiles.some(f => f.linkedTaskId === task.id))}
       onCancel={close}
       onConfirm={opts => {
-        state.duplicateTaskWithOptions(task.id, opts);
+        state.duplicateTaskWithOptions(projectId, task.id, opts);
         close();
       }}
     />

@@ -478,11 +478,13 @@ interface FieldDraft {
 function FormBuilder({
   initial,
   projects,
+  currentProjectId,
   onSave,
   onCancel,
 }: {
   initial?: Form;
   projects: Record<string, Project>;
+  currentProjectId: string | null;
   onSave: (form: Form) => void;
   onCancel: () => void;
 }) {
@@ -490,7 +492,7 @@ function FormBuilder({
   const [name, setName] = useState(initial?.name ?? '');
   const [projectId, setProjectId] = useState(
     initial?.projectId ??
-      (Object.keys(projects)[0] ?? '')
+      (currentProjectId || (Object.keys(projects)[0] ?? ''))
   );
   const [description, setDescription] = useState(initial?.description ?? '');
   const [fields, setFields] = useState<FieldDraft[]>(
@@ -1555,6 +1557,7 @@ export function FormsView({
             <FormBuilder
               initial={editingForm}
               projects={projects}
+              currentProjectId={currentProjectId}
               onSave={handleSave}
               onCancel={handleCancel}
             />

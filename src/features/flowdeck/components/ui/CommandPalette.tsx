@@ -34,15 +34,13 @@ interface CommandPaletteProps {
   onNewProject: () => void;
   /* tasks */
   tasksByProject: Record<string, Task[]>;
-  onOpenTask: (taskId: string) => void;
-  onNewTask: () => void;
+  onOpenTask: (projectId: string, taskId: string) => void;
+  onNewTask: (projectId?: string) => void;
   /* actions */
   onUndo: () => void;
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  /* theme */
-  onToggleTheme: () => void;
 }
 
 export function CommandPalette({
@@ -50,7 +48,6 @@ export function CommandPalette({
   projects, onOpenProject, onNewProject,
   tasksByProject, onOpenTask, onNewTask,
   onUndo, onRedo, canUndo, canRedo,
-  onToggleTheme,
 }: CommandPaletteProps) {
   /* Flatten all tasks across projects for search */
   const allTasks = useMemo(() => {
@@ -93,10 +90,6 @@ export function CommandPalette({
             <span style={{ fontFamily: FF }}>Redo</span>
             <CommandShortcut>⌘⇧Z</CommandShortcut>
           </CommandItem>
-          <CommandItem onSelect={() => handleSelect(onToggleTheme)}>
-            <SunMoon style={{ width: 16, height: 16 }} />
-            <span style={{ fontFamily: FF }}>Toggle Theme</span>
-          </CommandItem>
         </CommandGroup>
 
         <CommandSeparator />
@@ -136,8 +129,7 @@ export function CommandPalette({
               const proj = projects[t._projectId];
               return (
                 <CommandItem key={t.id} onSelect={() => handleSelect(() => {
-                  onOpenProject(t._projectId);
-                  setTimeout(() => onOpenTask(t.id), 50);
+                  onOpenTask(t._projectId, t.id);
                 })}>
                   <span style={{ fontFamily: FF, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {t.name}

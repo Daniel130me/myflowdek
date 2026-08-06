@@ -14,7 +14,7 @@ import { ColumnManager } from './ColumnManager';
 import type { GridActions } from './types';
 import { MobileToolbarSheet } from './MobileToolbarSheet';
 
-export function GridToolbar({ tasks, grid, filterSlot, extraLeft }: { tasks: Task[]; grid: GridActions; filterSlot?: React.ReactNode; extraLeft?: React.ReactNode }) {
+export function GridToolbar({ projectId, tasks, grid, filterSlot, extraLeft }: { projectId: string; tasks: Task[]; grid: GridActions; filterSlot?: React.ReactNode; extraLeft?: React.ReactNode }) {
   const { isMobile } = useViewport();
   const [open, setOpen] = React.useState<string | null>(null);
   const [mobileSheet, setMobileSheet] = React.useState(false);
@@ -31,7 +31,7 @@ export function GridToolbar({ tasks, grid, filterSlot, extraLeft }: { tasks: Tas
           display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10,
         }}>
           <button
-            onClick={e => { e.stopPropagation(); grid.onAddTask(); }}
+            onClick={e => { e.stopPropagation(); grid.onAddTask(projectId); }}
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: COLORS.accent, color: '#FFFFFF', border: 'none', borderRadius: 10, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, fontFamily: FF, boxShadow: '0 1px 3px rgba(254,128,41,0.2)', minHeight: 40 }}
           >
             <Plus size={16} /> Add
@@ -42,7 +42,7 @@ export function GridToolbar({ tasks, grid, filterSlot, extraLeft }: { tasks: Tas
           {hasSelection && <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF, marginRight: 4 }}>{grid.selectedIds.size} selected</span>}
           <button onClick={() => setMobileSheet(true)} style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${COLORS.line}`, borderRadius: 10, background: '#F3F4F6', color: COLORS.ink, cursor: 'pointer' }}><MoreHorizontal size={18} /></button>
         </div>
-        {mobileSheet && <MobileToolbarSheet grid={grid} hasSelection={hasSelection} onClose={() => setMobileSheet(false)} />}
+        {mobileSheet && <MobileToolbarSheet projectId={projectId} grid={grid} hasSelection={hasSelection} onClose={() => setMobileSheet(false)} />}
       </>
     );
   }
@@ -87,7 +87,7 @@ export function GridToolbar({ tasks, grid, filterSlot, extraLeft }: { tasks: Tas
       {extraLeft}
 
       <button
-        onClick={e => { e.stopPropagation(); grid.onAddTask(); }}
+        onClick={e => { e.stopPropagation(); grid.onAddTask(projectId); }}
         style={{ display: 'flex', alignItems: 'center', gap: 6, background: COLORS.accent, color: '#FFFFFF', border: 'none', borderRadius: 10, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0, fontFamily: FF, boxShadow: '0 1px 3px rgba(254,128,41,0.2)' }}
       >
         <Plus size={14} /> Add task
@@ -97,7 +97,7 @@ export function GridToolbar({ tasks, grid, filterSlot, extraLeft }: { tasks: Tas
         disabled: !hasSelection,
         popover: (
           <div>{TEAM.map(m => (
-            <button key={m.id} onClick={() => { grid.onBulkAssign(m.id); setOpen(null); }} style={popoverRowStyle}>
+            <button key={m.id} onClick={() => { grid.onBulkAssign(projectId, m.id); setOpen(null); }} style={popoverRowStyle}>
               <Avatar id={m.id} size={18} /> {m.name}
             </button>
           ))}</div>
@@ -108,7 +108,7 @@ export function GridToolbar({ tasks, grid, filterSlot, extraLeft }: { tasks: Tas
         disabled: !hasSelection,
         popover: (
           <div>{[['none', 'No recurrence'], ['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly']].map(([k, label]) => (
-            <button key={k} onClick={() => { grid.onSetRecurrence(k === 'none' ? null : k); setOpen(null); }} style={popoverRowStyle}>{label}</button>
+            <button key={k} onClick={() => { grid.onSetRecurrence(projectId, k === 'none' ? null : k); setOpen(null); }} style={popoverRowStyle}>{label}</button>
           ))}</div>
         )
       })}
@@ -118,23 +118,23 @@ export function GridToolbar({ tasks, grid, filterSlot, extraLeft }: { tasks: Tas
       {iconBtn(Redo2, 'redo', 'Redo', { onClick: grid.onRedo, disabled: !grid.canRedo })}
 
       <Sep />
-      {iconBtn(Outdent, 'outdent', 'Outdent', { onClick: grid.onOutdent, disabled: !hasSelection })}
-      {iconBtn(Indent, 'indent', 'Indent', { onClick: grid.onIndent, disabled: !hasSelection })}
+      {iconBtn(Outdent, 'outdent', 'Outdent', { onClick: () => grid.onOutdent(projectId), disabled: !hasSelection })}
+      {iconBtn(Indent, 'indent', 'Indent', { onClick: () => grid.onIndent(projectId), disabled: !hasSelection })}
 
       <Sep />
-      {iconBtn(Link2, 'link', 'Link selected tasks', { onClick: grid.onLink, disabled: grid.selectedIds.size < 2 })}
-      {iconBtn(Unlink2, 'unlink', 'Unlink selected tasks', { onClick: grid.onUnlink, disabled: !hasSelection })}
-      {iconBtn(Trash2, 'delete', 'Delete selected', { onClick: grid.onDeleteSelected, disabled: !hasSelection })}
+      {iconBtn(Link2, 'link', 'Link selected tasks', { onClick: () => grid.onLink(projectId), disabled: grid.selectedIds.size < 2 })}
+      {iconBtn(Unlink2, 'unlink', 'Unlink selected tasks', { onClick: () => grid.onUnlink(projectId), disabled: !hasSelection })}
+      {iconBtn(Trash2, 'delete', 'Delete selected', { onClick: () => grid.onDeleteSelected(projectId), disabled: !hasSelection })}
 
       <Sep />
-      {iconBtn(Bold, 'bold', 'Bold text', { onClick: grid.onToggleBold, disabled: !hasSelection })}
+      {iconBtn(Bold, 'bold', 'Bold text', { onClick: () => grid.onToggleBold(projectId), disabled: !hasSelection })}
       {iconBtn(Palette, 'color', 'Colour tag', {
         disabled: !hasSelection,
         popover: (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, width: 140 }}>
             {COLOR_SWATCHES.map((c, i) => (
               <button
-                key={i} onClick={() => { grid.onSetColor(c); setOpen(null); }}
+                key={i} onClick={() => { grid.onSetColor(projectId, c); setOpen(null); }}
                 title={c || 'No colour'}
                 style={{ width: 22, height: 22, borderRadius: 10, cursor: 'pointer', background: c || '#FFFFFF', border: c ? 'none' : `1px dashed ${COLORS.gray}` }}
               />
@@ -143,30 +143,30 @@ export function GridToolbar({ tasks, grid, filterSlot, extraLeft }: { tasks: Tas
         )
       })}
       {iconBtn(Hash, 'numfmt', `Duration: ${grid.durationUnit}`, { onClick: grid.onToggleDurationUnit })}
-      {iconBtn(Diamond, 'milestone', 'Mark as milestone', { onClick: grid.onToggleMilestone, disabled: !hasSelection })}
+      {iconBtn(Diamond, 'milestone', 'Mark as milestone', { onClick: () => grid.onToggleMilestone(projectId), disabled: !hasSelection })}
 
       <Sep />
-      <input ref={importRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) grid.onImportCSV(e.target.files[0]); e.target.value = ''; }} />
+      <input ref={importRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) grid.onImportCSV(projectId, e.target.files[0]); e.target.value = ''; }} />
       {iconBtn(FileUp, 'import', 'Import CSV', { onClick: () => importRef.current?.click() })}
-      {iconBtn(FileDown, 'export', 'Export CSV', { onClick: grid.onExportCSV })}
+      {iconBtn(FileDown, 'export', 'Export CSV', { onClick: () => grid.onExportCSV(projectId) })}
       {iconBtn(Printer, 'print', 'Print', { onClick: grid.onPrint })}
 
       <Sep />
-      {iconBtn(Scissors, 'cut', 'Cut', { onClick: grid.onCut, disabled: !hasSelection })}
-      {iconBtn(Copy, 'copy', 'Copy', { onClick: grid.onCopy, disabled: !hasSelection })}
-      {iconBtn(ClipboardPaste, 'paste', 'Paste', { onClick: grid.onPaste, disabled: !grid.canPaste })}
+      {iconBtn(Scissors, 'cut', 'Cut', { onClick: () => grid.onCut(projectId), disabled: !hasSelection })}
+      {iconBtn(Copy, 'copy', 'Copy', { onClick: () => grid.onCopy(projectId), disabled: !hasSelection })}
+      {iconBtn(ClipboardPaste, 'paste', 'Paste', { onClick: () => grid.onPaste(projectId), disabled: !grid.canPaste })}
 
       <Sep />
-      <input ref={attachRef} type="file" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files?.length) grid.onAttachFiles(e.target.files); e.target.value = ''; }} />
+      <input ref={attachRef} type="file" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files?.length) grid.onAttachFiles(projectId, e.target.files); e.target.value = ''; }} />
       {iconBtn(Paperclip, 'attach', 'Attach files to selected task', { onClick: () => attachRef.current?.click(), disabled: !hasSelection })}
 
       {iconBtn(Columns3, 'column', 'Add or remove columns', {
-        popover: <ColumnManager customCols={grid.customCols} onAddColumn={grid.onAddColumn} onRemoveColumn={grid.onRemoveColumn} />
+        popover: <ColumnManager projectId={projectId} customCols={grid.customCols} onAddColumn={grid.onAddColumn} onRemoveColumn={grid.onRemoveColumn} />
       })}
 
       {filterSlot}
 
-      {iconBtn(Share2, 'share', 'Share project', { onClick: grid.onOpenShare })}
+      {iconBtn(Share2, 'share', 'Share project', { onClick: () => grid.onOpenShare(projectId) })}
 
       <span style={{ marginLeft: 'auto', fontSize: 11.5, color: COLORS.gray, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: FF }}>
         {hasSelection ? `${grid.selectedIds.size} selected` : 'Select rows to enable row actions'}

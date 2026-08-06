@@ -13,26 +13,26 @@ import { useViewport } from '../../hooks/useViewport';
 interface BulkActionBarProps {
   count: number;
   onClearSelection: () => void;
-  onBulkAssign: (memberId: string) => void;
-  onSetPriority: (priority: string) => void;
-  onComplete: () => void;
-  onDelete: () => void;
-  onLink: () => void;
-  onUnlink: () => void;
-  onBold: () => void;
-  onMilestone: () => void;
-  onAttachFiles: (fileList: FileList) => void;
+  onBulkAssign: (projectId: string, memberId: string) => void;
+  onSetPriority: (projectId: string, priority: string) => void;
+  onComplete: (projectId: string) => void;
+  onDelete: (projectId: string) => void;
+  onLink: (projectId: string) => void;
+  onUnlink: (projectId: string) => void;
+  onBold: (projectId: string) => void;
+  onMilestone: (projectId: string) => void;
+  onAttachFiles: (projectId: string, fileList: FileList) => void;
   /* #30: Bulk duplicate */
-  onDuplicateBulk?: () => void;
+  onDuplicateBulk?: (projectId: string) => void;
   /* #34: Extended bulk operations */
-  onBulkSetDueDate?: (date: string | null) => void;
-  onBulkAddTag?: (tagId: string) => void;
-  onBulkRemoveTag?: (tagId: string) => void;
-  onBulkSetStatus?: (status: string) => void;
-  onBulkMoveToProject?: (targetProjectId: string) => void;
+  onBulkSetDueDate?: (projectId: string, date: string | null) => void;
+  onBulkAddTag?: (projectId: string, tagId: string) => void;
+  onBulkRemoveTag?: (projectId: string, tagId: string) => void;
+  onBulkSetStatus?: (projectId: string, status: string) => void;
+  onBulkMoveToProject?: (projectId: string, targetProjectId: string) => void;
   tags?: Tag[];
   projects?: Record<string, Project>;
-  currentProjectId?: string | null;
+  currentProjectId: string;
 }
 
 export function BulkActionBar({
@@ -114,7 +114,7 @@ export function BulkActionBar({
       <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.12)', margin: '0 3px', flexShrink: 0 }} />
 
       {/* Complete */}
-      <button onClick={onComplete} title="Mark complete" style={btnStyle()}>
+      <button onClick={() => onComplete(currentProjectId)} title="Mark complete" style={btnStyle()}>
         <CheckCircle2 size={isMobile ? 17 : 15} />
       </button>
 
@@ -128,7 +128,7 @@ export function BulkActionBar({
             <div onClick={closeAll} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
             <div style={popover}>
               {TEAM.map(m => (
-                <button key={m.id} onClick={() => { onBulkAssign(m.id); closeAll(); }} style={popItem(m.name, COLORS.ink)}>
+                <button key={m.id} onClick={() => { onBulkAssign(currentProjectId, m.id); closeAll(); }} style={popItem(m.name, COLORS.ink)}>
                   <div style={{ width: 8, height: 8, borderRadius: 4, background: m.color }} />
                   {m.name}
                 </button>
@@ -148,7 +148,7 @@ export function BulkActionBar({
             <div onClick={closeAll} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
             <div style={popover}>
               {Object.entries(PRIORITY_META).map(([k, v]) => (
-                <button key={k} onClick={() => { onSetPriority(k); closeAll(); }} style={popItem(v.label, v.color)}>
+                <button key={k} onClick={() => { onSetPriority(currentProjectId, k); closeAll(); }} style={popItem(v.label, v.color)}>
                   <Flag size={13} color={v.color} />
                   {v.label}
                 </button>
@@ -169,7 +169,7 @@ export function BulkActionBar({
               <div onClick={closeAll} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
               <div style={popover}>
                 {STATUS_ORDER.map(s => (
-                  <button key={s} onClick={() => { onBulkSetStatus(s); closeAll(); }} style={popItem(STATUS_META[s].label, STATUS_META[s].color)}>
+                  <button key={s} onClick={() => { onBulkSetStatus(currentProjectId, s); closeAll(); }} style={popItem(STATUS_META[s].label, STATUS_META[s].color)}>
                     <span style={{ width: 8, height: 8, borderRadius: 2, background: STATUS_META[s].color }} />
                     {STATUS_META[s].label}
                   </button>
@@ -192,7 +192,7 @@ export function BulkActionBar({
               <div style={{ ...popover, minWidth: 220 }}>
                 <div style={{ padding: '4px 10px 6px', fontSize: 11, fontWeight: 700, color: COLORS.gray, fontFamily: FF, letterSpacing: 0.5 }}>ADD TAG</div>
                 {tags.map(tag => (
-                  <button key={'a-' + tag.id} onClick={() => { onBulkAddTag(tag.id); closeAll(); }} style={popItem(tag.name, COLORS.ink)}>
+                  <button key={'a-' + tag.id} onClick={() => { onBulkAddTag(currentProjectId, tag.id); closeAll(); }} style={popItem(tag.name, COLORS.ink)}>
                     <span style={{ width: 10, height: 10, borderRadius: 3, background: tag.color, flexShrink: 0 }} />
                     {tag.name}
                   </button>
@@ -200,7 +200,7 @@ export function BulkActionBar({
                 <div style={{ height: 1, background: COLORS.line, margin: '4px 0' }} />
                 <div style={{ padding: '4px 10px 6px', fontSize: 11, fontWeight: 700, color: COLORS.gray, fontFamily: FF, letterSpacing: 0.5 }}>REMOVE TAG</div>
                 {tags.map(tag => (
-                  <button key={'r-' + tag.id} onClick={() => { onBulkRemoveTag?.(tag.id); closeAll(); }} style={popItem(tag.name, COLORS.red)}>
+                  <button key={'r-' + tag.id} onClick={() => { onBulkRemoveTag?.(currentProjectId, tag.id); closeAll(); }} style={popItem(tag.name, COLORS.red)}>
                     <span style={{ width: 10, height: 10, borderRadius: 3, background: tag.color, flexShrink: 0 }} />
                     {tag.name}
                   </button>
@@ -225,12 +225,12 @@ export function BulkActionBar({
                   <input
                     autoFocus
                     type="date"
-                    onChange={e => { onBulkSetDueDate(e.target.value || null); closeAll(); }}
+                    onChange={e => { onBulkSetDueDate(currentProjectId, e.target.value || null); closeAll(); }}
                     onKeyDown={e => { if (e.key === 'Escape') closeAll(); }}
                     style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 8, padding: '6px 8px', fontSize: 13, fontFamily: FF, outline: 'none', width: '100%', boxSizing: 'border-box' }}
                   />
                 </div>
-                <button onClick={() => { onBulkSetDueDate(null); closeAll(); }} style={{ ...popItem('Clear due date', COLORS.gray), marginTop: 2 }}>
+                <button onClick={() => { onBulkSetDueDate(currentProjectId, null); closeAll(); }} style={{ ...popItem('Clear due date', COLORS.gray), marginTop: 2 }}>
                   <X size={13} /> Clear due date
                 </button>
               </div>
@@ -250,7 +250,7 @@ export function BulkActionBar({
               <div onClick={closeAll} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
               <div style={popover}>
                 {otherProjects.map(p => (
-                  <button key={p.id} onClick={() => { onBulkMoveToProject(p.id); closeAll(); }} style={popItem(p.name, COLORS.ink)}>
+                  <button key={p.id} onClick={() => { onBulkMoveToProject(currentProjectId, p.id); closeAll(); }} style={popItem(p.name, COLORS.ink)}>
                     <span style={{ width: 10, height: 10, borderRadius: 3, background: p.color, flexShrink: 0 }} />
                     {p.name}
                   </button>
@@ -262,32 +262,32 @@ export function BulkActionBar({
       )}
 
       {/* Link / Unlink deps */}
-      <button onClick={onLink} title="Link dependencies" style={btnStyle()}>
+      <button onClick={() => onLink(currentProjectId)} title="Link dependencies" style={btnStyle()}>
         <Link2 size={isMobile ? 17 : 15} />
       </button>
-      <button onClick={onUnlink} title="Unlink dependencies" style={btnStyle()}>
+      <button onClick={() => onUnlink(currentProjectId)} title="Unlink dependencies" style={btnStyle()}>
         <Unlink2 size={isMobile ? 17 : 15} />
       </button>
 
       {/* Bold */}
-      <button onClick={onBold} title="Toggle bold" style={btnStyle()}>
+      <button onClick={() => onBold(currentProjectId)} title="Toggle bold" style={btnStyle()}>
         <Bold size={isMobile ? 17 : 15} />
       </button>
 
       {/* Milestone */}
-      <button onClick={onMilestone} title="Toggle milestone" style={btnStyle()}>
+      <button onClick={() => onMilestone(currentProjectId)} title="Toggle milestone" style={btnStyle()}>
         <Milestone size={isMobile ? 17 : 15} />
       </button>
 
       {/* #30: Bulk duplicate */}
       {onDuplicateBulk && (
-        <button onClick={onDuplicateBulk} title="Duplicate selected" style={btnStyle()}>
+        <button onClick={() => onDuplicateBulk(currentProjectId)} title="Duplicate selected" style={btnStyle()}>
           <Copy size={isMobile ? 17 : 15} />
         </button>
       )}
 
       {/* Attach files */}
-      <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files?.length) onAttachFiles(e.target.files); e.target.value = ''; }} />
+      <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files?.length) onAttachFiles(currentProjectId, e.target.files); e.target.value = ''; }} />
       <button onClick={() => fileRef.current?.click()} title="Attach files" style={btnStyle()}>
         <FileUp size={isMobile ? 17 : 15} />
       </button>
@@ -295,7 +295,7 @@ export function BulkActionBar({
       <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.12)', margin: '0 3px', flexShrink: 0 }} />
 
       {/* Delete */}
-      <button onClick={onDelete} title="Delete" style={dangerBtn}>
+      <button onClick={() => onDelete(currentProjectId)} title="Delete" style={dangerBtn}>
         <Trash2 size={isMobile ? 17 : 15} />
       </button>
 

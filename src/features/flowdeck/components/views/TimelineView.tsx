@@ -115,7 +115,8 @@ type LayoutRow = Row & {
 
 /* ------------------------------------------------------------------ component ------------------------------------------------------------------ */
 
-export function TimelineView({ project, tasks, onOpenTask, onToggleComplete, onUpdateTask, grid }: {
+export function TimelineView({ projectId, project, tasks, onOpenTask, onToggleComplete, onUpdateTask, grid }: {
+  projectId: string;
   project: Project;
   tasks: Task[];
   onOpenTask: (id: string) => void;
@@ -430,7 +431,7 @@ export function TimelineView({ project, tasks, onOpenTask, onToggleComplete, onU
 
     return (
       <div>
-        <GridToolbar tasks={tasks} grid={grid} />
+        <GridToolbar projectId={projectId} tasks={tasks} grid={grid} />
         <SectionHeader title="Timeline" subtitle="Tap a task to view details" />
 
         {/* Group mode selector */}
@@ -659,7 +660,7 @@ export function TimelineView({ project, tasks, onOpenTask, onToggleComplete, onU
 
   return (
     <div>
-      <GridToolbar tasks={tasks} grid={grid} />
+      <GridToolbar projectId={projectId} tasks={tasks} grid={grid} />
       <SectionHeader title="Timeline" subtitle="Click a bar to view or edit task details · lines show dependencies" />
 
       {/* Toolbar */}

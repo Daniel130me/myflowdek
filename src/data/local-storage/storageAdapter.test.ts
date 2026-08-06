@@ -69,3 +69,13 @@ test('migrateState assigns projectId from collection key for legacy tasksByProje
   assert.strictEqual(migrated.tasksByProject?.p1[0].projectId, 'p1');
 });
 
+test('migrateState enforces collection key as projectId even if task has wrong projectId', () => {
+  const sample = {
+    tasksByProject: {
+      p2: [{ id: 't1', projectId: 'p1', name: 'Task 1' }],
+    },
+  };
+  const migrated = migrateState(sample);
+  assert.strictEqual(migrated.tasksByProject?.p2[0].projectId, 'p2');
+});
+

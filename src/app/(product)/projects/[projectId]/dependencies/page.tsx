@@ -1,22 +1,29 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams, notFound } from 'next/navigation';
 import { DependenciesView } from '@/features/flowdeck/components/views';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { routes } from '@/shared/navigation/routes';
+import { getSingleParam } from '@/shared/utils/routeParams';
 
 export default function ProjectDependenciesPage() {
   const router = useRouter();
+  const params = useParams();
+  const projectId = getSingleParam(params.projectId);
   const state = useFlowDeck();
+
+  if (!projectId) {
+    notFound();
+  }
+
+  const tasks = state.tasksByProject[projectId] ?? [];
 
   return (
     <DependenciesView
-      tasks={state.tasks}
+      tasks={tasks}
       onOpenTask={id => {
-        if (state.currentProjectId) {
-          router.push(routes.task(state.currentProjectId, id));
-        }
+        router.push(routes.task(projectId, id));
       }}
     />
   );

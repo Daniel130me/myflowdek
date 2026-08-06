@@ -232,7 +232,7 @@ export function migrateState(rawState: unknown): PersistedState {
       if (Array.isArray(tasks)) {
         migratedTasksByProject[projectId] = tasks.map((task: any) => ({
           ...task,
-          projectId: task.projectId || projectId,
+          projectId: projectId, // Enforce collection key as projectId
         }));
       }
     }

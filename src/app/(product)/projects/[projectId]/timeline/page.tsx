@@ -1,34 +1,43 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams, notFound } from 'next/navigation';
 import { TimelineView } from '@/features/flowdeck/components/views';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { routes } from '@/shared/navigation/routes';
+import { getSingleParam } from '@/shared/utils/routeParams';
 
 export default function ProjectTimelinePage() {
   const router = useRouter();
+  const params = useParams();
+  const projectId = getSingleParam(params.projectId);
   const state = useFlowDeck();
 
-  if (!state.project) {
-    return (
-      <div style={{ padding: 32, textAlign: 'center', color: '#6B7280' }}>
-        Loading timeline…
-      </div>
-    );
+  if (!projectId) {
+    notFound();
   }
+
+  const project = state.projects[projectId];
+  if (!project) {
+    notFound();
+  }
+
+  const tasks = state.tasksByProject[projectId] ?? [];
+  const filteredTasks = tasks.filter(t => 
+    t.name.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
+    t.description?.toLowerCase().includes(state.searchQuery.toLowerCase())
+  );
 
   return (
     <TimelineView
-      project={state.project}
-      tasks={state.filteredTasks}
+      projectId={projectId}
+      project={project}
+      tasks={filteredTasks}
       onOpenTask={id => {
-        if (state.currentProjectId) {
-          router.push(routes.task(state.currentProjectId, id));
-        }
+        router.push(routes.task(projectId, id));
       }}
-      onToggleComplete={(id) => state.toggleComplete(state.project!.id, id)}
-      onUpdateTask={(id, patch) => state.updateTask(state.project!.id, id, patch)}
+      onToggleComplete={(id) => state.toggleComplete(projectId, id)}
+      onUpdateTask={(id, patch) => state.updateTask(projectId, id, patch)}
       grid={state.gridActions}
     />
   );

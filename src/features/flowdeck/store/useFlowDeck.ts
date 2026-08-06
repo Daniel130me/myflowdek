@@ -53,6 +53,7 @@ export interface FlowDeckState {
   filesByProject: Record<string, FileItem[]>;
   raidByProject: Record<string, RaidItem[]>;
   customColsByProject: Record<string, CustomColumn[]>;
+  statusUpdatesByProject: Record<string, ProjectStatusUpdate[]>;
   tagsByProject: Record<string, Tag[]>;
   commentsByProject: Record<string, Comment[]>;
   activityByProject: Record<string, ActivityEntry[]>;
@@ -119,18 +120,18 @@ export interface FlowDeckState {
   updateTask: (projectId: string, taskId: string, patch: Partial<Task>) => void;
   addTask: (projectId: string, input: CreateTaskInput | Task) => void;
   removeTask: (projectId: string, taskId: string) => void;
-  removeTasksBulk: (ids: Set<string>) => void;
-  duplicateTask: (id: string) => void;
+  removeTasksBulk: (projectId: string, ids: Set<string>) => void;
+  duplicateTask: (projectId: string, id: string) => void;
   moveStatus: (projectId: string, taskId: string, status: string) => void;
   toggleComplete: (projectId: string, taskId: string) => void;
   addFiles: (projectId: string, files: FileItem[]) => void;
   removeFile: (projectId: string, fileId: string) => void;
   linkFile: (projectId: string, fileId: string, linkedTaskId: string | null) => void;
-  addRaidItem: (item: RaidItem) => void;
-  updateRaidItem: (id: string, patch: Partial<RaidItem>) => void;
-  removeRaidItem: (id: string) => void;
-  addColumn: (def: CustomColumn) => void;
-  removeColumn: (key: string) => void;
+  addRaidItem: (projectId: string, item: RaidItem) => void;
+  updateRaidItem: (projectId: string, id: string, patch: Partial<RaidItem>) => void;
+  removeRaidItem: (projectId: string, id: string) => void;
+  addColumn: (projectId: string, def: CustomColumn) => void;
+  removeColumn: (projectId: string, key: string) => void;
   openFileViewer: (fileId: string) => void;
   /* Tags */
   addTag: (projectId: string, tag: Tag) => void;
@@ -152,16 +153,19 @@ export interface FlowDeckState {
   reorderTask: (projectId: string, taskId: string, toIndex: number) => void;
   quickAddTask: (projectId: string, name: string, opts?: { status?: string; parentId?: string | null; startOverride?: string }) => string | undefined;
   /* Batch 6 */
-  duplicateTaskWithOptions: (id: string, opts: { includeSubtasks: boolean; includeComments: boolean; includeAttachments: boolean }) => void;
-  duplicateTasksBulk: (ids: Set<string>) => void;
-  moveTaskToProject: (taskId: string, targetProjectId: string) => void;
-  moveTasksToProjectBulk: (ids: Set<string>, targetProjectId: string) => void;
+  duplicateTaskWithOptions: (projectId: string, id: string, opts: { includeSubtasks: boolean; includeComments: boolean; includeAttachments: boolean }) => void;
+  duplicateTasksBulk: (projectId: string, ids: Set<string>) => void;
+  moveTaskToProject: (sourceProjectId: string, taskId: string, targetProjectId: string) => void;
+  moveTasksToProjectBulk: (sourceProjectId: string, ids: Set<string>, targetProjectId: string) => void;
   promoteSubtask: (projectId: string, taskId: string) => void;
   demoteToSubtask: (projectId: string, taskId: string, newParentId: string) => void;
-  bulkSetDueDate: (ids: Set<string>, date: string | null) => void;
-  bulkAddTag: (ids: Set<string>, tagId: string) => void;
-  bulkRemoveTag: (ids: Set<string>, tagId: string) => void;
-  bulkSetStatus: (ids: Set<string>, status: string) => void;
+  bulkSetDueDate: (projectId: string, ids: Set<string>, date: string | null) => void;
+  bulkAddTag: (projectId: string, ids: Set<string>, tagId: string) => void;
+  bulkRemoveTag: (projectId: string, ids: Set<string>, tagId: string) => void;
+  bulkSetStatus: (projectId: string, ids: Set<string>, status: string) => void;
+  bulkAssign: (projectId: string, ids: Set<string>, memberId: string) => void;
+  bulkSetPriority: (projectId: string, ids: Set<string>, priority: TaskPriority) => void;
+  bulkComplete: (projectId: string, ids: Set<string>) => void;
   /* #35: Sections */
   sections: Section[];
   addSection: (projectId: string, name: string) => void;
@@ -177,9 +181,9 @@ export interface FlowDeckState {
   restoreProject: (projectId: string) => void;
   setProjectMembers: (projectId: string, members: string[]) => void;
   projectStatusUpdates: ProjectStatusUpdate[];
-  addProjectStatusUpdate: (text: string, color: 'green' | 'yellow' | 'red') => void;
-  deleteProjectStatusUpdate: (id: string) => void;
-  saveProjectAsTemplate: (name: string, includeTasks: boolean) => void;
+  addProjectStatusUpdate: (projectId: string, text: string, color: 'green' | 'yellow' | 'red') => void;
+  deleteProjectStatusUpdate: (projectId: string, id: string) => void;
+  saveProjectAsTemplate: (projectId: string, name: string, includeTasks: boolean) => void;
   /* #47: Goals / OKRs */
   goals: Goal[];
   keyResults: KeyResult[];
@@ -238,7 +242,7 @@ export function useFlowDeckStore(): FlowDeckState {
   const [tasksByProject, setTasksByProject] = useState<Record<string, Task[]>>(initialTasks);
   const [filesByProject, setFilesByProject] = useState<Record<string, FileItem[]>>(initialFiles);
   const [raidByProject, setRaidByProject] = useState<Record<string, RaidItem[]>>(initialRaid);
-  const [customColsByProject, setCustomColsByProject] = useState<Record<string, CustomColumn[]>>({ p1: [], p2: [] });
+  const [customColsByProject, setCustomColsByProject] = useState<Record<string, CustomColumn[]>>({});
   const [tagsByProject, setTagsByProject] = useState<Record<string, Tag[]>>(INITIAL_TAGS);
   const [commentsByProject, setCommentsByProject] = useState<Record<string, Comment[]>>(initialComments);
 
@@ -274,20 +278,7 @@ export function useFlowDeckStore(): FlowDeckState {
     setHydrated(true);
   }, []);
 
-  const [activityByProject, setActivityByProject] = useState<Record<string, ActivityEntry[]>>({
-    p1: [
-      { id: 'a1', taskId: 't1', type: 'completed', description: 'Wale Johnson marked as done', authorId: 'u5', timestamp: '2026-07-05T16:00:00' },
-      { id: 'a2', taskId: 't2', type: 'completed', description: 'Ada Coker marked as done', authorId: 'u1', timestamp: '2026-07-04T18:00:00' },
-      { id: 'a3', taskId: 't3', type: 'completed', description: 'Ada Coker marked as done', authorId: 'u1', timestamp: '2026-07-11T17:00:00' },
-      { id: 'a4', taskId: 't4', type: 'status_change', description: 'Wale Johnson changed status to In Progress', authorId: 'u5', timestamp: '2026-07-08T09:00:00' },
-      { id: 'a5', taskId: 't6', type: 'status_change', description: 'Ada Coker changed status to In Progress', authorId: 'u1', timestamp: '2026-07-18T09:00:00' },
-      { id: 'a6', taskId: 't6a', type: 'completed', description: 'Ada Coker marked as done', authorId: 'u1', timestamp: '2026-07-19T17:00:00' },
-      { id: 'a7', taskId: 't6b', type: 'completed', description: 'Ada Coker marked as done', authorId: 'u1', timestamp: '2026-07-21T16:00:00' },
-    ],
-    p2: [
-      { id: 'a8', taskId: 'm1', type: 'status_change', description: 'Wale Johnson changed status to In Progress', authorId: 'u5', timestamp: '2026-08-03T09:00:00' },
-    ],
-  });
+  const [activityByProject, setActivityByProject] = useState<Record<string, ActivityEntry[]>>({});
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState('projects');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -307,11 +298,7 @@ export function useFlowDeckStore(): FlowDeckState {
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_FILTERS);
   const [timeLogsByProject, setTimeLogsByProject] = useState<Record<string, TimeLog[]>>(initialTimeLogs);
   const [sectionsByProject, setSectionsByProject] = useState<Record<string, Section[]>>({});
-  const [statusUpdatesByProject, setStatusUpdatesByProject] = useState<Record<string, ProjectStatusUpdate[]>>({
-    p1: [
-      { id: 'su1', projectId: 'p1', authorId: 'u5', text: 'Design phase on track. Stakeholder interviews complete, wireframes approved. Moving into development sprint next week.', color: 'green', createdAt: '2026-07-15T10:00:00' },
-    ],
-  });
+  const [statusUpdatesByProject, setStatusUpdatesByProject] = useState<Record<string, ProjectStatusUpdate[]>>({});
 
   /* #47: Goals & Key Results */
   const [goals, setGoals] = useState<Goal[]>([  
@@ -586,12 +573,12 @@ export function useFlowDeckStore(): FlowDeckState {
     }
   }, [tasksByProject, commit, logActivity]);
 
-  const updateTasksBulk = useCallback((ids: Set<string>, patch: Partial<Task> | ((t: Task) => Partial<Task>)) => {
-    if (currentProjectId) {
-      const projectTasks = tasksByProject[currentProjectId] || [];
-      commit(currentProjectId, projectTasks.map(t => ids.has(t.id) ? { ...t, ...(typeof patch === 'function' ? patch(t) : patch) } : t));
+  const updateTasksBulk = useCallback((projectId: string, ids: Set<string>, patch: Partial<Task> | ((t: Task) => Partial<Task>)) => {
+    if (projectId) {
+      const projectTasks = tasksByProject[projectId] || [];
+      commit(projectId, projectTasks.map(t => ids.has(t.id) ? { ...t, ...(typeof patch === 'function' ? patch(t) : patch) } : t));
     }
-  }, [tasksByProject, currentProjectId, commit]);
+  }, [tasksByProject, commit]);
 
   const addTask = useCallback((projectId: string, input: CreateTaskInput | Task) => {
     const projectTasks = tasksByProject[projectId] || [];
@@ -623,12 +610,12 @@ export function useFlowDeckStore(): FlowDeckState {
     logActivity(projectId, id, 'created', `Task "${newTask.name}" was created`);
     toast.success('Task created', { description: newTask.name });
   }, [tasksByProject, commit, logActivity]);
-  const addTasksBulk = useCallback((newTasks: Task[]) => {
-    if (currentProjectId) {
-      const projectTasks = tasksByProject[currentProjectId] || [];
-      commit(currentProjectId, [...projectTasks, ...newTasks]);
+  const addTasksBulk = useCallback((projectId: string, newTasks: Task[]) => {
+    if (projectId) {
+      const projectTasks = tasksByProject[projectId] || [];
+      commit(projectId, [...projectTasks, ...newTasks]);
     }
-  }, [tasksByProject, currentProjectId, commit]);
+  }, [tasksByProject, commit]);
 
   const moveStatus = useCallback((projectId: string, id: string, status: string) => {
     const s = status as TaskStatus;
@@ -655,20 +642,63 @@ export function useFlowDeckStore(): FlowDeckState {
     toast.success('Task deleted', { description: task?.name || 'Task' });
   }, [tasksByProject, commit]);
 
-  const removeTasksBulk = useCallback((ids: Set<string>) => {
-    if (!currentProjectId) return;
+  const removeTasksBulk = useCallback((projectId: string, ids: Set<string>) => {
+    if (!projectId) return;
     const count = ids.size;
-    const projectTasks = tasksByProject[currentProjectId] || [];
-    commit(currentProjectId, projectTasks.filter(t => !ids.has(t.id)));
+    const projectTasks = tasksByProject[projectId] || [];
+    commit(projectId, projectTasks.filter(t => !ids.has(t.id)));
     setSelectedIds(new Set());
     toast.success(`${count} task${count > 1 ? 's' : ''} deleted`);
-  }, [currentProjectId, tasksByProject, commit]);
+  }, [tasksByProject, commit]);
 
-  const indentSelected = useCallback(() => updateTasksBulk(selectedIds, t => ({ level: Math.min(4, (t.level || 0) + 1) })), [selectedIds, updateTasksBulk]);
-  const outdentSelected = useCallback(() => updateTasksBulk(selectedIds, t => ({ level: Math.max(0, (t.level || 0) - 1) })), [selectedIds, updateTasksBulk]);
-  const linkSelected = useCallback(() => {
-    if (!currentProjectId) return;
-    const projectTasks = tasksByProject[currentProjectId] || [];
+  const bulkSetDueDate = useCallback((projectId: string, ids: Set<string>, date: string | null) => {
+    updateTasksBulk(projectId, ids, { dueDate: date || undefined });
+    toast.success(date ? `Due date set for ${ids.size} task${ids.size > 1 ? 's' : ''}` : `Due date cleared for ${ids.size} task${ids.size > 1 ? 's' : ''}`);
+  }, [updateTasksBulk]);
+
+  const bulkAddTag = useCallback((projectId: string, ids: Set<string>, tagId: string) => {
+    updateTasksBulk(projectId, ids, (t) => {
+      const current = t.tags || [];
+      return { tags: current.includes(tagId) ? current : [...current, tagId] };
+    });
+    toast.success(`Tag added to ${ids.size} task${ids.size > 1 ? 's' : ''}`);
+  }, [updateTasksBulk]);
+
+  const bulkRemoveTag = useCallback((projectId: string, ids: Set<string>, tagId: string) => {
+    updateTasksBulk(projectId, ids, (t) => ({
+      tags: (t.tags || []).filter(tid => tid !== tagId),
+    }));
+    toast.success(`Tag removed from ${ids.size} task${ids.size > 1 ? 's' : ''}`);
+  }, [updateTasksBulk]);
+
+  const bulkSetStatus = useCallback((projectId: string, ids: Set<string>, status: string) => {
+    const s = status as TaskStatus;
+    const progress = s === 'done' ? 100 : s === 'backlog' ? 0 : undefined;
+    updateTasksBulk(projectId, ids, progress !== undefined ? { status: s, progress } : { status: s });
+    toast.success(`${ids.size} task${ids.size > 1 ? 's' : ''} set to ${STATUS_META[s]?.label || s}`);
+  }, [updateTasksBulk]);
+
+  const bulkAssign = useCallback((projectId: string, ids: Set<string>, memberId: string) => {
+    updateTasksBulk(projectId, ids, { assignee: memberId });
+    const member = TEAM.find(m => m.id === memberId);
+    toast.success(`Assigned ${ids.size} task${ids.size > 1 ? 's' : ''} to ${member?.name || 'someone'}`);
+  }, [updateTasksBulk]);
+
+  const bulkSetPriority = useCallback((projectId: string, ids: Set<string>, priority: TaskPriority) => {
+    updateTasksBulk(projectId, ids, { priority });
+    toast.success(`Priority set to ${PRIORITY_META[priority].label} for ${ids.size} task${ids.size > 1 ? 's' : ''}`);
+  }, [updateTasksBulk]);
+
+  const bulkComplete = useCallback((projectId: string, ids: Set<string>) => {
+    updateTasksBulk(projectId, ids, { status: 'done', progress: 100 });
+    toast.success(`Completed ${ids.size} task${ids.size > 1 ? 's' : ''}`);
+  }, [updateTasksBulk]);
+
+  const indentSelected = useCallback((projectId: string) => updateTasksBulk(projectId, selectedIds, (t: Task) => ({ level: Math.min(4, (t.level || 0) + 1) })), [selectedIds, updateTasksBulk]);
+  const outdentSelected = useCallback((projectId: string) => updateTasksBulk(projectId, selectedIds, (t: Task) => ({ level: Math.max(0, (t.level || 0) - 1) })), [selectedIds, updateTasksBulk]);
+  const linkSelected = useCallback((projectId: string) => {
+    if (!projectId) return;
+    const projectTasks = tasksByProject[projectId] || [];
     const ordered = projectTasks.filter(t => selectedIds.has(t.id));
     if (ordered.length < 2) return;
     const next = projectTasks.map(t => ({ ...t, deps: [...t.deps] }));
@@ -677,76 +707,84 @@ export function useFlowDeckStore(): FlowDeckState {
       const predId = ordered[i - 1].id;
       if (successor && !successor.deps.includes(predId)) successor.deps.push(predId);
     }
-    commit(currentProjectId, next);
-  }, [currentProjectId, selectedIds, tasksByProject, commit]);
-  const unlinkSelected = useCallback(() => {
-    if (!currentProjectId) return;
-    const projectTasks = tasksByProject[currentProjectId] || [];
-    commit(currentProjectId, projectTasks.map(t => selectedIds.has(t.id) ? { ...t, deps: t.deps.filter(d => !selectedIds.has(d)) } : t));
-  }, [currentProjectId, selectedIds, tasksByProject, commit]);
-  const bulkAssign = useCallback((memberId: string) => updateTasksBulk(selectedIds, { assignee: memberId }), [selectedIds, updateTasksBulk]);
-  const setRecurrenceSelected = useCallback((freq: string | null) => updateTasksBulk(selectedIds, { recurrence: freq }), [selectedIds, updateTasksBulk]);
-  const toggleBoldSelected = useCallback(() => {
-    const anyBold = tasks.some(t => selectedIds.has(t.id) && t.bold);
-    updateTasksBulk(selectedIds, { bold: !anyBold });
-  }, [selectedIds, tasks, updateTasksBulk]);
-  const setColorSelected = useCallback((color: string | null) => updateTasksBulk(selectedIds, { color }), [selectedIds, updateTasksBulk]);
-  const toggleMilestoneSelected = useCallback(() => {
-    const anyMilestone = tasks.some(t => selectedIds.has(t.id) && t.milestone);
-    updateTasksBulk(selectedIds, { milestone: !anyMilestone });
-  }, [selectedIds, tasks, updateTasksBulk]);
-  const copySelected = useCallback(() => setClipboard({ items: tasks.filter(t => selectedIds.has(t.id)).map(t => ({ ...t })), mode: 'copy' }), [selectedIds, tasks]);
-  const cutSelected = useCallback(() => {
-    setClipboard({ items: tasks.filter(t => selectedIds.has(t.id)).map(t => ({ ...t })), mode: 'cut' });
-    removeTasksBulk(selectedIds);
-  }, [selectedIds, tasks, removeTasksBulk]);
-  const paste = useCallback(() => {
-    if (!clipboard.items.length) return;
-    const clones = clipboard.items.map(t => ({ ...t, id: defaultIdGenerator.generate('t'), name: t.name + ' (copy)' }));
-    addTasksBulk(clones);
+    commit(projectId, next);
+  }, [selectedIds, tasksByProject, commit]);
+  const unlinkSelected = useCallback((projectId: string) => {
+    if (!projectId) return;
+    const projectTasks = tasksByProject[projectId] || [];
+    commit(projectId, projectTasks.map(t => selectedIds.has(t.id) ? { ...t, deps: t.deps.filter(d => !selectedIds.has(d)) } : t));
+  }, [selectedIds, tasksByProject, commit]);
+  const setRecurrenceSelected = useCallback((projectId: string, freq: string | null) => updateTasksBulk(projectId, selectedIds, { recurrence: freq }), [selectedIds, updateTasksBulk]);
+  const toggleBoldSelected = useCallback((projectId: string) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const anyBold = projectTasks.some(t => selectedIds.has(t.id) && t.bold);
+    updateTasksBulk(projectId, selectedIds, { bold: !anyBold });
+  }, [selectedIds, tasksByProject, updateTasksBulk]);
+  const setColorSelected = useCallback((projectId: string, color: string | null) => updateTasksBulk(projectId, selectedIds, { color }), [selectedIds, updateTasksBulk]);
+  const toggleMilestoneSelected = useCallback((projectId: string) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const anyMilestone = projectTasks.some(t => selectedIds.has(t.id) && t.milestone);
+    updateTasksBulk(projectId, selectedIds, { milestone: !anyMilestone });
+  }, [selectedIds, tasksByProject, updateTasksBulk]);
+  const copySelected = useCallback((projectId: string) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    setClipboard({ items: projectTasks.filter(t => selectedIds.has(t.id)).map(t => ({ ...t })), mode: 'copy' });
+  }, [selectedIds, tasksByProject]);
+  const cutSelected = useCallback((projectId: string) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    setClipboard({ items: projectTasks.filter(t => selectedIds.has(t.id)).map(t => ({ ...t })), mode: 'cut' });
+    removeTasksBulk(projectId, selectedIds);
+  }, [selectedIds, tasksByProject, removeTasksBulk]);
+  const paste = useCallback((projectId: string) => {
+    if (!clipboard.items.length || !projectId) return;
+    const clones = clipboard.items.map(t => ({ ...t, id: defaultIdGenerator.generate('t'), projectId, name: t.name + ' (copy)' }));
+    addTasksBulk(projectId, clones);
   }, [clipboard.items, addTasksBulk]);
 
-  const importCSV = useCallback((file: File) => {
+  const importCSV = useCallback((projectId: string, file: File) => {
+    if (!projectId) return;
     Papa.parse(file, {
       header: true, skipEmptyLines: true,
       complete: (res) => {
         const rows = (res.data as Record<string, string>[]).map(r => {
           const member = TEAM.find(m => m.name.toLowerCase() === (r.assignee || '').toLowerCase());
-          return { id: defaultIdGenerator.generate('t'), projectId: currentProjectId || 'p1', name: r.name || 'Untitled task', description: r.description || undefined, assignee: member ? member.id : TEAM[0].id, start: r.start || TODAY.toISOString().slice(0, 10), duration: Number(r.duration) || 3, progress: Number(r.progress) || 0, priority: (PRIORITY_META[r.priority] ? r.priority : 'medium') as TaskPriority, status: (STATUS_META[r.status] ? r.status : 'backlog') as TaskStatus, deps: [] } as Task;
+          return { id: defaultIdGenerator.generate('t'), projectId, name: r.name || 'Untitled task', description: r.description || undefined, assignee: member ? member.id : TEAM[0].id, start: r.start || TODAY.toISOString().slice(0, 10), duration: Number(r.duration) || 3, progress: Number(r.progress) || 0, priority: (PRIORITY_META[r.priority] ? r.priority : 'medium') as TaskPriority, status: (STATUS_META[r.status] ? r.status : 'backlog') as TaskStatus, deps: [] } as Task;
         });
-        if (rows.length) addTasksBulk(rows);
+        if (rows.length) addTasksBulk(projectId, rows);
       },
     });
-  }, [addTasksBulk, currentProjectId]);
+  }, [addTasksBulk]);
 
-  const exportCSV = useCallback(() => {
+  const exportCSV = useCallback((projectId: string) => {
+    const project = projects[projectId];
     if (!project) return;
-    const csv = Papa.unparse(tasks.map(t => ({ name: t.name, description: t.description || '', assignee: TEAM.find(m => m.id === t.assignee)?.name || '', start: t.start, due_date: t.dueDate || '', duration: t.duration, progress: t.progress, priority: t.priority, status: t.status, tags: (t.tags || []).join(', ') })));
+    const projectTasks = tasksByProject[projectId] || [];
+    const csv = Papa.unparse(projectTasks.map(t => ({ name: t.name, description: t.description || '', assignee: TEAM.find(m => m.id === t.assignee)?.name || '', start: t.start, due_date: t.dueDate || '', duration: t.duration, progress: t.progress, priority: t.priority, status: t.status, tags: (t.tags || []).join(', ') })));
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = `${project.name.replace(/\s+/g, '-')}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [tasks, project]);
+  }, [tasksByProject, projects]);
 
-  const attachFilesToSelected = useCallback((fileList: FileList) => {
-    if (!selectedIds.size || !currentProjectId) return;
+  const attachFilesToSelected = useCallback((projectId: string, fileList: FileList) => {
+    if (!selectedIds.size || !projectId) return;
     const targetId = [...selectedIds][0];
     const now = TODAY.toISOString().slice(0, 10);
     const newFiles = Array.from(fileList).map(f => ({ id: defaultIdGenerator.generate('f'), name: f.name, size: f.size, uploadedBy: CURRENT_USER_ID, uploadedAt: now, linkedTaskId: targetId, url: URL.createObjectURL(f) }));
-    setFilesByProject(prev => ({ ...prev, [currentProjectId]: [...newFiles, ...(prev[currentProjectId] || [])] }));
-  }, [selectedIds, currentProjectId]);
+    setFilesByProject(prev => ({ ...prev, [projectId]: [...newFiles, ...(prev[projectId] || [])] }));
+  }, [selectedIds]);
 
-  const addColumn = useCallback((def: CustomColumn) => {
-    if (!currentProjectId) return;
-    setCustomColsByProject(prev => ({ ...prev, [currentProjectId]: [...(prev[currentProjectId] || []), def] }));
-  }, [currentProjectId]);
+  const addColumn = useCallback((projectId: string, def: CustomColumn) => {
+    if (!projectId) return;
+    setCustomColsByProject(prev => ({ ...prev, [projectId]: [...(prev[projectId] || []), def] }));
+  }, []);
 
-  const removeColumn = useCallback((key: string) => {
-    if (!currentProjectId) return;
-    setCustomColsByProject(prev => ({ ...prev, [currentProjectId]: (prev[currentProjectId] || []).filter(c => c.key !== key) }));
-  }, [currentProjectId]);
+  const removeColumn = useCallback((projectId: string, key: string) => {
+    if (!projectId) return;
+    setCustomColsByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).filter(c => c.key !== key) }));
+  }, []);
 
   const addFiles = useCallback((projectId: string, newFiles: FileItem[]) => {
     if (!projectId) return;
@@ -763,20 +801,20 @@ export function useFlowDeckStore(): FlowDeckState {
     setFilesByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).map(f => f.id === id ? { ...f, linkedTaskId } : f) }));
   }, []);
 
-  const addRaidItem = useCallback((item: RaidItem) => {
-    if (!currentProjectId) return;
-    setRaidByProject(prev => ({ ...prev, [currentProjectId]: [item, ...(prev[currentProjectId] || [])] }));
-  }, [currentProjectId]);
+  const addRaidItem = useCallback((projectId: string, item: RaidItem) => {
+    if (!projectId) return;
+    setRaidByProject(prev => ({ ...prev, [projectId]: [item, ...(prev[projectId] || [])] }));
+  }, []);
 
-  const updateRaidItem = useCallback((id: string, patch: Partial<RaidItem>) => {
-    if (!currentProjectId) return;
-    setRaidByProject(prev => ({ ...prev, [currentProjectId]: (prev[currentProjectId] || []).map(r => r.id === id ? { ...r, ...patch } : r) }));
-  }, [currentProjectId]);
+  const updateRaidItem = useCallback((projectId: string, id: string, patch: Partial<RaidItem>) => {
+    if (!projectId) return;
+    setRaidByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).map(r => r.id === id ? { ...r, ...patch } : r) }));
+  }, []);
 
-  const removeRaidItem = useCallback((id: string) => {
-    if (!currentProjectId) return;
-    setRaidByProject(prev => ({ ...prev, [currentProjectId]: (prev[currentProjectId] || []).filter(r => r.id !== id) }));
-  }, [currentProjectId]);
+  const removeRaidItem = useCallback((projectId: string, id: string) => {
+    if (!projectId) return;
+    setRaidByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).filter(r => r.id !== id) }));
+  }, []);
 
   /* ---- Tags ---- */
   const addTag = useCallback((projectId: string, tag: Tag) => {
@@ -989,13 +1027,13 @@ export function useFlowDeckStore(): FlowDeckState {
 
   const gridActions: GridActions = useMemo(() => ({
     selectedIds, setSelectedIds,
-    onAddTask: () => setShowNewTask(true),
-    onBulkAssign: bulkAssign,
+    onAddTask: (pid) => { if (pid) setShowNewTask(true); },
+    onBulkAssign: (pid, memberId) => bulkAssign(pid, selectedIds, memberId),
     onSetRecurrence: setRecurrenceSelected,
     onUndo: undo, onRedo: redo, canUndo: past.length > 0, canRedo: future.length > 0,
     onIndent: indentSelected, onOutdent: outdentSelected,
     onLink: linkSelected, onUnlink: unlinkSelected,
-    onDeleteSelected: () => removeTasksBulk(selectedIds),
+    onDeleteSelected: (pid) => removeTasksBulk(pid, selectedIds),
     onToggleBold: toggleBoldSelected,
     onSetColor: setColorSelected,
     durationUnit, onToggleDurationUnit: () => setDurationUnit(u => u === 'days' ? 'hours' : 'days'),
@@ -1004,7 +1042,7 @@ export function useFlowDeckStore(): FlowDeckState {
     onCut: cutSelected, onCopy: copySelected, onPaste: paste, canPaste: clipboard.items.length > 0,
     onAttachFiles: attachFilesToSelected,
     customCols, onAddColumn: addColumn, onRemoveColumn: removeColumn,
-    onOpenShare: () => setShareOpen(true),
+    onOpenShare: (pid) => { if (pid) setShareOpen(true); },
   }), [selectedIds, bulkAssign, setRecurrenceSelected, undo, redo, past.length, future.length,
     indentSelected, outdentSelected, linkSelected, unlinkSelected, removeTasksBulk,
     toggleBoldSelected, setColorSelected, durationUnit, toggleMilestoneSelected,
@@ -1012,8 +1050,9 @@ export function useFlowDeckStore(): FlowDeckState {
     attachFilesToSelected, customCols, addColumn, removeColumn]);
 
   /* ---- #30: Duplicate task with options ---- */
-  const duplicateTaskWithOptions = useCallback((id: string, opts?: { includeSubtasks?: boolean; includeComments?: boolean; includeAttachments?: boolean }) => {
-    const task = tasks.find(t => t.id === id);
+  const duplicateTaskWithOptions = useCallback((projectId: string, id: string, opts?: { includeSubtasks?: boolean; includeComments?: boolean; includeAttachments?: boolean }) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const task = projectTasks.find(t => t.id === id);
     if (!task) return;
     const newId = defaultIdGenerator.generate('t');
     const idMap = new Map<string, string>();
@@ -1022,6 +1061,7 @@ export function useFlowDeckStore(): FlowDeckState {
     const cloneBase: Task = {
       ...task,
       id: newId,
+      projectId,
       name: task.name + ' (copy)',
       status: 'backlog',
       progress: 0,
@@ -1036,13 +1076,14 @@ export function useFlowDeckStore(): FlowDeckState {
 
     /* Deep clone subtasks */
     if (opts?.includeSubtasks) {
-      const subtasks = tasks.filter(t => t.parentId === id);
+      const subtasks = projectTasks.filter(t => t.parentId === id);
       for (const sub of subtasks) {
         const subId = defaultIdGenerator.generate('t');
         idMap.set(sub.id, subId);
         newTasks.push({
           ...sub,
           id: subId,
+          projectId,
           parentId: newId,
           name: sub.name + ' (copy)',
           status: 'backlog',
@@ -1056,14 +1097,11 @@ export function useFlowDeckStore(): FlowDeckState {
       }
     }
 
-    if (currentProjectId) {
-      const projectTasks = tasksByProject[currentProjectId] || [];
-      commit(currentProjectId, [...projectTasks, ...newTasks]);
-    }
+    commit(projectId, [...projectTasks, ...newTasks]);
 
     /* Deep clone comments */
-    if (opts?.includeComments && currentProjectId) {
-      const taskComments = (commentsByProject[currentProjectId] || []).filter(c => c.taskId === id);
+    if (opts?.includeComments) {
+      const taskComments = (commentsByProject[projectId] || []).filter(c => c.taskId === id);
       if (taskComments.length) {
         const clonedComments = taskComments.map(c => ({
           id: defaultIdGenerator.generate('c'),
@@ -1074,14 +1112,14 @@ export function useFlowDeckStore(): FlowDeckState {
         }));
         setCommentsByProject(prev => ({
           ...prev,
-          [currentProjectId]: [...(prev[currentProjectId] || []), ...clonedComments],
+          [projectId]: [...(prev[projectId] || []), ...clonedComments],
         }));
       }
     }
 
     /* Deep clone attachments (file links only — can't clone blob URLs) */
-    if (opts?.includeAttachments && currentProjectId) {
-      const taskFiles = (filesByProject[currentProjectId] || []).filter(f => f.linkedTaskId === id);
+    if (opts?.includeAttachments) {
+      const taskFiles = (filesByProject[projectId] || []).filter(f => f.linkedTaskId === id);
       if (taskFiles.length) {
         const clonedFiles = taskFiles.map(f => ({
           ...f,
@@ -1090,29 +1128,29 @@ export function useFlowDeckStore(): FlowDeckState {
         }));
         setFilesByProject(prev => ({
           ...prev,
-          [currentProjectId]: [...(prev[currentProjectId] || []), ...clonedFiles],
+          [projectId]: [...(prev[projectId] || []), ...clonedFiles],
         }));
       }
     }
 
-    if (currentProjectId) {
-      logActivity(currentProjectId, newId, 'created', `Task "${cloneBase.name}" was created`);
-    }
+    logActivity(projectId, newId, 'created', `Task "${cloneBase.name}" was created`);
     toast.success('Task duplicated', { description: cloneBase.name });
-  }, [tasks, commit, logActivity, currentProjectId, commentsByProject, filesByProject]);
+  }, [tasksByProject, commit, logActivity, commentsByProject, filesByProject]);
 
   /* Keep simple duplicateTask as a thin wrapper */
-  const duplicateTask = useCallback((id: string) => duplicateTaskWithOptions(id), [duplicateTaskWithOptions]);
+  const duplicateTask = useCallback((projectId: string, id: string) => duplicateTaskWithOptions(projectId, id), [duplicateTaskWithOptions]);
 
   /* Bulk duplicate selected tasks */
-  const duplicateTasksBulk = useCallback((ids: Set<string>) => {
+  const duplicateTasksBulk = useCallback((projectId: string, ids: Set<string>) => {
+    const projectTasks = tasksByProject[projectId] || [];
     let newTasks: Task[] = [];
     for (const id of ids) {
-      const task = tasks.find(t => t.id === id);
+      const task = projectTasks.find(t => t.id === id);
       if (!task) continue;
       newTasks.push({
         ...task,
         id: defaultIdGenerator.generate('t'),
+        projectId,
         name: task.name + ' (copy)',
         status: 'backlog', progress: 0, deps: [],
         tags: [...(task.tags || [])],
@@ -1121,22 +1159,22 @@ export function useFlowDeckStore(): FlowDeckState {
         createdAt: new Date().toISOString(),
       });
     }
-    if (newTasks.length && currentProjectId) {
-      const projectTasks = tasksByProject[currentProjectId] || [];
-      commit(currentProjectId, [...projectTasks, ...newTasks]);
+    if (newTasks.length) {
+      commit(projectId, [...projectTasks, ...newTasks]);
       toast.success(`${newTasks.length} task${newTasks.length > 1 ? 's' : ''} duplicated`);
     }
-  }, [tasksByProject, currentProjectId, commit]);
+  }, [tasksByProject, commit]);
 
   /* ---- #32: Move task to another project ---- */
-  const moveTaskToProject = useCallback((taskId: string, targetProjectId: string) => {
-    if (!currentProjectId || targetProjectId === currentProjectId) return;
-    const task = tasks.find(t => t.id === taskId);
+  const moveTaskToProject = useCallback((projectId: string, taskId: string, targetProjectId: string) => {
+    if (!projectId || targetProjectId === projectId) return;
+    const projectTasks = tasksByProject[projectId] || [];
+    const task = projectTasks.find(t => t.id === taskId);
     if (!task) return;
     /* Collect task + all subtasks */
     const idsToMove = new Set<string>();
     const collectDescendants = (parentId: string) => {
-      for (const t of tasks) {
+      for (const t of projectTasks) {
         if (t.parentId === parentId && !idsToMove.has(t.id)) {
           idsToMove.add(t.id);
           collectDescendants(t.id);
@@ -1145,45 +1183,45 @@ export function useFlowDeckStore(): FlowDeckState {
     };
     idsToMove.add(taskId);
     collectDescendants(taskId);
-    const tasksToMove = tasks.filter(t => idsToMove.has(t.id));
+    const tasksToMove = projectTasks.filter(t => idsToMove.has(t.id)).map(t => ({ ...t, projectId: targetProjectId }));
 
     /* Remove from current project */
-    setTasksByProject(prev => ({ ...prev, [currentProjectId]: (prev[currentProjectId] || []).filter(t => !idsToMove.has(t.id)) }));
+    setTasksByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).filter(t => !idsToMove.has(t.id)) }));
     /* Add to target project */
     setTasksByProject(prev => ({ ...prev, [targetProjectId]: [...(prev[targetProjectId] || []), ...tasksToMove] }));
     /* Move associated comments */
-    const commentsToMove = (commentsByProject[currentProjectId] || []).filter(c => idsToMove.has(c.taskId));
+    const commentsToMove = (commentsByProject[projectId] || []).filter(c => idsToMove.has(c.taskId));
     if (commentsToMove.length) {
       setCommentsByProject(prev => ({
         ...prev,
-        [currentProjectId]: (prev[currentProjectId] || []).filter(c => !idsToMove.has(c.taskId)),
+        [projectId]: (prev[projectId] || []).filter(c => !idsToMove.has(c.taskId)),
         [targetProjectId]: [...(prev[targetProjectId] || []), ...commentsToMove],
       }));
     }
     /* Move associated activity */
-    const activityToMove = (activityByProject[currentProjectId] || []).filter(a => idsToMove.has(a.taskId));
+    const activityToMove = (activityByProject[projectId] || []).filter(a => idsToMove.has(a.taskId));
     if (activityToMove.length) {
       setActivityByProject(prev => ({
         ...prev,
-        [currentProjectId]: (prev[currentProjectId] || []).filter(a => !idsToMove.has(a.taskId)),
+        [projectId]: (prev[projectId] || []).filter(a => !idsToMove.has(a.taskId)),
         [targetProjectId]: [...(prev[targetProjectId] || []), ...activityToMove],
       }));
     }
     /* Move associated time logs */
-    const timeLogsToMove = (timeLogsByProject[currentProjectId] || []).filter(tl => idsToMove.has(tl.taskId));
+    const timeLogsToMove = (timeLogsByProject[projectId] || []).filter(tl => idsToMove.has(tl.taskId));
     if (timeLogsToMove.length) {
       setTimeLogsByProject(prev => ({
         ...prev,
-        [currentProjectId]: (prev[currentProjectId] || []).filter(tl => !idsToMove.has(tl.taskId)),
+        [projectId]: (prev[projectId] || []).filter(tl => !idsToMove.has(tl.taskId)),
         [targetProjectId]: [...(prev[targetProjectId] || []), ...timeLogsToMove],
       }));
     }
     /* Move associated files */
-    const filesToMove = (filesByProject[currentProjectId] || []).filter(f => idsToMove.has(f.linkedTaskId || ''));
+    const filesToMove = (filesByProject[projectId] || []).filter(f => idsToMove.has(f.linkedTaskId || ''));
     if (filesToMove.length) {
       setFilesByProject(prev => ({
         ...prev,
-        [currentProjectId]: (prev[currentProjectId] || []).filter(f => !idsToMove.has(f.linkedTaskId || '')),
+        [projectId]: (prev[projectId] || []).filter(f => !idsToMove.has(f.linkedTaskId || '')),
         [targetProjectId]: [...(prev[targetProjectId] || []), ...filesToMove],
       }));
     }
@@ -1195,56 +1233,57 @@ export function useFlowDeckStore(): FlowDeckState {
 
     const targetName = projects[targetProjectId]?.name || 'Project';
     toast.success(`Moved to ${targetName}`, { description: task.name });
-  }, [tasks, currentProjectId, selectedIds, selectedTaskId, commentsByProject, activityByProject, timeLogsByProject, filesByProject, projects]);
+  }, [tasksByProject, selectedIds, selectedTaskId, commentsByProject, activityByProject, timeLogsByProject, filesByProject, projects]);
 
   /* Bulk move selected tasks to another project */
-  const moveTasksToProjectBulk = useCallback((ids: Set<string>, targetProjectId: string) => {
-    if (!currentProjectId || targetProjectId === currentProjectId) return;
-    const tasksToMove = tasks.filter(t => ids.has(t.id));
+  const moveTasksToProjectBulk = useCallback((projectId: string, ids: Set<string>, targetProjectId: string) => {
+    if (!projectId || targetProjectId === projectId) return;
+    const projectTasks = tasksByProject[projectId] || [];
+    const tasksToMove = projectTasks.filter(t => ids.has(t.id)).map(t => ({ ...t, projectId: targetProjectId }));
     if (!tasksToMove.length) return;
 
     setTasksByProject(prev => ({
       ...prev,
-      [currentProjectId]: (prev[currentProjectId] || []).filter(t => !ids.has(t.id)),
+      [projectId]: (prev[projectId] || []).filter(t => !ids.has(t.id)),
       [targetProjectId]: [...(prev[targetProjectId] || []), ...tasksToMove],
     }));
 
-    const commentsToMove = (commentsByProject[currentProjectId] || []).filter(c => ids.has(c.taskId));
+    const commentsToMove = (commentsByProject[projectId] || []).filter(c => ids.has(c.taskId));
     if (commentsToMove.length) {
       setCommentsByProject(prev => ({
         ...prev,
-        [currentProjectId]: (prev[currentProjectId] || []).filter(c => !ids.has(c.taskId)),
+        [projectId]: (prev[projectId] || []).filter(c => !ids.has(c.taskId)),
         [targetProjectId]: [...(prev[targetProjectId] || []), ...commentsToMove],
       }));
     }
-    const activityToMove = (activityByProject[currentProjectId] || []).filter(a => ids.has(a.taskId));
+    const activityToMove = (activityByProject[projectId] || []).filter(a => ids.has(a.taskId));
     if (activityToMove.length) {
       setActivityByProject(prev => ({
         ...prev,
-        [currentProjectId]: (prev[currentProjectId] || []).filter(a => !ids.has(a.taskId)),
+        [projectId]: (prev[projectId] || []).filter(a => !ids.has(a.taskId)),
         [targetProjectId]: [...(prev[targetProjectId] || []), ...activityToMove],
       }));
     }
-    const timeLogsToMove = (timeLogsByProject[currentProjectId] || []).filter(tl => ids.has(tl.taskId));
+    const timeLogsToMove = (timeLogsByProject[projectId] || []).filter(tl => ids.has(tl.taskId));
     if (timeLogsToMove.length) {
       setTimeLogsByProject(prev => ({
         ...prev,
-        [currentProjectId]: (prev[currentProjectId] || []).filter(tl => !ids.has(tl.taskId)),
+        [projectId]: (prev[projectId] || []).filter(tl => !ids.has(tl.taskId)),
         [targetProjectId]: [...(prev[targetProjectId] || []), ...timeLogsToMove],
       }));
     }
-    const filesToMove = (filesByProject[currentProjectId] || []).filter(f => ids.has(f.linkedTaskId || ''));
+    const filesToMove = (filesByProject[projectId] || []).filter(f => ids.has(f.linkedTaskId || ''));
     if (filesToMove.length) {
       setFilesByProject(prev => ({
         ...prev,
-        [currentProjectId]: (prev[currentProjectId] || []).filter(f => !ids.has(f.linkedTaskId || '')),
+        [projectId]: (prev[projectId] || []).filter(f => !ids.has(f.linkedTaskId || '')),
         [targetProjectId]: [...(prev[targetProjectId] || []), ...filesToMove],
       }));
     }
     setSelectedIds(new Set());
     const targetName = projects[targetProjectId]?.name || 'Project';
     toast.success(`${ids.size} task${ids.size > 1 ? 's' : ''} moved to ${targetName}`);
-  }, [tasks, currentProjectId, commentsByProject, activityByProject, timeLogsByProject, filesByProject, projects]);
+  }, [tasksByProject, commentsByProject, activityByProject, timeLogsByProject, filesByProject, projects]);
 
   /* ---- #33: Promote subtask to top-level ---- */
   const promoteSubtask = useCallback((projectId: string, taskId: string) => {
@@ -1273,26 +1312,6 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [tasksByProject, commit, logActivity]);
 
   /* ---- #34: Bulk set due date / add tag / set status ---- */
-  const bulkSetDueDate = useCallback((ids: Set<string>, date: string | null) => {
-    updateTasksBulk(ids, { dueDate: date || undefined });
-    toast.success(date ? `Due date set for ${ids.size} task${ids.size > 1 ? 's' : ''}` : `Due date cleared for ${ids.size} task${ids.size > 1 ? 's' : ''}`);
-  }, [updateTasksBulk]);
-
-  const bulkAddTag = useCallback((ids: Set<string>, tagId: string) => {
-    updateTasksBulk(ids, (t) => {
-      const current = t.tags || [];
-      return { tags: current.includes(tagId) ? current : [...current, tagId] };
-    });
-    toast.success(`Tag added to ${ids.size} task${ids.size > 1 ? 's' : ''}`);
-  }, [updateTasksBulk]);
-
-  const bulkRemoveTag = useCallback((ids: Set<string>, tagId: string) => {
-    updateTasksBulk(ids, (t) => ({
-      tags: (t.tags || []).filter(tid => tid !== tagId),
-    }));
-    toast.success(`Tag removed from ${ids.size} task${ids.size > 1 ? 's' : ''}`);
-  }, [updateTasksBulk]);
-
   /* ---- #35: Sections ---- */
   const addSection = useCallback((projectId: string, name: string) => {
     if (!projectId) return;
@@ -1347,13 +1366,6 @@ export function useFlowDeckStore(): FlowDeckState {
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, sectionId } : t));
   }, [tasksByProject, commit]);
 
-  const bulkSetStatus = useCallback((ids: Set<string>, status: string) => {
-    const s = status as TaskStatus;
-    const progress = s === 'done' ? 100 : s === 'backlog' ? 0 : undefined;
-    updateTasksBulk(ids, progress !== undefined ? { status: s, progress } : { status: s });
-    toast.success(`${ids.size} task${ids.size > 1 ? 's' : ''} set to ${STATUS_META[s]?.label || s}`);
-  }, [updateTasksBulk]);
-
   /* Close menus on view change */
   useEffect(() => { setMoreMenuOpen(false); }, [activeView]);
 
@@ -1402,50 +1414,49 @@ export function useFlowDeckStore(): FlowDeckState {
     });
   }, []);
 
-  const addProjectStatusUpdate = useCallback((text: string, color: 'green' | 'yellow' | 'red') => {
-    if (!currentProjectId) return;
+  const addProjectStatusUpdate = useCallback((projectId: string, text: string, color: 'green' | 'yellow' | 'red') => {
+    if (!projectId) return;
     const id = defaultIdGenerator.generate('su');
     const update: ProjectStatusUpdate = {
-      id, projectId: currentProjectId, authorId: CURRENT_USER_ID,
+      id, projectId: projectId, authorId: CURRENT_USER_ID,
       text, color, createdAt: new Date().toISOString(),
     };
     setStatusUpdatesByProject(prev => ({
       ...prev,
-      [currentProjectId]: [...(prev[currentProjectId] || []), update],
+      [projectId]: [...(prev[projectId] || []), update],
     }));
     toast.success('Status update posted');
-  }, [currentProjectId]);
+  }, []);
 
-  const deleteProjectStatusUpdate = useCallback((id: string) => {
-    if (!currentProjectId) return;
+  const deleteProjectStatusUpdate = useCallback((projectId: string, id: string) => {
+    if (!projectId) return;
     setStatusUpdatesByProject(prev => ({
       ...prev,
-      [currentProjectId]: (prev[currentProjectId] || []).filter(su => su.id !== id),
+      [projectId]: (prev[projectId] || []).filter(su => su.id !== id),
     }));
-  }, [currentProjectId]);
+  }, []);
 
-  const saveProjectAsTemplate = useCallback((name: string, includeTasks: boolean) => {
-    if (!currentProjectId) return;
-    const p = projects[currentProjectId];
+  const saveProjectAsTemplate = useCallback((projectId: string, name: string, includeTasks: boolean) => {
+    if (!projectId) return;
+    const p = projects[projectId];
     if (!p) return;
     const tid = defaultIdGenerator.generate('tpl');
-    const taskList = includeTasks ? (tasksByProject[currentProjectId] || []) : [];
-    const tagList = (tagsByProject[currentProjectId] || []).map(t => ({ name: t.name, color: t.color }));
-    const colsList = customColsByProject[currentProjectId] || [];
-    /* Save custom template to localStorage */
+    const taskList = includeTasks ? (tasksByProject[projectId] || []) : [];
+    const tagList = (tagsByProject[projectId] || []).map(t => ({ name: t.name, color: t.color }));
+    const colsList = customColsByProject[projectId] || [];
+    /* Save custom template to storage adapter */
     try {
-      const raw = localStorage.getItem('flowdeck-custom-templates');
-      const existing = raw ? JSON.parse(raw) : [];
+      const existing = loadCustomTemplates();
       existing.push({
         id: tid, name, description: p.description || '', icon: '📁', color: p.color,
         taskCount: taskList.length, tags: tagList, customCols: colsList,
         tasks: taskList.map(t => ({ ...t, id: '', parentId: null, createdAt: undefined })),
         createdAt: new Date().toISOString(),
       });
-      localStorage.setItem('flowdeck-custom-templates', JSON.stringify(existing));
+      saveCustomTemplates(existing);
       toast.success(`Template "${name}" saved`);
     } catch { toast.error('Failed to save template'); }
-  }, [currentProjectId, projects, tasksByProject, tagsByProject, customColsByProject]);
+  }, [projects, tasksByProject, tagsByProject, customColsByProject]);
 
   /* ---- #47: Goals / OKRs ---- */
   const addGoal = useCallback((goal: Goal) => { setGoals(prev => [...prev, goal]); toast.success('Goal added'); }, []);
@@ -1588,6 +1599,7 @@ export function useFlowDeckStore(): FlowDeckState {
 
   return {
     projects, tasksByProject, filesByProject, raidByProject, customColsByProject,
+    statusUpdatesByProject,
     tagsByProject, commentsByProject, activityByProject, timeLogsByProject, sectionsByProject,
     currentUserId: CURRENT_USER_ID,
     currentProjectId, activeView, selectedTaskId, selectedIds, searchQuery,
@@ -1604,7 +1616,7 @@ export function useFlowDeckStore(): FlowDeckState {
     duplicateTask, duplicateTaskWithOptions, duplicateTasksBulk,
     moveTaskToProject, moveTasksToProjectBulk,
     promoteSubtask, demoteToSubtask,
-    bulkSetDueDate, bulkAddTag, bulkRemoveTag, bulkSetStatus,
+    bulkSetDueDate, bulkAddTag, bulkRemoveTag, bulkSetStatus, bulkAssign, bulkSetPriority, bulkComplete,
     sections,
     addSection, renameSection, deleteSection, toggleSectionCollapsed, reorderSection, setTaskSection,
     /* Batch 7 */
@@ -1635,7 +1647,7 @@ export function useFlowDeckStore(): FlowDeckState {
     reorderTask, quickAddTask,
     /* Reset persisted state */
     resetToDefaults: () => {
-      localStorage.removeItem(STORAGE_KEY);
+      clearPersistedState();
       window.location.reload();
     },
     /* Expose setters for layout components */

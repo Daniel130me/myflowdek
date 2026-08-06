@@ -264,6 +264,20 @@ export function AIAssistantView({ tasks, projects, currentProjectId, currentUser
 
   const handleChatKeyDown = useCallback((e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleChatSend(); } }, [handleChatSend]);
 
+  if (!currentProjectId) {
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '72px 24px' }}>
+        <div style={{ width: 64, height: 64, borderRadius: '50%', background: COLORS.accentSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, color: COLORS.accent }}>
+          <Sparkles size={28} />
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: COLORS.ink, fontFamily: FF, marginBottom: 6 }}>Select a project</div>
+        <div style={{ fontSize: 13, color: COLORS.gray, fontFamily: FF, maxWidth: 360, lineHeight: 1.5 }}>
+          Select a project from the sidebar to use the AI Assistant with your project data.
+        </div>
+      </div>
+    );
+  }
+
   const suggestions = ['What\'s at risk?', 'Summarize status', 'Suggest priorities', 'What should I focus on?'];
 
   return (

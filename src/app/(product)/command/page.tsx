@@ -22,33 +22,32 @@ export default function CommandRoutePage() {
         }}
         activeView={state.activeView}
         onNavigate={view => {
-          router.push(getRouteForView(view));
-          close();
+          router.replace(getRouteForView(view));
         }}
         projects={state.projects}
         onOpenProject={id => {
           state.openProject(id);
-          router.push(routes.projectOverview(id));
-          close();
+          router.replace(routes.projectOverview(id));
         }}
         onNewProject={() => {
-          router.push(routes.newProject());
+          router.replace(routes.newProject());
         }}
         tasksByProject={state.tasksByProject}
-        onOpenTask={(taskId: string) => {
-          const pId = state.currentProjectId || Object.keys(state.projects)[0];
-          if (pId) router.push(routes.task(pId, taskId));
-          close();
+        onOpenTask={(pId: string, taskId: string) => {
+          router.replace(routes.task(pId, taskId));
         }}
-        onNewTask={() => {
-          const pId = state.currentProjectId || Object.keys(state.projects)[0];
-          if (pId) router.push(routes.newTask(pId));
+        onNewTask={(pId?: string) => {
+          if (pId) {
+            router.replace(routes.newTask(pId));
+          } else {
+            // If no project specified, go to projects portfolio
+            router.replace(routes.projects());
+          }
         }}
         onUndo={state.gridActions.onUndo}
         onRedo={state.gridActions.onRedo}
         canUndo={state.gridActions.canUndo}
         canRedo={state.gridActions.canRedo}
-        onToggleTheme={() => {}}
       />
     </>
   );

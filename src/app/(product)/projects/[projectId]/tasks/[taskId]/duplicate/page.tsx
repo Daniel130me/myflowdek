@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, notFound } from 'next/navigation';
 import ProjectTasksPage from '../../page';
 import { DuplicateTaskDialog } from '@/features/flowdeck/components/ui';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
@@ -14,6 +14,11 @@ export default function DuplicateTaskRoutePage() {
   const projectId = getSingleParam(params.projectId);
   const taskId = getSingleParam(params.taskId);
   const state = useFlowDeck();
+
+  if (!projectId || !taskId) {
+    notFound();
+  }
+
   const close = () => router.push(routes.projectTasks(projectId));
 
   const projectTasks = state.tasksByProject[projectId] ?? [];
@@ -22,22 +27,24 @@ export default function DuplicateTaskRoutePage() {
 
   const task = projectTasks.find(t => t.id === taskId);
 
+  if (!task) {
+    notFound();
+  }
+
   return (
     <>
       <ProjectTasksPage />
-      {task && (
-        <DuplicateTaskDialog
-          taskName={task.name}
-          hasSubtasks={Boolean(task.parentId || projectTasks.some(t => t.parentId === task.id))}
-          hasComments={Boolean(projectComments.some(c => c.taskId === task.id))}
-          hasAttachments={Boolean(projectFiles.some(f => f.linkedTaskId === task.id))}
-          onCancel={close}
-          onConfirm={opts => {
-            state.duplicateTaskWithOptions(task.id, opts);
-            close();
-          }}
-        />
-      )}
+      <DuplicateTaskDialog
+        taskName={task.name}
+        hasSubtasks={Boolean(task.parentId || projectTasks.some(t => t.parentId === task.id))}
+        hasComments={Boolean(projectComments.some(c => c.taskId === task.id))}
+        hasAttachments={Boolean(projectFiles.some(f => f.linkedTaskId === task.id))}
+        onCancel={close}
+        onConfirm={opts => {
+          state.duplicateTaskWithOptions(projectId, task.id, opts);
+          close();
+        }}
+      />
     </>
   );
 }

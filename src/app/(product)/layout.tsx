@@ -84,9 +84,9 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
     searchQuery,
     selectedIds: state.selectedIds,
     onToggleComplete: (id) => routeProjectId && state.toggleComplete(routeProjectId, id),
-    onIndent: gridActions.onIndent,
-    onOutdent: gridActions.onOutdent,
-    onDelete: gridActions.onDeleteSelected,
+    onIndent: () => routeProjectId && gridActions.onIndent(routeProjectId),
+    onOutdent: () => routeProjectId && gridActions.onOutdent(routeProjectId),
+    onDelete: () => routeProjectId && gridActions.onDeleteSelected(routeProjectId),
     onUndo: gridActions.onUndo,
     onRedo: gridActions.onRedo,
     onShowNewTask: () => {
@@ -226,31 +226,25 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
       </div>
 
       {/* Global Selection Action Bar */}
-      {state.selectedIds.size > 0 && (
+      {state.selectedIds.size > 0 && routeProjectId && (
         <BulkActionBar
           count={state.selectedIds.size}
           onClearSelection={() => state.setSelectedIds(new Set())}
-          onBulkAssign={memberId => {
-            if (routeProjectId) state.selectedIds.forEach(id => state.updateTask(routeProjectId, id, { assignee: memberId }));
-          }}
-          onSetPriority={priority => {
-            if (routeProjectId) state.selectedIds.forEach(id => state.updateTask(routeProjectId, id, { priority: priority as TaskPriority }));
-          }}
-          onComplete={() => {
-            if (routeProjectId) state.selectedIds.forEach(id => state.updateTask(routeProjectId, id, { status: 'done' }));
-          }}
-          onDelete={() => state.removeTasksBulk(state.selectedIds)}
-          onLink={gridActions.onLink}
-          onUnlink={gridActions.onUnlink}
-          onBold={gridActions.onToggleBold}
-          onMilestone={gridActions.onToggleMilestone}
-          onAttachFiles={gridActions.onAttachFiles}
-          onDuplicateBulk={() => state.duplicateTasksBulk(state.selectedIds)}
-          onBulkSetDueDate={date => state.bulkSetDueDate(state.selectedIds, date)}
-          onBulkAddTag={tagId => state.bulkAddTag(state.selectedIds, tagId)}
-          onBulkRemoveTag={tagId => state.bulkRemoveTag(state.selectedIds, tagId)}
-          onBulkSetStatus={status => state.bulkSetStatus(state.selectedIds, status)}
-          onBulkMoveToProject={targetProjectId => state.moveTasksToProjectBulk(state.selectedIds, targetProjectId)}
+          onBulkAssign={(pid, memberId) => state.bulkAssign(pid, state.selectedIds, memberId)}
+          onSetPriority={(pid, priority) => state.bulkSetPriority(pid, state.selectedIds, priority as TaskPriority)}
+          onComplete={(pid) => state.bulkComplete(pid, state.selectedIds)}
+          onDelete={(pid) => state.removeTasksBulk(pid, state.selectedIds)}
+          onLink={(pid) => gridActions.onLink(pid)}
+          onUnlink={(pid) => gridActions.onUnlink(pid)}
+          onBold={(pid) => gridActions.onToggleBold(pid)}
+          onMilestone={(pid) => gridActions.onToggleMilestone(pid)}
+          onAttachFiles={(pid, files) => gridActions.onAttachFiles(pid, files)}
+          onDuplicateBulk={(pid) => state.duplicateTasksBulk(pid, state.selectedIds)}
+          onBulkSetDueDate={(pid, date) => state.bulkSetDueDate(pid, state.selectedIds, date)}
+          onBulkAddTag={(pid, tagId) => state.bulkAddTag(pid, state.selectedIds, tagId)}
+          onBulkRemoveTag={(pid, tagId) => state.bulkRemoveTag(pid, state.selectedIds, tagId)}
+          onBulkSetStatus={(pid, status) => state.bulkSetStatus(pid, state.selectedIds, status)}
+          onBulkMoveToProject={(pid, targetProjectId) => state.moveTasksToProjectBulk(pid, state.selectedIds, targetProjectId)}
           tags={state.tags}
           projects={projects}
           currentProjectId={routeProjectId}

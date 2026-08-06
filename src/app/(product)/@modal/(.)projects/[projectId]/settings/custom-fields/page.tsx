@@ -19,8 +19,8 @@ export default function InterceptedCustomFieldsPage() {
   return (
     <CustomFieldsModal
       columns={columns}
-      onAdd={col => state.addColumn(col)}
-      onRemove={id => state.removeColumn(id)}
+      onAdd={col => state.addColumn(projectId, col)}
+      onRemove={id => state.removeColumn(projectId, id)}
       onClose={close}
     />
   );

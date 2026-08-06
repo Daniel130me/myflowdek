@@ -6,14 +6,14 @@ import { COLORS } from '@/features/flowdeck/model';
 import type { CustomColumn } from '@/features/flowdeck/model';
 import { selectStyle, popoverRowStyle, FF } from '../ui/styles';
 
-export function ColumnManager({ customCols, onAddColumn, onRemoveColumn }: { customCols: CustomColumn[]; onAddColumn: (def: CustomColumn) => void; onRemoveColumn: (key: string) => void }) {
+export function ColumnManager({ projectId, customCols, onAddColumn, onRemoveColumn }: { projectId: string; customCols: CustomColumn[]; onAddColumn: (projectId: string, def: CustomColumn) => void; onRemoveColumn: (projectId: string, key: string) => void }) {
   const [adding, setAdding] = React.useState(false);
   const [label, setLabel] = React.useState('');
   const [type, setType] = React.useState<CustomColumn['type']>('text');
 
   function submit() {
     if (!label.trim()) return;
-    onAddColumn({ key: 'custom_' + Math.random().toString(36).slice(2, 8), label: label.trim(), type });
+    onAddColumn(projectId, { key: 'custom_' + Math.random().toString(36).slice(2, 8), label: label.trim(), type });
     setLabel(''); setType('text'); setAdding(false);
   }
 
@@ -24,7 +24,7 @@ export function ColumnManager({ customCols, onAddColumn, onRemoveColumn }: { cus
       {customCols.map(c => (
         <div key={c.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 2px', fontSize: 12.5, fontFamily: FF }}>
           <span>{c.label} <span style={{ color: COLORS.gray, fontSize: 11 }}>({c.type})</span></span>
-          <button onClick={() => onRemoveColumn(c.key)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 4 }}><X size={13} /></button>
+          <button onClick={() => onRemoveColumn(projectId, c.key)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 4 }}><X size={13} /></button>
         </div>
       ))}
       <div style={{ height: 1, background: COLORS.line, margin: '8px 0' }} />

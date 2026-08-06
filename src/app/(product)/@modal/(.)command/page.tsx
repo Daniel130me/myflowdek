@@ -49,7 +49,6 @@ export default function InterceptedCommandPalettePage() {
       onRedo={state.gridActions.onRedo}
       canUndo={state.gridActions.canUndo}
       canRedo={state.gridActions.canRedo}
-      onToggleTheme={() => {}}
     />
   );
 }

@@ -12,8 +12,8 @@ import { Avatar } from '../ui/Avatar';
 import { FF } from '../ui/styles';
 import type { GridActions } from './types';
 
-export function MobileToolbarSheet({ grid, hasSelection, onClose }: {
-  grid: GridActions; hasSelection: boolean; onClose: () => void;
+export function MobileToolbarSheet({ projectId, grid, hasSelection, onClose }: {
+  projectId: string; grid: GridActions; hasSelection: boolean; onClose: () => void;
 }) {
   const { isMobile } = useViewport();
   const [colorPicker, setColorPicker] = React.useState(false);
@@ -55,8 +55,8 @@ export function MobileToolbarSheet({ grid, hasSelection, onClose }: {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)' }} />
-      <input ref={localImportRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) grid.onImportCSV(e.target.files[0]); e.target.value = ''; }} />
-      <input ref={localAttachRef} type="file" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files?.length) grid.onAttachFiles(e.target.files); e.target.value = ''; }} />
+      <input ref={localImportRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) grid.onImportCSV(projectId, e.target.files[0]); e.target.value = ''; }} />
+      <input ref={localAttachRef} type="file" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files?.length) grid.onAttachFiles(projectId, e.target.files); e.target.value = ''; }} />
       <div style={{ position: 'relative', background: '#FFFFFF', borderRadius: '20px 20px 0 0', padding: '8px 16px 28px', maxHeight: '75vh', overflowY: 'auto', boxShadow: '0 -4px 20px rgba(0,0,0,0.12)' }}>
         <div style={{ width: 36, height: 4, borderRadius: 2, background: COLORS.line, margin: '4px auto 8px' }} />
 
@@ -66,31 +66,31 @@ export function MobileToolbarSheet({ grid, hasSelection, onClose }: {
             {actionRow(UserPlus, 'Assign to\u2026', () => setAssignPicker(true), !hasSelection)}
             {actionRow(Repeat, 'Set recurrence', () => {
               const freqs: [string, string][] = [['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly']];
-              grid.onSetRecurrence(freqs[0][0]); onClose();
+              grid.onSetRecurrence(projectId, freqs[0][0]); onClose();
             }, !hasSelection)}
-            {actionRow(Link2, 'Link tasks', grid.onLink, grid.selectedIds.size < 2)}
-            {actionRow(Unlink2, 'Unlink tasks', grid.onUnlink, !hasSelection)}
-            {actionRow(Trash2, 'Delete selected', grid.onDeleteSelected, !hasSelection, COLORS.red)}
+            {actionRow(Link2, 'Link tasks', () => grid.onLink(projectId), grid.selectedIds.size < 2)}
+            {actionRow(Unlink2, 'Unlink tasks', () => grid.onUnlink(projectId), !hasSelection)}
+            {actionRow(Trash2, 'Delete selected', () => grid.onDeleteSelected(projectId), !hasSelection, COLORS.red)}
 
             {sectionTitle('FORMATTING')}
-            {actionRow(Bold, 'Toggle bold', grid.onToggleBold, !hasSelection)}
+            {actionRow(Bold, 'Toggle bold', () => grid.onToggleBold(projectId), !hasSelection)}
             {actionRow(Palette, 'Colour tag', () => setColorPicker(true), !hasSelection)}
-            {actionRow(Diamond, 'Toggle milestone', grid.onToggleMilestone, !hasSelection)}
-            {actionRow(Indent, 'Indent', grid.onIndent, !hasSelection)}
-            {actionRow(Outdent, 'Outdent', grid.onOutdent, !hasSelection)}
+            {actionRow(Diamond, 'Toggle milestone', () => grid.onToggleMilestone(projectId), !hasSelection)}
+            {actionRow(Indent, 'Indent', () => grid.onIndent(projectId), !hasSelection)}
+            {actionRow(Outdent, 'Outdent', () => grid.onOutdent(projectId), !hasSelection)}
             {actionRow(Hash, `Duration: ${grid.durationUnit}`, grid.onToggleDurationUnit)}
 
             {sectionTitle('CLIPBOARD & FILES')}
-            {actionRow(Scissors, 'Cut', grid.onCut, !hasSelection)}
-            {actionRow(Copy, 'Copy', grid.onCopy, !hasSelection)}
-            {actionRow(ClipboardPaste, 'Paste', grid.onPaste, !grid.canPaste)}
+            {actionRow(Scissors, 'Cut', () => grid.onCut(projectId), !hasSelection)}
+            {actionRow(Copy, 'Copy', () => grid.onCopy(projectId), !hasSelection)}
+            {actionRow(ClipboardPaste, 'Paste', () => grid.onPaste(projectId), !grid.canPaste)}
             {actionRow(Paperclip, 'Attach files', () => setTriggerAttach(n => n + 1), !hasSelection)}
 
             {sectionTitle('IMPORT / EXPORT')}
             {actionRow(FileUp, 'Import CSV', () => setTriggerImport(n => n + 1))}
-            {actionRow(FileDown, 'Export CSV', grid.onExportCSV)}
+            {actionRow(FileDown, 'Export CSV', () => { grid.onExportCSV(projectId); onClose(); })}
             {actionRow(Printer, 'Print', grid.onPrint)}
-            {actionRow(Share2, 'Share project', grid.onOpenShare)}
+            {actionRow(Share2, 'Share project', () => { grid.onOpenShare(projectId); onClose(); })}
           </>
         )}
 
@@ -98,7 +98,7 @@ export function MobileToolbarSheet({ grid, hasSelection, onClose }: {
           <>
             <button onClick={() => setAssignPicker(false)} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', background: 'none', cursor: 'pointer', fontFamily: FF, fontSize: 14, fontWeight: 600, color: COLORS.gray, padding: '8px 0', minHeight: 44 }}><ArrowLeft size={16} /> Assign to</button>
             {TEAM.map(m => (
-              <button key={m.id} onClick={() => { grid.onBulkAssign(m.id); onClose(); }} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', padding: '12px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: FF, fontSize: 14, borderRadius: 12, minHeight: 48 }}>
+              <button key={m.id} onClick={() => { grid.onBulkAssign(projectId, m.id); onClose(); }} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', padding: '12px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: FF, fontSize: 14, borderRadius: 12, minHeight: 48 }}>
                 <Avatar id={m.id} size={22} /> {m.name}
               </button>
             ))}
@@ -111,7 +111,7 @@ export function MobileToolbarSheet({ grid, hasSelection, onClose }: {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, padding: '12px 4px' }}>
               {COLOR_SWATCHES.map((c, i) => (
                 <button
-                  key={i} onClick={() => { grid.onSetColor(c); onClose(); }}
+                  key={i} onClick={() => { grid.onSetColor(projectId, c); onClose(); }}
                   title={c || 'No colour'}
                   style={{ width: 36, height: 36, borderRadius: 12, cursor: 'pointer', background: c || '#FFFFFF', border: c ? 'none' : `1px dashed ${COLORS.gray}` }}
                 />
