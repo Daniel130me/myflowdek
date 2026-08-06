@@ -70,7 +70,7 @@ const DARK_LAYOUT = {
 
 const DARK_STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   backlog:   { label: 'Backlog',     color: '#6B7280', bg: '#1A1C20' },
-  inprogress:{ label: 'In Progress', color: '#FE8029', bg: '#1C1008' },
+  in_progress:{ label: 'In Progress', color: '#FE8029', bg: '#1C1008' },
   review:    { label: 'In Review',   color: '#7C3AED', bg: '#1A0D24' },
   done:      { label: 'Done',        color: '#16A34A', bg: '#0D2818' },
 };

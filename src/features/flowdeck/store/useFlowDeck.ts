@@ -9,7 +9,7 @@ import {
   INITIAL_TAGS, initialComments, initialTimeLogs, MEMBER_CAPACITY, CURRENT_USER_ID,
   PROJECT_TEMPLATES,
   FONT_FAMILY as FF,
-  type Task, type Project, type FileItem, type RaidItem, type CustomColumn,
+  type Task, type Project, type FileItem, type RaidItem, type CustomColumn, type TaskStatus, type TaskPriority,
   type Tag, type Comment, type ActivityEntry, type TimeLog, type SearchFilters, type Section, type Reaction, type Goal, type KeyResult, type SavedFilter, EMPTY_FILTERS,
   type AutomationRule, type Form, type FormSubmission, type ApprovalRequest, type Budget, type Expense, type TimesheetEntry,
 } from '@/features/flowdeck/model';
@@ -111,6 +111,7 @@ export interface FlowDeckState {
 
   /* Actions */
   openProject: (id: string) => void;
+  syncProjectFromRoute: (id: string) => void;
   goToPortfolio: () => void;
   createProject: (p: { name: string; color: string; start: string; end: string }) => void;
   createProjectFromTemplate: (templateId: string, name: string, color: string, start: string, end: string) => void;
@@ -399,6 +400,12 @@ export function useFlowDeckStore(): FlowDeckState {
 
   const clearFilters = useCallback(() => setSearchFilters(EMPTY_FILTERS), []);
 
+  const syncProjectFromRoute = useCallback((id: string) => {
+    if (!projects[id]) return;
+    if (currentProjectId === id) return;
+    setCurrentProjectId(id);
+  }, [currentProjectId, projects]);
+
   const openProject = useCallback((id: string) => {
     setCurrentProjectId(id);
     setActiveView('dashboard');
@@ -530,7 +537,7 @@ export function useFlowDeckStore(): FlowDeckState {
     if (!task) return;
     const member = TEAM.find(m => m.id === CURRENT_USER_ID);
     if (task.status === 'done') {
-      commit(tasks.map(t => t.id === id ? { ...t, status: 'inprogress', progress: 0 } : t));
+      commit(tasks.map(t => t.id === id ? { ...t, status: 'in_progress', progress: 0 } : t));
       logActivity(id, 'reopened', `${member?.name || 'Someone'} reopened this task`);
       toast.info('Task reopened', { description: task.name });
     } else {
@@ -541,6 +548,7 @@ export function useFlowDeckStore(): FlowDeckState {
         const newId = defaultIdGenerator.generate('t');
         const nextTask: Task = {
           id: newId,
+          projectId: task.projectId,
           name: task.name,
           description: task.description,
           status: 'backlog',
@@ -563,13 +571,13 @@ export function useFlowDeckStore(): FlowDeckState {
         };
         /* Mark current done AND add next instance in one commit */
         commit([
-          ...tasks.map(t => t.id === id ? { ...t, status: 'done', progress: 100 } : t),
+          ...tasks.map(t => t.id === id ? { ...t, status: 'done' as TaskStatus, progress: 100 } : t),
           nextTask,
         ]);
         logActivity(id, 'completed', `${member?.name || 'Someone'} marked as done (recurring — next instance created)`);
         toast.success('Task completed — next instance created', { description: task.name });
       } else {
-        commit(tasks.map(t => t.id === id ? { ...t, status: 'done', progress: 100 } : t));
+        commit(tasks.map(t => t.id === id ? { ...t, status: 'done' as TaskStatus, progress: 100 } : t));
         logActivity(id, 'completed', `${member?.name || 'Someone'} marked as done`);
         toast.success('Task completed', { description: task.name });
       }
@@ -588,8 +596,9 @@ export function useFlowDeckStore(): FlowDeckState {
   const addTasksBulk = useCallback((newTasks: Task[]) => { commit([...tasks, ...newTasks]); }, [tasks, commit]);
 
   const moveStatus = useCallback((id: string, status: string) => {
-    const progress = status === 'done' ? 100 : status === 'backlog' ? 0 : undefined;
-    updateTask(id, progress === undefined ? { status } : { status, progress });
+    const s = status as TaskStatus;
+    const progress = s === 'done' ? 100 : s === 'backlog' ? 0 : undefined;
+    updateTask(id, progress === undefined ? { status: s } : { status: s, progress });
   }, [updateTask]);
 
   const removeTask = useCallback((id: string) => {
@@ -661,12 +670,12 @@ export function useFlowDeckStore(): FlowDeckState {
       complete: (res) => {
         const rows = (res.data as Record<string, string>[]).map(r => {
           const member = TEAM.find(m => m.name.toLowerCase() === (r.assignee || '').toLowerCase());
-          return { id: defaultIdGenerator.generate('t'), name: r.name || 'Untitled task', description: r.description || undefined, assignee: member ? member.id : TEAM[0].id, start: r.start || TODAY.toISOString().slice(0, 10), duration: Number(r.duration) || 3, progress: Number(r.progress) || 0, priority: PRIORITY_META[r.priority] ? r.priority : 'medium', status: STATUS_META[r.status] ? r.status : 'backlog', deps: [] } as Task;
+          return { id: defaultIdGenerator.generate('t'), projectId: currentProjectId || 'p1', name: r.name || 'Untitled task', description: r.description || undefined, assignee: member ? member.id : TEAM[0].id, start: r.start || TODAY.toISOString().slice(0, 10), duration: Number(r.duration) || 3, progress: Number(r.progress) || 0, priority: (PRIORITY_META[r.priority] ? r.priority : 'medium') as TaskPriority, status: (STATUS_META[r.status] ? r.status : 'backlog') as TaskStatus, deps: [] } as Task;
         });
         if (rows.length) addTasksBulk(rows);
       },
     });
-  }, [addTasksBulk]);
+  }, [addTasksBulk, currentProjectId]);
 
   const exportCSV = useCallback(() => {
     if (!project) return;
@@ -771,8 +780,9 @@ export function useFlowDeckStore(): FlowDeckState {
     const todayStr = TODAY.toISOString().slice(0, 10);
     const newTask: Task = {
       id,
+      projectId: currentProjectId || 'p1',
       name: name.trim(),
-      status: opts?.status || 'backlog',
+      status: (opts?.status || 'backlog') as TaskStatus,
       assignee: CURRENT_USER_ID,
       start: opts?.startOverride || todayStr,
       duration: 3,
@@ -1280,9 +1290,10 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [tasks, commit]);
 
   const bulkSetStatus = useCallback((ids: Set<string>, status: string) => {
-    const progress = status === 'done' ? 100 : status === 'backlog' ? 0 : undefined;
-    updateTasksBulk(ids, progress !== undefined ? { status, progress } : { status });
-    toast.success(`${ids.size} task${ids.size > 1 ? 's' : ''} set to ${STATUS_META[status]?.label || status}`);
+    const s = status as TaskStatus;
+    const progress = s === 'done' ? 100 : s === 'backlog' ? 0 : undefined;
+    updateTasksBulk(ids, progress !== undefined ? { status: s, progress } : { status: s });
+    toast.success(`${ids.size} task${ids.size > 1 ? 's' : ''} set to ${STATUS_META[s]?.label || s}`);
   }, [updateTasksBulk]);
 
   /* Close menus on view change */
@@ -1426,8 +1437,8 @@ export function useFlowDeckStore(): FlowDeckState {
                 const copy = { ...prevTasks, [projectId]: taskList.map(t => {
                   if (t.id !== taskId) return t;
                   const patch: Partial<Task> = {};
-                  if (action.type === 'set_status' && action.value) patch.status = action.value;
-                  if (action.type === 'set_priority' && action.value) patch.priority = action.value;
+                  if (action.type === 'set_status' && action.value) patch.status = action.value as TaskStatus;
+                  if (action.type === 'set_priority' && action.value) patch.priority = action.value as TaskPriority;
                   if (action.type === 'set_assignee' && action.value) patch.assignee = action.value;
                   if (action.type === 'set_due_date' && action.value) patch.dueDate = action.value;
                   return { ...t, ...patch };
@@ -1458,6 +1469,7 @@ export function useFlowDeckStore(): FlowDeckState {
       if (pid && tasksByProject[pid]) {
         const newTask: Task = {
           id: defaultIdGenerator.generate('t'),
+          projectId: pid,
           name: taskName,
           status: 'backlog',
           assignee: CURRENT_USER_ID,
@@ -1529,7 +1541,7 @@ export function useFlowDeckStore(): FlowDeckState {
     searchFilters, setSearchFilters, activeFilterCount, clearFilters,
     timeLogs, taskTimeLogs,
     gridActions,
-    openProject, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
+    openProject, syncProjectFromRoute, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
     updateTask, addTask, removeTask, removeTasksBulk, moveStatus, toggleComplete,
     duplicateTask, duplicateTaskWithOptions, duplicateTasksBulk,
     moveTaskToProject, moveTasksToProjectBulk,

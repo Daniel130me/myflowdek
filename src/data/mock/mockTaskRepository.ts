@@ -40,6 +40,7 @@ export class MockTaskRepository implements TaskRepository {
   async create(projectId: string, input: CreateTaskInput): Promise<Task> {
     const newTask: Task = {
       id: defaultIdGenerator.generate('t'),
+      projectId,
       name: input.name,
       description: input.description || '',
       status: input.status || 'backlog',

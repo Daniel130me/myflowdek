@@ -13,7 +13,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     if (projectExists && state.currentProjectId !== projectId) {
-      state.openProject(projectId);
+      state.syncProjectFromRoute(projectId);
     }
   }, [projectId, projectExists, state]);
 

@@ -75,16 +75,16 @@ export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 export interface Task {
   id: string;
-  projectId?: string;
+  projectId: string;
   name: string;
   description?: string;
-  status: TaskStatus | string;
+  status: TaskStatus;
   assignee: string;
   start: string;
   duration: number;
   dueDate?: string;
   progress: number;
-  priority: TaskPriority | string;
+  priority: TaskPriority;
   deps: string[];
   tags?: string[];
   followers?: string[];
@@ -98,6 +98,39 @@ export interface Task {
   storyPoints?: number;
   createdAt?: string;
   sectionId?: string | null;
+}
+
+export interface CreateTaskInput {
+  name: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assignee: string;
+  start: string;
+  duration: number;
+  dueDate?: string;
+  parentId?: string | null;
+  sectionId?: string | null;
+  tags?: string[];
+}
+
+export interface UpdateTaskInput {
+  name?: string;
+  description?: string;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  assignee?: string;
+  start?: string;
+  duration?: number;
+  dueDate?: string | null;
+  progress?: number;
+  tags?: string[];
+  deps?: string[];
+  followers?: string[];
+  parentId?: string | null;
+  sectionId?: string | null;
+  customFields?: Record<string, string>;
+  storyPoints?: number;
 }
 
 /* ---------------------------------- Files ---------------------------------- */

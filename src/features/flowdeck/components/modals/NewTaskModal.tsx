@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { X } from 'lucide-react';
-import { COLORS, TEAM, PRIORITY_META, TODAY, TAG_COLORS, type Task, type Tag } from '@/features/flowdeck/model';
+import { COLORS, TEAM, PRIORITY_META, TODAY, TAG_COLORS, type Task, type Tag, type TaskPriority } from '@/features/flowdeck/model';
 import { useViewport } from '../../hooks/useViewport';
 import { Field } from '../ui/Field';
 import { selectStyle, FF } from '../ui/styles';
@@ -11,7 +11,7 @@ export function NewTaskModal({ projectStart, tasks = [], tags = [], onClose, onC
   const [name, setName] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [assignee, setAssignee] = React.useState(TEAM[0].id);
-  const [priority, setPriority] = React.useState('medium');
+  const [priority, setPriority] = React.useState<TaskPriority>('medium');
   const [duration, setDuration] = React.useState(5);
   const [start, setStart] = React.useState(TODAY.toISOString().slice(0, 10));
   const [dueDate, setDueDate] = React.useState('');
@@ -20,8 +20,10 @@ export function NewTaskModal({ projectStart, tasks = [], tags = [], onClose, onC
 
   function submit() {
     if (!name.trim()) return;
+    const pid = tasks[0]?.projectId || 'p1';
     onCreate({
       id: 't' + Math.random().toString(36).slice(2, 8),
+      projectId: pid,
       name: name.trim(),
       description: description.trim() || undefined,
       status: 'backlog', assignee, start, duration: Number(duration),
@@ -93,7 +95,7 @@ export function NewTaskModal({ projectStart, tasks = [], tags = [], onClose, onC
           {tagPickerContent}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Field label="Assignee"><select value={assignee} onChange={e => setAssignee(e.target.value)} style={selectStyle}>{TEAM.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
-            <Field label="Priority"><select value={priority} onChange={e => setPriority(e.target.value)} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
+            <Field label="Priority"><select value={priority} onChange={e => setPriority(e.target.value as TaskPriority)} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
             <Field label="Start date"><input type="date" value={start} onChange={e => setStart(e.target.value)} style={selectStyle} /></Field>
             <Field label="Due date"><input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={selectStyle} /></Field>
             <Field label="Duration (days)"><input type="number" min={1} value={duration} onChange={e => setDuration(Number(e.target.value))} style={selectStyle} /></Field>
@@ -118,7 +120,7 @@ export function NewTaskModal({ projectStart, tasks = [], tags = [], onClose, onC
         {tagPickerContent}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="Assignee"><select value={assignee} onChange={e => setAssignee(e.target.value)} style={selectStyle}>{TEAM.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
-          <Field label="Priority"><select value={priority} onChange={e => setPriority(e.target.value)} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
+          <Field label="Priority"><select value={priority} onChange={e => setPriority(e.target.value as TaskPriority)} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
           <Field label="Start date"><input type="date" value={start} onChange={e => setStart(e.target.value)} style={selectStyle} /></Field>
           <Field label="Due date"><input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={selectStyle} /></Field>
           <Field label="Duration (days)"><input type="number" min={1} value={duration} onChange={e => setDuration(Number(e.target.value))} style={selectStyle} /></Field>

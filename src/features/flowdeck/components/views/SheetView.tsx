@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { Search, Diamond, GripVertical } from 'lucide-react';
-import { COLORS, STATUS_META, PRIORITY_META, SHEET_COLUMNS, TEAM, teamById, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task } from '@/features/flowdeck/model';
+import { COLORS, STATUS_META, PRIORITY_META, SHEET_COLUMNS, TEAM, teamById, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task, type TaskStatus, type TaskPriority } from '@/features/flowdeck/model';
 import { SectionHeader, TaskCheckbox, FF } from '../ui';
 import { GridToolbar, type GridActions } from '../toolbar';
 import { useViewport } from '../../hooks/useViewport';
@@ -144,11 +144,11 @@ export function SheetView({ tasks, onUpdate, onAdd, onRemove, grid, onReorder, o
       case 'duration':
         return grid.durationUnit === 'hours' ? <input type="number" min={1} style={inputCell} value={t.duration * 8} onChange={e => onUpdate(t.id, { duration: Math.max(1, Math.round((Number(e.target.value) || 8) / 8)) })} /> : <input type="number" min={1} style={inputCell} value={t.duration} onChange={e => onUpdate(t.id, { duration: Number(e.target.value) || 1 })} />;
       case 'progress':
-        return <input type="number" min={0} max={100} step={5} style={inputCell} value={t.progress} onChange={e => { const val = Math.max(0, Math.min(100, Number(e.target.value) || 0)); onUpdate(t.id, { progress: val, status: val === 100 ? 'done' : t.status === 'done' ? 'inprogress' : t.status }); }} />;
+        return <input type="number" min={0} max={100} step={5} style={inputCell} value={t.progress} onChange={e => { const val = Math.max(0, Math.min(100, Number(e.target.value) || 0)); onUpdate(t.id, { progress: val, status: val === 100 ? 'done' : t.status === 'done' ? 'in_progress' : t.status }); }} />;
       case 'select-priority':
-        return <select style={inputCell} value={t.priority} onChange={e => onUpdate(t.id, { priority: e.target.value })}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>;
+        return <select style={inputCell} value={t.priority} onChange={e => onUpdate(t.id, { priority: e.target.value as TaskPriority })}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>;
       case 'select-status':
-        return <select style={{ ...inputCell, color: STATUS_META[t.status]?.color || COLORS.ink, fontWeight: 600 }} value={t.status} onChange={e => onUpdate(t.id, { status: e.target.value, progress: e.target.value === 'done' ? 100 : t.progress })}>{['backlog', 'inprogress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select>;
+        return <select style={{ ...inputCell, color: STATUS_META[t.status]?.color || COLORS.ink, fontWeight: 600 }} value={t.status} onChange={e => onUpdate(t.id, { status: e.target.value as TaskStatus, progress: e.target.value === 'done' ? 100 : t.progress })}>{['backlog', 'in_progress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select>;
       default: return null;
     }
   }

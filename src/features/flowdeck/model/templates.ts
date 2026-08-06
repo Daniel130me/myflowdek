@@ -5,9 +5,9 @@ function uid(): string {
   return 't' + Math.random().toString(36).slice(2, 8);
 }
 
-function task(name: string, start: string, duration: number, deps: string[] = [], opts: Partial<Task> = {}): Task {
+function task(pid: string, name: string, start: string, duration: number, deps: string[] = [], opts: Partial<Task> = {}): Task {
   return {
-    id: uid(), name, status: 'backlog', assignee: 'u5', start, duration,
+    id: uid(), projectId: pid, name, status: 'backlog', assignee: 'u5', start, duration,
     progress: 0, priority: 'medium', deps, createdAt: new Date().toISOString(), ...opts,
   };
 }
@@ -35,18 +35,18 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
       const t1 = uid(), t2 = uid(), t3 = uid(), t4 = uid(), t5 = uid(), t6 = uid();
       const t7 = uid(), t8 = uid(), t9 = uid(), t10 = uid(), t11 = uid(), t12 = uid();
       return [
-        task('Stakeholder discovery', d(0), 5, [], { id: t1, priority: 'high', assignee: 'u5' }),
-        task('Competitive audit', d(0), 4, [], { id: t2, assignee: 'u1' }),
-        task('Information architecture', d(5), 5, [t1, t2], { id: t3, priority: 'high', assignee: 'u1' }),
-        task('Content inventory & copywriting', d(5), 8, [t2], { id: t4, assignee: 'u6' }),
-        task('Wireframes', d(10), 5, [t3], { id: t5, priority: 'high', assignee: 'u1' }),
-        task('Visual design system', d(15), 8, [t5], { id: t6, priority: 'urgent', assignee: 'u1' }),
-        task('Component library', d(23), 10, [t6], { id: t7, priority: 'high', assignee: 'u2' }),
-        task('Front-end pages build', d(33), 12, [t7], { id: t8, priority: 'high', assignee: 'u2' }),
-        task('CMS integration', d(33), 8, [t7], { id: t9, assignee: 'u3' }),
-        task('SEO & performance', d(45), 5, [t8, t9], { id: t10, assignee: 'u3' }),
-        task('QA & testing', d(50), 5, [t10], { id: t11, priority: 'high', assignee: 'u4' }),
-        task('Launch', d(55), 2, [t11], { id: t12, priority: 'urgent', assignee: 'u7' }),
+        task(pid, 'Stakeholder discovery', d(0), 5, [], { id: t1, priority: 'high', assignee: 'u5' }),
+        task(pid, 'Competitive audit', d(0), 4, [], { id: t2, assignee: 'u1' }),
+        task(pid, 'Information architecture', d(5), 5, [t1, t2], { id: t3, priority: 'high', assignee: 'u1' }),
+        task(pid, 'Content inventory & copywriting', d(5), 8, [t2], { id: t4, assignee: 'u6' }),
+        task(pid, 'Wireframes', d(10), 5, [t3], { id: t5, priority: 'high', assignee: 'u1' }),
+        task(pid, 'Visual design system', d(15), 8, [t5], { id: t6, priority: 'urgent', assignee: 'u1' }),
+        task(pid, 'Component library', d(23), 10, [t6], { id: t7, priority: 'high', assignee: 'u2' }),
+        task(pid, 'Front-end pages build', d(33), 12, [t7], { id: t8, priority: 'high', assignee: 'u2' }),
+        task(pid, 'CMS integration', d(33), 8, [t7], { id: t9, assignee: 'u3' }),
+        task(pid, 'SEO & performance', d(45), 5, [t8, t9], { id: t10, assignee: 'u3' }),
+        task(pid, 'QA & testing', d(50), 5, [t10], { id: t11, priority: 'high', assignee: 'u4' }),
+        task(pid, 'Launch', d(55), 2, [t11], { id: t12, priority: 'urgent', assignee: 'u7' }),
       ];
     },
   },
@@ -70,14 +70,14 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
       const d = (offset: number) => addDays(start, offset).toISOString().slice(0, 10);
       const t1 = uid(), t2 = uid(), t3 = uid(), t4 = uid(), t5 = uid(), t6 = uid(), t7 = uid(), t8 = uid();
       return [
-        task('Sprint planning & backlog grooming', d(0), 1, [], { id: t1, priority: 'high', assignee: 'u5', storyPoints: 0 }),
-        task('Define sprint goal & acceptance criteria', d(0), 1, [t1], { id: t2, priority: 'high', assignee: 'u5', storyPoints: 0 }),
-        task('Development - feature work', d(1), 7, [t2], { id: t3, priority: 'high', assignee: 'u2', storyPoints: 13 }),
-        task('Development - bug fixes', d(1), 5, [], { id: t4, priority: 'medium', assignee: 'u3', storyPoints: 5 }),
-        task('Code review & pair programming', d(3), 6, [t3], { id: t5, assignee: 'u2', storyPoints: 3 }),
-        task('QA testing & regression', d(8), 3, [t3, t4, t5], { id: t6, priority: 'high', assignee: 'u4', storyPoints: 3 }),
-        task('Sprint demo & stakeholder review', d(9), 1, [t6], { id: t7, priority: 'high', assignee: 'u5', storyPoints: 0 }),
-        task('Sprint retrospective', d(10), 1, [t7], { id: t8, assignee: 'u5', storyPoints: 0 }),
+        task(pid, 'Sprint planning & backlog grooming', d(0), 1, [], { id: t1, priority: 'high', assignee: 'u5', storyPoints: 0 }),
+        task(pid, 'Define sprint goal & acceptance criteria', d(0), 1, [t1], { id: t2, priority: 'high', assignee: 'u5', storyPoints: 0 }),
+        task(pid, 'Development - feature work', d(1), 7, [t2], { id: t3, priority: 'high', assignee: 'u2', storyPoints: 13 }),
+        task(pid, 'Development - bug fixes', d(1), 5, [], { id: t4, priority: 'medium', assignee: 'u3', storyPoints: 5 }),
+        task(pid, 'Code review & pair programming', d(3), 6, [t3], { id: t5, assignee: 'u2', storyPoints: 3 }),
+        task(pid, 'QA testing & regression', d(8), 3, [t3, t4, t5], { id: t6, priority: 'high', assignee: 'u4', storyPoints: 3 }),
+        task(pid, 'Sprint demo & stakeholder review', d(9), 1, [t6], { id: t7, priority: 'high', assignee: 'u5', storyPoints: 0 }),
+        task(pid, 'Sprint retrospective', d(10), 1, [t7], { id: t8, assignee: 'u5', storyPoints: 0 }),
       ];
     },
   },
@@ -101,16 +101,16 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
       const d = (offset: number) => addDays(start, offset).toISOString().slice(0, 10);
       const t1 = uid(), t2 = uid(), t3 = uid(), t4 = uid(), t5 = uid(), t6 = uid(), t7 = uid(), t8 = uid(), t9 = uid(), t10 = uid();
       return [
-        task('Market research & positioning', d(0), 7, [], { id: t1, priority: 'high', assignee: 'u5' }),
-        task('Competitive positioning document', d(7), 5, [t1], { id: t2, assignee: 'u6' }),
-        task('Messaging & value proposition', d(7), 5, [t1], { id: t3, priority: 'high', assignee: 'u6' }),
-        task('Launch landing page copy', d(12), 4, [t2, t3], { id: t4, assignee: 'u6' }),
-        task('Email campaign sequence', d(12), 5, [t3], { id: t5, assignee: 'u6' }),
-        task('Sales enablement materials', d(16), 6, [t2], { id: t6, assignee: 'u5' }),
-        task('Press release & PR outreach', d(16), 5, [t3], { id: t7, assignee: 'u6' }),
-        task('Social media content calendar', d(12), 8, [t3], { id: t8, assignee: 'u6' }),
-        task('Legal & compliance review', d(17), 4, [t4, t5, t6, t7, t8], { id: t9, priority: 'high', assignee: 'u5' }),
-        task('Launch day coordination', d(21), 1, [t9], { id: t10, priority: 'urgent', assignee: 'u5' }),
+        task(pid, 'Market research & positioning', d(0), 7, [], { id: t1, priority: 'high', assignee: 'u5' }),
+        task(pid, 'Competitive positioning document', d(7), 5, [t1], { id: t2, assignee: 'u6' }),
+        task(pid, 'Messaging & value proposition', d(7), 5, [t1], { id: t3, priority: 'high', assignee: 'u6' }),
+        task(pid, 'Launch landing page copy', d(12), 4, [t2, t3], { id: t4, assignee: 'u6' }),
+        task(pid, 'Email campaign sequence', d(12), 5, [t3], { id: t5, assignee: 'u6' }),
+        task(pid, 'Sales enablement materials', d(16), 6, [t2], { id: t6, assignee: 'u5' }),
+        task(pid, 'Press release & PR outreach', d(16), 5, [t3], { id: t7, assignee: 'u6' }),
+        task(pid, 'Social media content calendar', d(12), 8, [t3], { id: t8, assignee: 'u6' }),
+        task(pid, 'Legal & compliance review', d(17), 4, [t4, t5, t6, t7, t8], { id: t9, priority: 'high', assignee: 'u5' }),
+        task(pid, 'Launch day coordination', d(21), 1, [t9], { id: t10, priority: 'urgent', assignee: 'u5' }),
       ];
     },
   },
@@ -134,16 +134,16 @@ export const PROJECT_TEMPLATES: ProjectTemplate[] = [
       const d = (offset: number) => addDays(start, offset).toISOString().slice(0, 10);
       const t1 = uid(), t2 = uid(), t3 = uid(), t4 = uid(), t5 = uid(), t6 = uid(), t7 = uid(), t8 = uid(), t9 = uid(), t10 = uid();
       return [
-        task('Define event goals & budget', d(0), 3, [], { id: t1, priority: 'high', assignee: 'u5' }),
-        task('Venue research & booking', d(3), 5, [t1], { id: t2, priority: 'high', assignee: 'u5' }),
-        task('Speaker outreach & invitations', d(3), 10, [t1], { id: t3, priority: 'medium', assignee: 'u6' }),
-        task('Event website & registration', d(8), 7, [t2], { id: t4, assignee: 'u2' }),
-        task('Marketing & promotion plan', d(8), 10, [t1], { id: t5, assignee: 'u6' }),
-        task('Sponsorship & partnerships', d(8), 12, [t1], { id: t6, assignee: 'u5' }),
-        task('AV & technical setup', d(18), 5, [t2], { id: t7, assignee: 'u3' }),
-        task('Catering & logistics', d(18), 5, [t2], { id: t8, assignee: 'u5' }),
-        task('Rehearsal & run-through', d(25), 1, [t3, t7, t8], { id: t9, priority: 'high', assignee: 'u5' }),
-        task('Post-event follow-up & survey', d(26), 5, [t9], { id: t10, assignee: 'u6' }),
+        task(pid, 'Define event goals & budget', d(0), 3, [], { id: t1, priority: 'high', assignee: 'u5' }),
+        task(pid, 'Venue research & booking', d(3), 5, [t1], { id: t2, priority: 'high', assignee: 'u5' }),
+        task(pid, 'Speaker outreach & invitations', d(3), 10, [t1], { id: t3, priority: 'medium', assignee: 'u6' }),
+        task(pid, 'Event website & registration', d(8), 7, [t2], { id: t4, assignee: 'u2' }),
+        task(pid, 'Marketing & promotion plan', d(8), 10, [t1], { id: t5, assignee: 'u6' }),
+        task(pid, 'Sponsorship & partnerships', d(8), 12, [t1], { id: t6, assignee: 'u5' }),
+        task(pid, 'AV & technical setup', d(18), 5, [t2], { id: t7, assignee: 'u3' }),
+        task(pid, 'Catering & logistics', d(18), 5, [t2], { id: t8, assignee: 'u5' }),
+        task(pid, 'Rehearsal & run-through', d(25), 1, [t3, t7, t8], { id: t9, priority: 'high', assignee: 'u5' }),
+        task(pid, 'Post-event follow-up & survey', d(26), 5, [t9], { id: t10, assignee: 'u6' }),
       ];
     },
   },

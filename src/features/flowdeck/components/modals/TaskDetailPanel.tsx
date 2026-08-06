@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { X, ArrowLeft, Calendar, Link2, Diamond, Repeat, Tag as TagIcon, Plus, Trash2, Eye, Download, Upload, Copy, FolderInput, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
-import { COLORS, STATUS_META, PRIORITY_META, TEAM, TAG_COLORS, fmtRange, fmtDueDate, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, CURRENT_USER_ID, TODAY, type Task, type FileItem, type Tag, type Comment, type ActivityEntry, type TimeLog, type CustomColumn } from '@/features/flowdeck/model';
+import { COLORS, STATUS_META, PRIORITY_META, TEAM, TAG_COLORS, fmtRange, fmtDueDate, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, CURRENT_USER_ID, TODAY, type Task, type FileItem, type Tag, type Comment, type ActivityEntry, type TimeLog, type CustomColumn, type TaskStatus, type TaskPriority } from '@/features/flowdeck/model';
 import { useViewport } from '../../hooks/useViewport';
 import { StatusPill } from '../ui/StatusPill';
 import { FileThumbnail } from '../ui/FileThumbnail';
@@ -411,13 +411,13 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
           {tagsSection}
           {parentTaskField}
           {subtasksSection}
-          <Field label="Status"><select value={task.status} onChange={e => onUpdate({ status: e.target.value, progress: e.target.value === 'done' ? 100 : task.progress })} style={selectStyle}>{['backlog', 'inprogress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select></Field>
+          <Field label="Status"><select value={task.status} onChange={e => onUpdate({ status: e.target.value as TaskStatus, progress: e.target.value === 'done' ? 100 : task.progress })} style={selectStyle}>{['backlog', 'in_progress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select></Field>
           <Field label="Assignee"><select value={task.assignee} onChange={e => onUpdate({ assignee: e.target.value })} style={selectStyle}>{TEAM.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
-          <Field label="Priority"><select value={task.priority} onChange={e => onUpdate({ priority: e.target.value })} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
+          <Field label="Priority"><select value={task.priority} onChange={e => onUpdate({ priority: e.target.value as TaskPriority })} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
           {dueDateField}
           {recurrenceField}
           {sectionField}
-          <Field label={`Progress \u2014 ${task.progress}%`}><input type="range" min={0} max={100} step={5} value={task.progress} onChange={e => { const val = Number(e.target.value); onUpdate({ progress: val, status: val === 100 ? 'done' : task.status === 'done' ? 'inprogress' : task.status }); }} style={{ width: '100%', accentColor: COLORS.accent }} /></Field>
+          <Field label={`Progress \u2014 ${task.progress}%`}><input type="range" min={0} max={100} step={5} value={task.progress} onChange={e => { const val = Number(e.target.value); onUpdate({ progress: val, status: val === 100 ? 'done' : task.status === 'done' ? 'in_progress' : task.status }); }} style={{ width: '100%', accentColor: COLORS.accent }} /></Field>
           <Field label="Dates"><div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: COLORS.ink, fontFamily: FF }}><Calendar size={16} color={COLORS.gray} /> {fmtRange(task.start, task.duration)} <span style={{ color: COLORS.gray }}>({task.duration}d)</span></div></Field>
           {storyPointsSection}
           {customFieldsSection}
@@ -504,13 +504,13 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
         {tagsSection}
         {parentTaskField}
         {subtasksSection}
-        <Field label="Status"><select value={task.status} onChange={e => onUpdate({ status: e.target.value, progress: e.target.value === 'done' ? 100 : task.progress })} style={selectStyle}>{['backlog', 'inprogress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select></Field>
+        <Field label="Status"><select value={task.status} onChange={e => onUpdate({ status: e.target.value as TaskStatus, progress: e.target.value === 'done' ? 100 : task.progress })} style={selectStyle}>{['backlog', 'in_progress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select></Field>
         <Field label="Assignee"><select value={task.assignee} onChange={e => onUpdate({ assignee: e.target.value })} style={selectStyle}>{TEAM.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
-        <Field label="Priority"><select value={task.priority} onChange={e => onUpdate({ priority: e.target.value })} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
+        <Field label="Priority"><select value={task.priority} onChange={e => onUpdate({ priority: e.target.value as TaskPriority })} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
         {dueDateField}
         {recurrenceField}
         {sectionField}
-        <Field label={`Progress \u2014 ${task.progress}%`}><input type="range" min={0} max={100} step={5} value={task.progress} onChange={e => { const val = Number(e.target.value); onUpdate({ progress: val, status: val === 100 ? 'done' : task.status === 'done' ? 'inprogress' : task.status }); }} style={{ width: '100%', accentColor: COLORS.accent }} /></Field>
+        <Field label={`Progress \u2014 ${task.progress}%`}><input type="range" min={0} max={100} step={5} value={task.progress} onChange={e => { const val = Number(e.target.value); onUpdate({ progress: val, status: val === 100 ? 'done' : task.status === 'done' ? 'in_progress' : task.status }); }} style={{ width: '100%', accentColor: COLORS.accent }} /></Field>
         <Field label="Dates"><div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: COLORS.ink, fontFamily: FF }}><Calendar size={14} color={COLORS.gray} /> {fmtRange(task.start, task.duration)} <span style={{ color: COLORS.gray }}>({task.duration}d)</span></div></Field>
         {storyPointsSection}
         {customFieldsSection}

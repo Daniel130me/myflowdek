@@ -11,7 +11,7 @@ import {
   Trash2, Copy, CheckSquare, Square, Flag,
   ArrowUpCircle, ArrowDownCircle, Tag as TagIcon, Play, Eye, FolderInput, ArrowRightToLine, Repeat, LayoutList,
 } from 'lucide-react';
-import { STATUS_META, STATUS_ORDER, PRIORITY_META, COLORS, FF, type Task, type Tag, type Project } from '@/features/flowdeck/model';
+import { STATUS_META, STATUS_ORDER, PRIORITY_META, COLORS, FF, type Task, type Tag, type Project, type TaskStatus, type TaskPriority } from '@/features/flowdeck/model';
 
 interface TaskContextMenuProps {
   task: Task;
@@ -84,7 +84,7 @@ export function TaskContextMenu({
               return (
                 <ContextMenuItem
                   key={s}
-                  onSelect={() => onUpdateTask(task.id, { status: s, progress: s === 'done' ? 100 : s === 'backlog' ? 0 : task.progress })}
+                  onSelect={() => onUpdateTask(task.id, { status: s as TaskStatus, progress: s === 'done' ? 100 : s === 'backlog' ? 0 : task.progress })}
                   disabled={task.status === s}
                 >
                   <span style={{ width: 8, height: 8, borderRadius: 2, background: meta.color, marginRight: 4 }} />
@@ -106,7 +106,7 @@ export function TaskContextMenu({
             {Object.entries(PRIORITY_META).map(([key, meta]) => (
               <ContextMenuItem
                 key={key}
-                onSelect={() => onUpdateTask(task.id, { priority: key })}
+                onSelect={() => onUpdateTask(task.id, { priority: key as TaskPriority })}
                 disabled={task.priority === key}
               >
                 <span style={{ width: 8, height: 8, borderRadius: 2, background: meta.color, marginRight: 4 }} />

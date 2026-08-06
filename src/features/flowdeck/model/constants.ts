@@ -31,11 +31,11 @@ export const COLORS = {
 
 export const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   backlog: { label: "Backlog", color: "#6B7280", bg: "#F3F4F6" },
-  inprogress: { label: "In Progress", color: "#FE8029", bg: "#FFF4EB" },
+  in_progress: { label: "In Progress", color: "#FE8029", bg: "#FFF4EB" },
   review: { label: "In Review", color: "#7C3AED", bg: "#EDE9FE" },
   done: { label: "Done", color: "#16A34A", bg: "#DCFCE7" },
 };
-export const STATUS_ORDER = ["backlog", "inprogress", "review", "done"];
+export const STATUS_ORDER = ["backlog", "in_progress", "review", "done"];
 
 export const PRIORITY_META: Record<string, { label: string; color: string }> = {
   low: { label: "Low", color: "#6B7280" },

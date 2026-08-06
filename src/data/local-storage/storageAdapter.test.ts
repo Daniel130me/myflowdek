@@ -10,17 +10,17 @@ test('migrateState provides default fallback arrays if input is null or missing 
   assert.ok(typeof migrated.projects === 'object');
 });
 
-test('migrateState preserves valid existing data fields', () => {
+test('migrateState preserves valid existing data fields and converts inprogress to in_progress', () => {
   const sample = {
     version: 1,
     currentProjectId: 'p2',
     projects: { p1: { id: 'p1', name: 'Test' } },
-    tasks: [{ id: 't1', name: 'Task 1' }],
+    tasksByProject: { p1: [{ id: 't1', projectId: 'p1', name: 'Task 1', status: 'inprogress' }] },
   };
   const migrated = migrateState(sample);
   assert.strictEqual(migrated.currentProjectId, 'p2');
   assert.strictEqual((migrated.projects as any).p1.name, 'Test');
-  assert.strictEqual(migrated.tasks?.length, 1);
+  assert.strictEqual(migrated.tasksByProject?.p1[0].status, 'in_progress');
 });
 
 test('migrateState recovers safely from invalid non-object input', () => {

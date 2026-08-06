@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter, useParams } from 'next/navigation';
-import { FONT_FAMILY as FF } from '@/features/flowdeck/model';
+import { FONT_FAMILY as FF, type TaskPriority } from '@/features/flowdeck/model';
 import { useViewport } from '@/features/flowdeck/hooks/useViewport';
 import { useKeyboardShortcuts } from '@/features/flowdeck/hooks/useKeyboardShortcuts';
 import { ThemeProvider, useTheme } from '@/features/flowdeck/hooks/useTheme';
@@ -241,7 +241,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
             state.selectedIds.forEach(id => state.updateTask(id, { assignee: memberId }));
           }}
           onSetPriority={priority => {
-            state.selectedIds.forEach(id => state.updateTask(id, { priority }));
+            state.selectedIds.forEach(id => state.updateTask(id, { priority: priority as TaskPriority }));
           }}
           onComplete={() => {
             state.selectedIds.forEach(id => state.updateTask(id, { status: 'done' }));
