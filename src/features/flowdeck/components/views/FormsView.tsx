@@ -491,8 +491,7 @@ function FormBuilder({
   const { isMobile } = useViewport();
   const [name, setName] = useState(initial?.name ?? '');
   const [projectId, setProjectId] = useState(
-    initial?.projectId ??
-      (currentProjectId || (Object.keys(projects)[0] ?? ''))
+    initial?.projectId ?? (currentProjectId || '')
   );
   const [description, setDescription] = useState(initial?.description ?? '');
   const [fields, setFields] = useState<FieldDraft[]>(

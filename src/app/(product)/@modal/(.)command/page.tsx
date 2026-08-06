@@ -23,27 +23,26 @@ export default function InterceptedCommandPalettePage() {
       }}
       activeView={state.activeView}
       onNavigate={view => {
-        router.push(getRouteForView(view, projectId || state.currentProjectId || undefined));
-        close();
+        router.replace(getRouteForView(view, projectId || undefined));
       }}
       projects={state.projects}
       onOpenProject={id => {
         state.openProject(id);
-        router.push(routes.projectOverview(id));
-        close();
+        router.replace(routes.projectOverview(id));
       }}
       onNewProject={() => {
         router.push(routes.newProject());
       }}
       tasksByProject={state.tasksByProject}
-      onOpenTask={id => {
-        const pId = projectId || state.currentProjectId || Object.keys(state.projects)[0];
-        if (pId) router.push(routes.task(pId, id));
-        close();
+      onOpenTask={(pId, taskId) => {
+        router.replace(routes.task(pId, taskId));
       }}
-      onNewTask={() => {
-        const pId = projectId || state.currentProjectId || Object.keys(state.projects)[0];
-        if (pId) router.push(routes.newTask(pId));
+      onNewTask={pid => {
+        if (pid) {
+          router.replace(routes.newTask(pid));
+        } else {
+          router.replace(routes.projects());
+        }
       }}
       onUndo={state.gridActions.onUndo}
       onRedo={state.gridActions.onRedo}

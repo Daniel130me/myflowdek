@@ -36,11 +36,10 @@ export default function CommandRoutePage() {
         onOpenTask={(pId: string, taskId: string) => {
           router.replace(routes.task(pId, taskId));
         }}
-        onNewTask={(pId?: string) => {
-          if (pId) {
-            router.replace(routes.newTask(pId));
+        onNewTask={projectId => {
+          if (projectId) {
+            router.replace(routes.newTask(projectId));
           } else {
-            // If no project specified, go to projects portfolio
             router.replace(routes.projects());
           }
         }}

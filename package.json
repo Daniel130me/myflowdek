@@ -11,7 +11,7 @@
     "start": "next start -H 0.0.0.0",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/shared/navigation/routes.test.ts src/providers/FlowdekDataProvider.test.ts src/data/local-storage/storageAdapter.test.ts src/features/tasks/selectors/getTaskForProject.test.ts src/features/files/selectors/getFileForProject.test.ts",
+    "test": "tsx --test src/shared/navigation/routes.test.ts src/providers/FlowdekDataProvider.test.ts src/data/local-storage/storageAdapter.test.ts src/features/tasks/selectors/getTaskForProject.test.ts src/features/files/selectors/getFileForProject.test.ts src/features/flowdeck/corrections.test.ts",
     "check": "npm run lint && npm run typecheck && npm run test",
     "verify": "npm run db:generate && npm run check && npm run build",
     "db:push": "prisma db push",

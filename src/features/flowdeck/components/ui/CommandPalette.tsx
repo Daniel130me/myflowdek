@@ -60,8 +60,7 @@ export function CommandPalette({
 
   const handleSelect = useCallback((action: () => void) => {
     action();
-    onOpenChange(false);
-  }, [onOpenChange]);
+  }, []);
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
