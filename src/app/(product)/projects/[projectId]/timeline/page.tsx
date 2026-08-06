@@ -27,8 +27,8 @@ export default function ProjectTimelinePage() {
           router.push(routes.task(state.currentProjectId, id));
         }
       }}
-      onToggleComplete={state.toggleComplete}
-      onUpdateTask={state.updateTask}
+      onToggleComplete={(id) => state.toggleComplete(state.project!.id, id)}
+      onUpdateTask={(id, patch) => state.updateTask(state.project!.id, id, patch)}
       grid={state.gridActions}
     />
   );

@@ -13,8 +13,8 @@ export default function AiAssistantRoutePage() {
       tasks={state.tasks}
       currentProjectId={state.currentProjectId}
       currentUserId={state.currentUserId}
-      onAddTask={state.addTask}
-      onUpdateTask={state.updateTask}
+      onAddTask={(task) => state.addTask(state.currentProjectId!, task)}
+      onUpdateTask={(id, patch) => state.updateTask(state.currentProjectId!, id, patch)}
     />
   );
 }

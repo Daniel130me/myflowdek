@@ -103,15 +103,20 @@ export interface Task {
 export interface CreateTaskInput {
   name: string;
   description?: string;
-  status: TaskStatus;
-  priority: TaskPriority;
-  assignee: string;
-  start: string;
-  duration: number;
+  status?: TaskStatus;
+  assignee?: string;
+  start?: string;
+  duration?: number;
   dueDate?: string;
+  priority?: TaskPriority;
+  deps?: string[];
+  tags?: string[];
   parentId?: string | null;
   sectionId?: string | null;
-  tags?: string[];
+  customFields?: Record<string, string>;
+  storyPoints?: number;
+  color?: string | null;
+  milestone?: boolean;
 }
 
 export interface UpdateTaskInput {

@@ -14,9 +14,9 @@ export default function ProjectFilesPage() {
     <FilesView
       files={state.files}
       tasks={state.tasks}
-      onAdd={state.addFiles}
-      onRemove={state.removeFile}
-      onLink={state.linkFile}
+      onAdd={(files) => state.addFiles(state.currentProjectId!, files)}
+      onRemove={(fileId) => state.removeFile(state.currentProjectId!, fileId)}
+      onLink={(fileId, linkedTaskId) => state.linkFile(state.currentProjectId!, fileId, linkedTaskId)}
       onViewFile={fileId => {
         if (state.currentProjectId) {
           router.push(routes.file(state.currentProjectId, fileId));

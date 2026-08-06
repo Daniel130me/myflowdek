@@ -78,19 +78,12 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
   const routeProjectId = getSingleParam(params?.projectId);
   const activeView = getViewFromPathname(pathname);
 
-  // Sync route projectId with store state
-  useEffect(() => {
-    if (routeProjectId && projects[routeProjectId]) {
-      state.openProject(routeProjectId);
-    }
-  }, [routeProjectId, projects, state]);
-
   // Keyboard shortcut listeners
   useKeyboardShortcuts({
     activeView,
     searchQuery,
     selectedIds: state.selectedIds,
-    onToggleComplete: state.toggleComplete,
+    onToggleComplete: (id) => routeProjectId && state.toggleComplete(routeProjectId, id),
     onIndent: gridActions.onIndent,
     onOutdent: gridActions.onOutdent,
     onDelete: gridActions.onDeleteSelected,
@@ -238,20 +231,20 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
           count={state.selectedIds.size}
           onClearSelection={() => state.setSelectedIds(new Set())}
           onBulkAssign={memberId => {
-            state.selectedIds.forEach(id => state.updateTask(id, { assignee: memberId }));
+            if (routeProjectId) state.selectedIds.forEach(id => state.updateTask(routeProjectId, id, { assignee: memberId }));
           }}
           onSetPriority={priority => {
-            state.selectedIds.forEach(id => state.updateTask(id, { priority: priority as TaskPriority }));
+            if (routeProjectId) state.selectedIds.forEach(id => state.updateTask(routeProjectId, id, { priority: priority as TaskPriority }));
           }}
           onComplete={() => {
-            state.selectedIds.forEach(id => state.updateTask(id, { status: 'done' }));
+            if (routeProjectId) state.selectedIds.forEach(id => state.updateTask(routeProjectId, id, { status: 'done' }));
           }}
           onDelete={() => state.removeTasksBulk(state.selectedIds)}
-          onLink={() => {}}
-          onUnlink={() => {}}
-          onBold={() => {}}
-          onMilestone={() => {}}
-          onAttachFiles={() => {}}
+          onLink={gridActions.onLink}
+          onUnlink={gridActions.onUnlink}
+          onBold={gridActions.onToggleBold}
+          onMilestone={gridActions.onToggleMilestone}
+          onAttachFiles={gridActions.onAttachFiles}
           onDuplicateBulk={() => state.duplicateTasksBulk(state.selectedIds)}
           onBulkSetDueDate={date => state.bulkSetDueDate(state.selectedIds, date)}
           onBulkAddTag={tagId => state.bulkAddTag(state.selectedIds, tagId)}

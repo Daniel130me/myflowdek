@@ -27,8 +27,8 @@ export default function NewTaskRoutePage() {
         tasks={tasks}
         tags={tags}
         onClose={close}
-        onCreate={task => {
-          state.addTask({ ...task, projectId });
+        onCreate={input => {
+          state.addTask(projectId, input);
           close();
         }}
       />

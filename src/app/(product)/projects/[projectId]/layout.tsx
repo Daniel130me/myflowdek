@@ -11,11 +11,24 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
 
   const projectExists = Boolean(projectId && state.projects[projectId]);
 
+  const {
+    currentProjectId,
+    syncProjectFromRoute,
+  } = state;
+
   useEffect(() => {
-    if (projectExists && state.currentProjectId !== projectId) {
-      state.syncProjectFromRoute(projectId);
+    if (
+      projectExists &&
+      currentProjectId !== projectId
+    ) {
+      syncProjectFromRoute(projectId);
     }
-  }, [projectId, projectExists, state]);
+  }, [
+    projectId,
+    projectExists,
+    currentProjectId,
+    syncProjectFromRoute,
+  ]);
 
   if (!projectExists) {
     notFound();

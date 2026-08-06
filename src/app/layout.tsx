@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import React from "react";
 import "./globals.css";
 
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
   title: "Flowdek - Workflow & Task Management",
   description: "Modern workflow and task management application built with Next.js, TypeScript, and Tailwind CSS.",

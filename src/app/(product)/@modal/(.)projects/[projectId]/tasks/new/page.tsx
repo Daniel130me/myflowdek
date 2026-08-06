@@ -24,8 +24,8 @@ export default function InterceptedNewTaskPage() {
       tasks={tasks}
       tags={tags}
       onClose={close}
-      onCreate={task => {
-        state.addTask({ ...task, projectId });
+      onCreate={input => {
+        state.addTask(projectId, input);
         close();
       }}
     />

@@ -2,12 +2,12 @@
 
 import React from 'react';
 import { X } from 'lucide-react';
-import { COLORS, TEAM, PRIORITY_META, TODAY, TAG_COLORS, type Task, type Tag, type TaskPriority } from '@/features/flowdeck/model';
+import { COLORS, TEAM, PRIORITY_META, TODAY, TAG_COLORS, type Task, type Tag, type TaskPriority, type CreateTaskInput } from '@/features/flowdeck/model';
 import { useViewport } from '../../hooks/useViewport';
 import { Field } from '../ui/Field';
 import { selectStyle, FF } from '../ui/styles';
 
-export function NewTaskModal({ projectStart, tasks = [], tags = [], onClose, onCreate }: { projectStart: string; tasks?: Task[]; tags?: Tag[]; onClose: () => void; onCreate: (task: Task) => void }) {
+export function NewTaskModal({ projectStart, tasks = [], tags = [], onClose, onCreate }: { projectStart: string; tasks?: Task[]; tags?: Tag[]; onClose: () => void; onCreate: (input: CreateTaskInput) => void }) {
   const [name, setName] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [assignee, setAssignee] = React.useState(TEAM[0].id);
@@ -20,18 +20,17 @@ export function NewTaskModal({ projectStart, tasks = [], tags = [], onClose, onC
 
   function submit() {
     if (!name.trim()) return;
-    const pid = tasks[0]?.projectId || 'p1';
     onCreate({
-      id: 't' + Math.random().toString(36).slice(2, 8),
-      projectId: pid,
       name: name.trim(),
       description: description.trim() || undefined,
-      status: 'backlog', assignee, start, duration: Number(duration),
-      progress: 0, priority, deps: [],
+      status: 'backlog',
+      assignee,
+      start,
+      duration: Number(duration),
+      priority,
       dueDate: dueDate || undefined,
       tags: [...selectedTags],
-      parentId: parentId || undefined,
-      createdAt: new Date().toISOString().slice(0, 10),
+      parentId: parentId || null,
     });
   }
 

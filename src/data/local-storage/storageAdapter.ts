@@ -23,7 +23,7 @@ export const TaskPrioritySchema = z.enum(['low', 'medium', 'high', 'urgent']);
 
 export const TaskSchema = z.object({
   id: z.string().min(1),
-  projectId: z.string().min(1).default('p1'),
+  projectId: z.string().min(1),
   name: z.string().min(1),
   description: z.string().optional(),
   status: TaskStatusSchema.default('backlog'),
@@ -226,6 +226,19 @@ export function migrateState(rawState: unknown): PersistedState {
     return value;
   });
 
+  if (sanitized.tasksByProject && typeof sanitized.tasksByProject === 'object') {
+    const migratedTasksByProject: Record<string, any[]> = {};
+    for (const [projectId, tasks] of Object.entries(sanitized.tasksByProject as Record<string, any>)) {
+      if (Array.isArray(tasks)) {
+        migratedTasksByProject[projectId] = tasks.map((task: any) => ({
+          ...task,
+          projectId: task.projectId || projectId,
+        }));
+      }
+    }
+    sanitized.tasksByProject = migratedTasksByProject;
+  }
+
   const result = PersistedStateSchema.safeParse(sanitized);
   if (!result.success) {
     console.warn('[Flowdek] Persisted state validation failed, falling back to safe state:', result.error);
@@ -240,6 +253,15 @@ export function migrateState(rawState: unknown): PersistedState {
     tasksByProject: (validated.tasksByProject ?? initialTasks) as Record<string, Task[]>,
     filesByProject: (validated.filesByProject ?? initialFiles) as Record<string, FileItem[]>,
     raidByProject: (validated.raidByProject ?? initialRaid) as Record<string, RaidItem[]>,
+    customColsByProject: validated.customColsByProject ?? {},
+    tagsByProject: validated.tagsByProject ?? {},
+    commentsByProject: validated.commentsByProject ?? {},
+    activityByProject: validated.activityByProject ?? {},
+    timeLogsByProject: validated.timeLogsByProject ?? {},
+    sectionsByProject: validated.sectionsByProject ?? {},
+    statusUpdatesByProject: validated.statusUpdatesByProject ?? {},
+    savedFilters: validated.savedFilters ?? [],
+    activeView: validated.activeView,
     tasks: (Array.isArray(validated.tasks) ? validated.tasks : Object.values(validated.tasksByProject || initialTasks).flat()) as Task[],
     files: (Array.isArray(validated.files) ? validated.files : Object.values(validated.filesByProject || initialFiles).flat()) as FileItem[],
     raidItems: (Array.isArray(validated.raidItems) ? validated.raidItems : Object.values(validated.raidByProject || initialRaid).flat()) as RaidItem[],
@@ -267,6 +289,15 @@ export function createDefaultPersistedState(): PersistedState {
     tasksByProject: initialTasks,
     filesByProject: initialFiles,
     raidByProject: initialRaid,
+    customColsByProject: {},
+    tagsByProject: {},
+    commentsByProject: {},
+    activityByProject: {},
+    timeLogsByProject: {},
+    sectionsByProject: {},
+    statusUpdatesByProject: {},
+    savedFilters: [],
+    activeView: undefined,
     tasks: Object.values(initialTasks).flat(),
     files: Object.values(initialFiles).flat(),
     raidItems: Object.values(initialRaid).flat(),

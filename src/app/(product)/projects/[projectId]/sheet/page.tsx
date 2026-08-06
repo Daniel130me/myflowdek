@@ -10,15 +10,15 @@ export default function ProjectSheetPage() {
   return (
     <SheetView
       tasks={state.filteredTasks}
-      onUpdate={state.updateTask}
-      onAdd={state.addTask}
-      onRemove={state.removeTask}
+      onUpdate={(id, patch) => state.updateTask(state.currentProjectId!, id, patch)}
+      onAdd={(task) => state.addTask(state.currentProjectId!, task)}
+      onRemove={(id) => state.removeTask(state.currentProjectId!, id)}
       grid={state.gridActions}
-      onReorder={(taskId, toIndex) => state.reorderTask(taskId, toIndex)}
+      onReorder={(taskId, toIndex) => state.reorderTask(state.currentProjectId!, taskId, toIndex)}
       onQuickAdd={name => {
-        state.quickAddTask(name, { status: 'backlog' });
+        state.quickAddTask(state.currentProjectId!, name, { status: 'backlog' });
       }}
-      onToggleComplete={state.toggleComplete}
+      onToggleComplete={(id) => state.toggleComplete(state.currentProjectId!, id)}
     />
   );
 }

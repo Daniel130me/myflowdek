@@ -23,25 +23,25 @@ export default function ProjectTasksPage() {
           router.push(routes.task(state.currentProjectId, id));
         }
       }}
-      onMove={(id, status) => state.moveStatus(id, status)}
-      onToggleComplete={state.toggleComplete}
-      onReorder={(taskId, toIndex) => state.reorderTask(taskId, toIndex)}
+      onMove={(id, status) => state.moveStatus(state.currentProjectId!, id, status)}
+      onToggleComplete={(id) => state.toggleComplete(state.currentProjectId!, id)}
+      onReorder={(taskId, toIndex) => state.reorderTask(state.currentProjectId!, taskId, toIndex)}
       onQuickAdd={name => {
-        state.quickAddTask(name, { status: 'backlog' });
+        state.quickAddTask(state.currentProjectId!, name, { status: 'backlog' });
       }}
-      onUpdateTask={state.updateTask}
-      onRemoveTask={state.removeTask}
+      onUpdateTask={(id, patch) => state.updateTask(state.currentProjectId!, id, patch)}
+      onRemoveTask={(id) => state.removeTask(state.currentProjectId!, id)}
       onDuplicateTask={id => {
         if (state.currentProjectId) {
           router.push(routes.taskDuplicate(state.currentProjectId, id));
         }
       }}
-      onToggleTaskTag={state.toggleTaskTag}
+      onToggleTaskTag={(taskId, tagId) => state.toggleTaskTag(state.currentProjectId!, taskId, tagId)}
       onMoveToProject={state.moveTaskToProject}
-      onPromoteSubtask={state.promoteSubtask}
-      onDemoteToSubtask={state.demoteToSubtask}
-      onAddSection={state.addSection}
-      onDeleteSection={state.deleteSection}
+      onPromoteSubtask={(id) => state.promoteSubtask(state.currentProjectId!, id)}
+      onDemoteToSubtask={(id, parentId) => state.demoteToSubtask(state.currentProjectId!, id, parentId)}
+      onAddSection={(name) => state.addSection(state.currentProjectId!, name)}
+      onDeleteSection={(id) => state.deleteSection(state.currentProjectId!, id)}
     />
   );
 }

@@ -52,25 +52,25 @@ export default function TaskDetailRoutePage() {
         activity={taskActivity}
         parentTask={parentTask}
         onClose={() => router.push(routes.projectTasks(projectId))}
-        onUpdate={patch => state.updateTask(task.id, patch)}
+        onUpdate={patch => state.updateTask(projectId, task.id, patch)}
         onAddSubtask={() => router.push(routes.newTask(projectId))}
         onNavigateToTask={tid => router.push(routes.task(projectId, tid))}
-        onToggleTaskTag={state.toggleTaskTag}
-        onAddTag={state.addTag}
-        onRemoveTag={state.removeTag}
-        onAddComment={state.addComment}
-        onDeleteComment={state.deleteComment}
-        onEditComment={state.editComment}
-        onToggleReaction={state.toggleReaction}
-        onToggleFollower={state.toggleFollower}
+        onToggleTaskTag={(taskId, tagId) => state.toggleTaskTag(projectId, taskId, tagId)}
+        onAddTag={(tag) => state.addTag(projectId, tag)}
+        onRemoveTag={(tagId) => state.removeTag(projectId, tagId)}
+        onAddComment={(taskId, text, parentId) => state.addComment(projectId, taskId, text, parentId)}
+        onDeleteComment={(commentId) => state.deleteComment(projectId, commentId)}
+        onEditComment={(commentId, newText) => state.editComment(projectId, commentId, newText)}
+        onToggleReaction={(commentId, emoji) => state.toggleReaction(projectId, commentId, emoji)}
+        onToggleFollower={(taskId, userId) => state.toggleFollower(projectId, taskId, userId)}
         timeLogs={taskTimeLogs}
-        onAddTimeLog={state.addTimeLog}
-        onDeleteTimeLog={state.deleteTimeLog}
+        onAddTimeLog={(taskId, minutes, note) => state.addTimeLog(projectId, taskId, minutes, note)}
+        onDeleteTimeLog={(timeLogId) => state.deleteTimeLog(projectId, timeLogId)}
         currentUserId={state.currentUserId}
         customCols={projectCustomFields}
         onViewFile={fileId => router.push(routes.file(projectId, fileId))}
-        onRemoveFile={state.removeFile}
-        onAddFiles={state.addFiles}
+        onRemoveFile={(fileId) => state.removeFile(projectId, fileId)}
+        onAddFiles={(files) => state.addFiles(projectId, files)}
         onDuplicateTaskWithOptions={state.duplicateTaskWithOptions}
         onMoveToProject={state.moveTaskToProject}
       />

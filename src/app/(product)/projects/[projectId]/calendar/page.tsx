@@ -19,9 +19,9 @@ export default function ProjectCalendarPage() {
         }
       }}
       onQuickAdd={(name, start) => {
-        state.quickAddTask(name, { startOverride: start });
+        state.quickAddTask(state.currentProjectId!, name, { startOverride: start });
       }}
-      onUpdateTaskDueDate={(taskId, newDate) => state.updateTask(taskId, { start: newDate })}
+      onUpdateTaskDueDate={(taskId, newDate) => state.updateTask(state.currentProjectId!, taskId, { start: newDate })}
     />
   );
 }

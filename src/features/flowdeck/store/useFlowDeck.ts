@@ -11,12 +11,12 @@ import {
   FONT_FAMILY as FF,
   type Task, type Project, type FileItem, type RaidItem, type CustomColumn, type TaskStatus, type TaskPriority,
   type Tag, type Comment, type ActivityEntry, type TimeLog, type SearchFilters, type Section, type Reaction, type Goal, type KeyResult, type SavedFilter, EMPTY_FILTERS,
-  type AutomationRule, type Form, type FormSubmission, type ApprovalRequest, type Budget, type Expense, type TimesheetEntry,
+  type AutomationRule, type Form, type FormSubmission, type ApprovalRequest, type Budget, type Expense, type TimesheetEntry, type CreateTaskInput,
 } from '@/features/flowdeck/model';
 import type { GridActions } from '../components/toolbar/types';
 import type { ProjectStatusUpdate } from '@/features/flowdeck/model';
 import { useOptionalFlowdekData } from '@/providers/FlowdekDataProvider';
-import { loadPersistedState, savePersistedState, STORAGE_KEY } from '@/data/local-storage/storageAdapter';
+import { loadPersistedState, savePersistedState, clearPersistedState, loadCustomTemplates, saveCustomTemplates, STORAGE_KEY } from '@/data/local-storage/storageAdapter';
 import { defaultIdGenerator } from '@/shared/utils/id';
 
 /* ---- LocalStorage persistence ---- */
@@ -116,16 +116,16 @@ export interface FlowDeckState {
   createProject: (p: { name: string; color: string; start: string; end: string }) => void;
   createProjectFromTemplate: (templateId: string, name: string, color: string, start: string, end: string) => void;
   deleteProject: (id: string) => void;
-  updateTask: (id: string, patch: Partial<Task>) => void;
-  addTask: (task: Task) => void;
-  removeTask: (id: string) => void;
+  updateTask: (projectId: string, taskId: string, patch: Partial<Task>) => void;
+  addTask: (projectId: string, input: CreateTaskInput | Task) => void;
+  removeTask: (projectId: string, taskId: string) => void;
   removeTasksBulk: (ids: Set<string>) => void;
   duplicateTask: (id: string) => void;
-  moveStatus: (id: string, status: string) => void;
-  toggleComplete: (id: string) => void;
-  addFiles: (files: FileItem[]) => void;
-  removeFile: (id: string) => void;
-  linkFile: (id: string, linkedTaskId: string | null) => void;
+  moveStatus: (projectId: string, taskId: string, status: string) => void;
+  toggleComplete: (projectId: string, taskId: string) => void;
+  addFiles: (projectId: string, files: FileItem[]) => void;
+  removeFile: (projectId: string, fileId: string) => void;
+  linkFile: (projectId: string, fileId: string, linkedTaskId: string | null) => void;
   addRaidItem: (item: RaidItem) => void;
   updateRaidItem: (id: string, patch: Partial<RaidItem>) => void;
   removeRaidItem: (id: string) => void;
@@ -133,43 +133,43 @@ export interface FlowDeckState {
   removeColumn: (key: string) => void;
   openFileViewer: (fileId: string) => void;
   /* Tags */
-  addTag: (tag: Tag) => void;
-  removeTag: (tagId: string) => void;
-  toggleTaskTag: (taskId: string, tagId: string) => void;
+  addTag: (projectId: string, tag: Tag) => void;
+  removeTag: (projectId: string, tagId: string) => void;
+  toggleTaskTag: (projectId: string, taskId: string, tagId: string) => void;
   /* Comments */
-  addComment: (taskId: string, text: string, parentId?: string | null) => void;
-  deleteComment: (commentId: string) => void;
-  editComment: (commentId: string, newText: string) => void;
-  toggleReaction: (commentId: string, emoji: string) => void;
+  addComment: (projectId: string, taskId: string, text: string, parentId?: string | null) => void;
+  deleteComment: (projectId: string, commentId: string) => void;
+  editComment: (projectId: string, commentId: string, newText: string) => void;
+  toggleReaction: (projectId: string, commentId: string, emoji: string) => void;
   /* Followers */
-  toggleFollower: (taskId: string, userId: string) => void;
+  toggleFollower: (projectId: string, taskId: string, userId: string) => void;
   /* Time Logs */
   timeLogs: TimeLog[];
   taskTimeLogs: TimeLog[];
-  addTimeLog: (taskId: string, minutes: number, note: string) => void;
-  deleteTimeLog: (timeLogId: string) => void;
+  addTimeLog: (projectId: string, taskId: string, minutes: number, note: string) => void;
+  deleteTimeLog: (projectId: string, timeLogId: string) => void;
   /* Reorder & Quick Add */
-  reorderTask: (taskId: string, toIndex: number) => void;
-  quickAddTask: (name: string, opts?: { status?: string; parentId?: string | null; startOverride?: string }) => string | undefined;
+  reorderTask: (projectId: string, taskId: string, toIndex: number) => void;
+  quickAddTask: (projectId: string, name: string, opts?: { status?: string; parentId?: string | null; startOverride?: string }) => string | undefined;
   /* Batch 6 */
   duplicateTaskWithOptions: (id: string, opts: { includeSubtasks: boolean; includeComments: boolean; includeAttachments: boolean }) => void;
   duplicateTasksBulk: (ids: Set<string>) => void;
   moveTaskToProject: (taskId: string, targetProjectId: string) => void;
   moveTasksToProjectBulk: (ids: Set<string>, targetProjectId: string) => void;
-  promoteSubtask: (taskId: string) => void;
-  demoteToSubtask: (taskId: string, newParentId: string) => void;
+  promoteSubtask: (projectId: string, taskId: string) => void;
+  demoteToSubtask: (projectId: string, taskId: string, newParentId: string) => void;
   bulkSetDueDate: (ids: Set<string>, date: string | null) => void;
   bulkAddTag: (ids: Set<string>, tagId: string) => void;
   bulkRemoveTag: (ids: Set<string>, tagId: string) => void;
   bulkSetStatus: (ids: Set<string>, status: string) => void;
   /* #35: Sections */
   sections: Section[];
-  addSection: (name: string) => void;
-  renameSection: (sectionId: string, name: string) => void;
-  deleteSection: (sectionId: string) => void;
-  toggleSectionCollapsed: (sectionId: string) => void;
-  reorderSection: (sectionId: string, toIndex: number) => void;
-  setTaskSection: (taskId: string, sectionId: string | null) => void;
+  addSection: (projectId: string, name: string) => void;
+  renameSection: (projectId: string, sectionId: string, name: string) => void;
+  deleteSection: (projectId: string, sectionId: string) => void;
+  toggleSectionCollapsed: (projectId: string, sectionId: string) => void;
+  reorderSection: (projectId: string, sectionId: string, toIndex: number) => void;
+  setTaskSection: (projectId: string, taskId: string, sectionId: string | null) => void;
   /* Batch 7: Project management */
   updateProject: (projectId: string, patch: Partial<Project>) => void;
   toggleProjectFavorite: (projectId: string) => void;
@@ -478,8 +478,8 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [projects, currentProjectId]);
 
   /* ---- activity logging ---- */
-  const logActivity = useCallback((taskId: string, type: ActivityEntry['type'], description: string) => {
-    if (!currentProjectId) return;
+  const logActivity = useCallback((projectId: string, taskId: string, type: ActivityEntry['type'], description: string) => {
+    if (!projectId) return;
     const entry: ActivityEntry = {
       id: defaultIdGenerator.generate('a'),
       taskId, type, description,
@@ -488,16 +488,16 @@ export function useFlowDeckStore(): FlowDeckState {
     };
     setActivityByProject(prev => ({
       ...prev,
-      [currentProjectId]: [...(prev[currentProjectId] || []), entry],
+      [projectId]: [...(prev[projectId] || []), entry],
     }));
-  }, [currentProjectId]);
+  }, []);
 
   /* ---- history-tracked task mutation ---- */
-  const commit = useCallback((nextTasksForProject: Task[]) => {
+  const commit = useCallback((projectId: string, nextTasksForProject: Task[]) => {
     setPast(p => [...p.slice(-49), tasksByProject]);
     setFuture([]);
-    if (currentProjectId) setTasksByProject(prev => ({ ...prev, [currentProjectId]: nextTasksForProject }));
-  }, [tasksByProject, currentProjectId]);
+    if (projectId) setTasksByProject(prev => ({ ...prev, [projectId]: nextTasksForProject }));
+  }, [tasksByProject]);
 
   const undo = useCallback(() => {
     if (!past.length) return;
@@ -515,30 +515,32 @@ export function useFlowDeckStore(): FlowDeckState {
     setFuture(f => f.slice(1));
   }, [future, tasksByProject]);
 
-  const updateTask = useCallback((id: string, patch: Partial<Task>) => {
-    const task = tasks.find(t => t.id === id);
-    commit(tasks.map(t => t.id === id ? { ...t, ...patch } : t));
+  const updateTask = useCallback((projectId: string, id: string, patch: Partial<Task>) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const task = projectTasks.find(t => t.id === id);
+    commit(projectId, projectTasks.map(t => t.id === id ? { ...t, ...patch } : t));
     if (task && patch.status && patch.status !== task.status) {
       const member = TEAM.find(m => m.id === CURRENT_USER_ID);
-      logActivity(id, 'status_change', `${member?.name || 'Someone'} changed status to ${STATUS_META[patch.status]?.label || patch.status}`);
+      logActivity(projectId, id, 'status_change', `${member?.name || 'Someone'} changed status to ${STATUS_META[patch.status]?.label || patch.status}`);
     }
     if (task && patch.priority && patch.priority !== task.priority) {
       const member = TEAM.find(m => m.id === CURRENT_USER_ID);
-      logActivity(id, 'priority_change', `${member?.name || 'Someone'} changed priority to ${PRIORITY_META[patch.priority]?.label || patch.priority}`);
+      logActivity(projectId, id, 'priority_change', `${member?.name || 'Someone'} changed priority to ${PRIORITY_META[patch.priority]?.label || patch.priority}`);
     }
     if (task && patch.dueDate && patch.dueDate !== task.dueDate) {
       const member = TEAM.find(m => m.id === CURRENT_USER_ID);
-      logActivity(id, 'due_date_change', `${member?.name || 'Someone'} changed due date`);
+      logActivity(projectId, id, 'due_date_change', `${member?.name || 'Someone'} changed due date`);
     }
-  }, [tasks, commit, logActivity]);
+  }, [tasksByProject, commit, logActivity]);
 
-  const toggleComplete = useCallback((id: string) => {
-    const task = tasks.find(t => t.id === id);
+  const toggleComplete = useCallback((projectId: string, id: string) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const task = projectTasks.find(t => t.id === id);
     if (!task) return;
     const member = TEAM.find(m => m.id === CURRENT_USER_ID);
     if (task.status === 'done') {
-      commit(tasks.map(t => t.id === id ? { ...t, status: 'in_progress', progress: 0 } : t));
-      logActivity(id, 'reopened', `${member?.name || 'Someone'} reopened this task`);
+      commit(projectId, projectTasks.map(t => t.id === id ? { ...t, status: 'in_progress', progress: 0 } : t));
+      logActivity(projectId, id, 'reopened', `${member?.name || 'Someone'} reopened this task`);
       toast.info('Task reopened', { description: task.name });
     } else {
       /* ---- Recurring task: create next instance ---- */
@@ -548,7 +550,7 @@ export function useFlowDeckStore(): FlowDeckState {
         const newId = defaultIdGenerator.generate('t');
         const nextTask: Task = {
           id: newId,
-          projectId: task.projectId,
+          projectId,
           name: task.name,
           description: task.description,
           status: 'backlog',
@@ -570,42 +572,76 @@ export function useFlowDeckStore(): FlowDeckState {
           createdAt: new Date().toISOString(),
         };
         /* Mark current done AND add next instance in one commit */
-        commit([
-          ...tasks.map(t => t.id === id ? { ...t, status: 'done' as TaskStatus, progress: 100 } : t),
+        commit(projectId, [
+          ...projectTasks.map(t => t.id === id ? { ...t, status: 'done' as TaskStatus, progress: 100 } : t),
           nextTask,
         ]);
-        logActivity(id, 'completed', `${member?.name || 'Someone'} marked as done (recurring — next instance created)`);
+        logActivity(projectId, id, 'completed', `${member?.name || 'Someone'} marked as done (recurring — next instance created)`);
         toast.success('Task completed — next instance created', { description: task.name });
       } else {
-        commit(tasks.map(t => t.id === id ? { ...t, status: 'done' as TaskStatus, progress: 100 } : t));
-        logActivity(id, 'completed', `${member?.name || 'Someone'} marked as done`);
+        commit(projectId, projectTasks.map(t => t.id === id ? { ...t, status: 'done' as TaskStatus, progress: 100 } : t));
+        logActivity(projectId, id, 'completed', `${member?.name || 'Someone'} marked as done`);
         toast.success('Task completed', { description: task.name });
       }
     }
-  }, [tasks, commit, logActivity]);
+  }, [tasksByProject, commit, logActivity]);
 
   const updateTasksBulk = useCallback((ids: Set<string>, patch: Partial<Task> | ((t: Task) => Partial<Task>)) => {
-    commit(tasks.map(t => ids.has(t.id) ? { ...t, ...(typeof patch === 'function' ? patch(t) : patch) } : t));
-  }, [tasks, commit]);
+    if (currentProjectId) {
+      const projectTasks = tasksByProject[currentProjectId] || [];
+      commit(currentProjectId, projectTasks.map(t => ids.has(t.id) ? { ...t, ...(typeof patch === 'function' ? patch(t) : patch) } : t));
+    }
+  }, [tasksByProject, currentProjectId, commit]);
 
-  const addTask = useCallback((newTask: Task) => {
-    commit([...tasks, newTask]);
-    logActivity(newTask.id, 'created', `Task "${newTask.name}" was created`);
+  const addTask = useCallback((projectId: string, input: CreateTaskInput | Task) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const id = ('id' in input && input.id) ? input.id : defaultIdGenerator.generate('t');
+    const createdAt = ('createdAt' in input && input.createdAt) ? input.createdAt : new Date().toISOString().slice(0, 10);
+    const newTask: Task = {
+      id,
+      projectId,
+      name: input.name,
+      description: input.description,
+      status: (input.status || 'backlog') as TaskStatus,
+      assignee: input.assignee || CURRENT_USER_ID,
+      start: input.start || TODAY.toISOString().slice(0, 10),
+      duration: input.duration ?? 3,
+      dueDate: input.dueDate,
+      progress: ('progress' in input && typeof input.progress === 'number') ? input.progress : 0,
+      priority: (input.priority || 'medium') as TaskPriority,
+      deps: ('deps' in input && Array.isArray(input.deps)) ? input.deps : [],
+      tags: input.tags,
+      parentId: input.parentId || null,
+      sectionId: input.sectionId || null,
+      customFields: input.customFields,
+      storyPoints: input.storyPoints,
+      color: input.color || null,
+      milestone: input.milestone,
+      createdAt,
+    };
+    commit(projectId, [...projectTasks, newTask]);
+    logActivity(projectId, id, 'created', `Task "${newTask.name}" was created`);
     toast.success('Task created', { description: newTask.name });
-  }, [tasks, commit, logActivity]);
-  const addTasksBulk = useCallback((newTasks: Task[]) => { commit([...tasks, ...newTasks]); }, [tasks, commit]);
+  }, [tasksByProject, commit, logActivity]);
+  const addTasksBulk = useCallback((newTasks: Task[]) => {
+    if (currentProjectId) {
+      const projectTasks = tasksByProject[currentProjectId] || [];
+      commit(currentProjectId, [...projectTasks, ...newTasks]);
+    }
+  }, [tasksByProject, currentProjectId, commit]);
 
-  const moveStatus = useCallback((id: string, status: string) => {
+  const moveStatus = useCallback((projectId: string, id: string, status: string) => {
     const s = status as TaskStatus;
     const progress = s === 'done' ? 100 : s === 'backlog' ? 0 : undefined;
-    updateTask(id, progress === undefined ? { status: s } : { status: s, progress });
+    updateTask(projectId, id, progress === undefined ? { status: s } : { status: s, progress });
   }, [updateTask]);
 
-  const removeTask = useCallback((id: string) => {
-    const task = tasks.find(t => t.id === id);
+  const removeTask = useCallback((projectId: string, id: string) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const task = projectTasks.find(t => t.id === id);
     const descendantIds = new Set<string>();
     const collectDescendants = (parentId: string) => {
-      for (const t of tasks) {
+      for (const t of projectTasks) {
         if (t.parentId === parentId && !descendantIds.has(t.id)) {
           descendantIds.add(t.id);
           collectDescendants(t.id);
@@ -614,34 +650,40 @@ export function useFlowDeckStore(): FlowDeckState {
     };
     descendantIds.add(id);
     collectDescendants(id);
-    commit(tasks.filter(t => !descendantIds.has(t.id)));
+    commit(projectId, projectTasks.filter(t => !descendantIds.has(t.id)));
     setSelectedIds(prev => { const n = new Set(prev); for (const did of descendantIds) n.delete(did); return n; });
     toast.success('Task deleted', { description: task?.name || 'Task' });
-  }, [tasks, commit]);
+  }, [tasksByProject, commit]);
 
   const removeTasksBulk = useCallback((ids: Set<string>) => {
+    if (!currentProjectId) return;
     const count = ids.size;
-    commit(tasks.filter(t => !ids.has(t.id)));
+    const projectTasks = tasksByProject[currentProjectId] || [];
+    commit(currentProjectId, projectTasks.filter(t => !ids.has(t.id)));
     setSelectedIds(new Set());
     toast.success(`${count} task${count > 1 ? 's' : ''} deleted`);
-  }, [tasks, commit]);
+  }, [currentProjectId, tasksByProject, commit]);
 
   const indentSelected = useCallback(() => updateTasksBulk(selectedIds, t => ({ level: Math.min(4, (t.level || 0) + 1) })), [selectedIds, updateTasksBulk]);
   const outdentSelected = useCallback(() => updateTasksBulk(selectedIds, t => ({ level: Math.max(0, (t.level || 0) - 1) })), [selectedIds, updateTasksBulk]);
   const linkSelected = useCallback(() => {
-    const ordered = tasks.filter(t => selectedIds.has(t.id));
+    if (!currentProjectId) return;
+    const projectTasks = tasksByProject[currentProjectId] || [];
+    const ordered = projectTasks.filter(t => selectedIds.has(t.id));
     if (ordered.length < 2) return;
-    const next = tasks.map(t => ({ ...t, deps: [...t.deps] }));
+    const next = projectTasks.map(t => ({ ...t, deps: [...t.deps] }));
     for (let i = 1; i < ordered.length; i++) {
       const successor = next.find(t => t.id === ordered[i].id);
       const predId = ordered[i - 1].id;
       if (successor && !successor.deps.includes(predId)) successor.deps.push(predId);
     }
-    commit(next);
-  }, [selectedIds, tasks, commit]);
+    commit(currentProjectId, next);
+  }, [currentProjectId, selectedIds, tasksByProject, commit]);
   const unlinkSelected = useCallback(() => {
-    commit(tasks.map(t => selectedIds.has(t.id) ? { ...t, deps: t.deps.filter(d => !selectedIds.has(d)) } : t));
-  }, [selectedIds, tasks, commit]);
+    if (!currentProjectId) return;
+    const projectTasks = tasksByProject[currentProjectId] || [];
+    commit(currentProjectId, projectTasks.map(t => selectedIds.has(t.id) ? { ...t, deps: t.deps.filter(d => !selectedIds.has(d)) } : t));
+  }, [currentProjectId, selectedIds, tasksByProject, commit]);
   const bulkAssign = useCallback((memberId: string) => updateTasksBulk(selectedIds, { assignee: memberId }), [selectedIds, updateTasksBulk]);
   const setRecurrenceSelected = useCallback((freq: string | null) => updateTasksBulk(selectedIds, { recurrence: freq }), [selectedIds, updateTasksBulk]);
   const toggleBoldSelected = useCallback(() => {
@@ -706,20 +748,20 @@ export function useFlowDeckStore(): FlowDeckState {
     setCustomColsByProject(prev => ({ ...prev, [currentProjectId]: (prev[currentProjectId] || []).filter(c => c.key !== key) }));
   }, [currentProjectId]);
 
-  const addFiles = useCallback((newFiles: FileItem[]) => {
-    if (!currentProjectId) return;
-    setFilesByProject(prev => ({ ...prev, [currentProjectId]: [...newFiles, ...(prev[currentProjectId] || [])] }));
-  }, [currentProjectId]);
+  const addFiles = useCallback((projectId: string, newFiles: FileItem[]) => {
+    if (!projectId) return;
+    setFilesByProject(prev => ({ ...prev, [projectId]: [...newFiles, ...(prev[projectId] || [])] }));
+  }, []);
 
-  const removeFile = useCallback((id: string) => {
-    if (!currentProjectId) return;
-    setFilesByProject(prev => ({ ...prev, [currentProjectId]: (prev[currentProjectId] || []).filter(f => f.id !== id) }));
-  }, [currentProjectId]);
+  const removeFile = useCallback((projectId: string, id: string) => {
+    if (!projectId) return;
+    setFilesByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).filter(f => f.id !== id) }));
+  }, []);
 
-  const linkFile = useCallback((id: string, linkedTaskId: string | null) => {
-    if (!currentProjectId) return;
-    setFilesByProject(prev => ({ ...prev, [currentProjectId]: (prev[currentProjectId] || []).map(f => f.id === id ? { ...f, linkedTaskId } : f) }));
-  }, [currentProjectId]);
+  const linkFile = useCallback((projectId: string, id: string, linkedTaskId: string | null) => {
+    if (!projectId) return;
+    setFilesByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).map(f => f.id === id ? { ...f, linkedTaskId } : f) }));
+  }, []);
 
   const addRaidItem = useCallback((item: RaidItem) => {
     if (!currentProjectId) return;
@@ -737,50 +779,55 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [currentProjectId]);
 
   /* ---- Tags ---- */
-  const addTag = useCallback((tag: Tag) => {
-    if (!currentProjectId) return;
-    setTagsByProject(prev => ({ ...prev, [currentProjectId]: [...(prev[currentProjectId] || []), tag] }));
+  const addTag = useCallback((projectId: string, tag: Tag) => {
+    if (!projectId) return;
+    setTagsByProject(prev => ({ ...prev, [projectId]: [...(prev[projectId] || []), tag] }));
     toast.success('Tag created', { description: tag.name });
-  }, [currentProjectId]);
+  }, []);
 
-  const removeTag = useCallback((tagId: string) => {
-    if (!currentProjectId) return;
-    const tag = tags.find(t => t.id === tagId);
-    setTagsByProject(prev => ({ ...prev, [currentProjectId]: (prev[currentProjectId] || []).filter(t => t.id !== tagId) }));
-    commit(tasks.map(t => ({ ...t, tags: (t.tags || []).filter(tid => tid !== tagId) })));
+  const removeTag = useCallback((projectId: string, tagId: string) => {
+    if (!projectId) return;
+    const tagList = tagsByProject[projectId] || [];
+    const tag = tagList.find(t => t.id === tagId);
+    setTagsByProject(prev => ({ ...prev, [projectId]: tagList.filter(t => t.id !== tagId) }));
+    const projectTasks = tasksByProject[projectId] || [];
+    commit(projectId, projectTasks.map(t => ({ ...t, tags: (t.tags || []).filter(tid => tid !== tagId) })));
     toast.success('Tag removed', { description: tag?.name || 'Tag' });
-  }, [currentProjectId, tasks, commit, tags]);
+  }, [tagsByProject, tasksByProject, commit]);
 
-  const toggleTaskTag = useCallback((taskId: string, tagId: string) => {
-    const task = tasks.find(t => t.id === taskId);
+  const toggleTaskTag = useCallback((projectId: string, taskId: string, tagId: string) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const task = projectTasks.find(t => t.id === taskId);
     if (!task) return;
     const currentTags = task.tags || [];
     const newTags = currentTags.includes(tagId)
       ? currentTags.filter(t => t !== tagId)
       : [...currentTags, tagId];
-    commit(tasks.map(t => t.id === taskId ? { ...t, tags: newTags } : t));
-    const tag = tags.find(tg => tg.id === tagId);
-    if (tag) logActivity(taskId, currentTags.includes(tagId) ? 'tag_removed' : 'tag_added', `Tag "${tag.name}" ${currentTags.includes(tagId) ? 'removed from' : 'added to'} task`);
-  }, [tasks, commit, tags, logActivity]);
+    commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, tags: newTags } : t));
+    const tagList = tagsByProject[projectId] || [];
+    const tag = tagList.find(tg => tg.id === tagId);
+    if (tag) logActivity(projectId, taskId, currentTags.includes(tagId) ? 'tag_removed' : 'tag_added', `Tag "${tag.name}" ${currentTags.includes(tagId) ? 'removed from' : 'added to'} task`);
+  }, [tasksByProject, tagsByProject, commit, logActivity]);
 
   /* ---- Reorder ---- */
-  const reorderTask = useCallback((taskId: string, toIndex: number) => {
-    const idx = tasks.findIndex(t => t.id === taskId);
+  const reorderTask = useCallback((projectId: string, taskId: string, toIndex: number) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const idx = projectTasks.findIndex(t => t.id === taskId);
     if (idx === -1 || idx === toIndex) return;
-    const arr = [...tasks];
+    const arr = [...projectTasks];
     const [removed] = arr.splice(idx, 1);
     arr.splice(toIndex, 0, removed);
-    commit(arr);
-  }, [tasks, commit]);
+    commit(projectId, arr);
+  }, [tasksByProject, commit]);
 
   /* ---- Quick Add ---- */
-  const quickAddTask = useCallback((name: string, opts?: { status?: string; parentId?: string | null; startOverride?: string }) => {
+  const quickAddTask = useCallback((projectId: string, name: string, opts?: { status?: string; parentId?: string | null; startOverride?: string }) => {
     if (!name.trim()) return;
     const id = defaultIdGenerator.generate('t');
     const todayStr = TODAY.toISOString().slice(0, 10);
     const newTask: Task = {
       id,
-      projectId: currentProjectId || 'p1',
+      projectId,
       name: name.trim(),
       status: (opts?.status || 'backlog') as TaskStatus,
       assignee: CURRENT_USER_ID,
@@ -792,14 +839,15 @@ export function useFlowDeckStore(): FlowDeckState {
       parentId: opts?.parentId || null,
       createdAt: new Date().toISOString(),
     };
-    commit([...tasks, newTask]);
-    logActivity(id, 'created', `Task "${newTask.name}" was created`);
+    const projectTasks = tasksByProject[projectId] || [];
+    commit(projectId, [...projectTasks, newTask]);
+    logActivity(projectId, id, 'created', `Task "${newTask.name}" was created`);
     return id;
-  }, [tasks, commit, logActivity]);
+  }, [tasksByProject, commit, logActivity]);
 
   /* ---- Comments ---- */
-  const addComment = useCallback((taskId: string, text: string, parentId?: string | null) => {
-    if (!currentProjectId || !text.trim()) return;
+  const addComment = useCallback((projectId: string, taskId: string, text: string, parentId?: string | null) => {
+    if (!projectId || !text.trim()) return;
     const comment: Comment = {
       id: defaultIdGenerator.generate('c'),
       taskId,
@@ -811,43 +859,43 @@ export function useFlowDeckStore(): FlowDeckState {
     };
     setCommentsByProject(prev => ({
       ...prev,
-      [currentProjectId]: [...(prev[currentProjectId] || []), comment],
+      [projectId]: [...(prev[projectId] || []), comment],
     }));
     const member = TEAM.find(m => m.id === CURRENT_USER_ID);
-    logActivity(taskId, 'comment', `${member?.name || 'Someone'} ${parentId ? 'replied' : 'commented'}`);
-  }, [currentProjectId, logActivity]);
+    logActivity(projectId, taskId, 'comment', `${member?.name || 'Someone'} ${parentId ? 'replied' : 'commented'}`);
+  }, [logActivity]);
 
-  const deleteComment = useCallback((commentId: string) => {
-    if (!currentProjectId) return;
+  const deleteComment = useCallback((projectId: string, commentId: string) => {
+    if (!projectId) return;
     /* Also delete replies to this comment */
     setCommentsByProject(prev => {
-      const comments = prev[currentProjectId] || [];
+      const comments = prev[projectId] || [];
       const idsToDelete = new Set<string>();
       idsToDelete.add(commentId);
       /* Collect all descendant reply IDs (only 1 level deep per spec) */
       comments.forEach(c => { if (c.parentId && idsToDelete.has(c.parentId)) idsToDelete.add(c.id); });
       return {
         ...prev,
-        [currentProjectId]: comments.filter(c => !idsToDelete.has(c.id)),
+        [projectId]: comments.filter(c => !idsToDelete.has(c.id)),
       };
     });
-  }, [currentProjectId]);
+  }, []);
 
-  const editComment = useCallback((commentId: string, newText: string) => {
-    if (!currentProjectId || !newText.trim()) return;
+  const editComment = useCallback((projectId: string, commentId: string, newText: string) => {
+    if (!projectId || !newText.trim()) return;
     setCommentsByProject(prev => ({
       ...prev,
-      [currentProjectId]: (prev[currentProjectId] || []).map(c =>
+      [projectId]: (prev[projectId] || []).map(c =>
         c.id === commentId ? { ...c, text: newText.trim(), edited: true } : c
       ),
     }));
-  }, [currentProjectId]);
+  }, []);
 
-  const toggleReaction = useCallback((commentId: string, emoji: string) => {
-    if (!currentProjectId) return;
+  const toggleReaction = useCallback((projectId: string, commentId: string, emoji: string) => {
+    if (!projectId) return;
     setCommentsByProject(prev => ({
       ...prev,
-      [currentProjectId]: (prev[currentProjectId] || []).map(c => {
+      [projectId]: (prev[projectId] || []).map(c => {
         if (c.id !== commentId) return c;
         const reactions = [...(c.reactions || [])];
         const existing = reactions.find(r => r.emoji === emoji);
@@ -869,25 +917,26 @@ export function useFlowDeckStore(): FlowDeckState {
         }
       }),
     }));
-  }, [currentProjectId]);
+  }, []);
 
   /* ---- Followers ---- */
-  const toggleFollower = useCallback((taskId: string, userId: string) => {
-    const task = tasks.find(t => t.id === taskId);
+  const toggleFollower = useCallback((projectId: string, taskId: string, userId: string) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const task = projectTasks.find(t => t.id === taskId);
     if (!task) return;
     const current = task.followers || [];
     const newFollowers = current.includes(userId)
       ? current.filter(u => u !== userId)
       : [...current, userId];
-    commit(tasks.map(t => t.id === taskId ? { ...t, followers: newFollowers } : t));
+    commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, followers: newFollowers } : t));
     const member = TEAM.find(m => m.id === userId);
     const memberName = member?.name || 'Someone';
-    logActivity(taskId, 'comment', `${memberName} ${current.includes(userId) ? 'stopped following' : 'is now following'} this task`);
-  }, [tasks, commit, logActivity]);
+    logActivity(projectId, taskId, 'comment', `${memberName} ${current.includes(userId) ? 'stopped following' : 'is now following'} this task`);
+  }, [tasksByProject, commit, logActivity]);
 
   /* ---- Time Logs ---- */
-  const addTimeLog = useCallback((taskId: string, minutes: number, note: string) => {
-    if (!currentProjectId || minutes <= 0) return;
+  const addTimeLog = useCallback((projectId: string, taskId: string, minutes: number, note: string) => {
+    if (!projectId || minutes <= 0) return;
     const entry: TimeLog = {
       id: defaultIdGenerator.generate('tl'),
       taskId, userId: CURRENT_USER_ID, minutes, note: note.trim(),
@@ -895,17 +944,17 @@ export function useFlowDeckStore(): FlowDeckState {
     };
     setTimeLogsByProject(prev => ({
       ...prev,
-      [currentProjectId]: [...(prev[currentProjectId] || []), entry],
+      [projectId]: [...(prev[projectId] || []), entry],
     }));
-  }, [currentProjectId]);
+  }, []);
 
-  const deleteTimeLog = useCallback((timeLogId: string) => {
-    if (!currentProjectId) return;
+  const deleteTimeLog = useCallback((projectId: string, timeLogId: string) => {
+    if (!projectId) return;
     setTimeLogsByProject(prev => ({
       ...prev,
-      [currentProjectId]: (prev[currentProjectId] || []).filter(tl => tl.id !== timeLogId),
+      [projectId]: (prev[projectId] || []).filter(tl => tl.id !== timeLogId),
     }));
-  }, [currentProjectId]);
+  }, []);
 
   const selectedTask = tasks.find(t => t.id === selectedTaskId) || null;
   const viewingFile = files.find(f => f.id === viewingFileId) || null;
@@ -1007,7 +1056,10 @@ export function useFlowDeckStore(): FlowDeckState {
       }
     }
 
-    commit([...tasks, ...newTasks]);
+    if (currentProjectId) {
+      const projectTasks = tasksByProject[currentProjectId] || [];
+      commit(currentProjectId, [...projectTasks, ...newTasks]);
+    }
 
     /* Deep clone comments */
     if (opts?.includeComments && currentProjectId) {
@@ -1043,7 +1095,9 @@ export function useFlowDeckStore(): FlowDeckState {
       }
     }
 
-    logActivity(newId, 'created', `Task "${cloneBase.name}" was created`);
+    if (currentProjectId) {
+      logActivity(currentProjectId, newId, 'created', `Task "${cloneBase.name}" was created`);
+    }
     toast.success('Task duplicated', { description: cloneBase.name });
   }, [tasks, commit, logActivity, currentProjectId, commentsByProject, filesByProject]);
 
@@ -1067,11 +1121,12 @@ export function useFlowDeckStore(): FlowDeckState {
         createdAt: new Date().toISOString(),
       });
     }
-    if (newTasks.length) {
-      commit([...tasks, ...newTasks]);
+    if (newTasks.length && currentProjectId) {
+      const projectTasks = tasksByProject[currentProjectId] || [];
+      commit(currentProjectId, [...projectTasks, ...newTasks]);
       toast.success(`${newTasks.length} task${newTasks.length > 1 ? 's' : ''} duplicated`);
     }
-  }, [tasks, commit]);
+  }, [tasksByProject, currentProjectId, commit]);
 
   /* ---- #32: Move task to another project ---- */
   const moveTaskToProject = useCallback((taskId: string, targetProjectId: string) => {
@@ -1192,28 +1247,30 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [tasks, currentProjectId, commentsByProject, activityByProject, timeLogsByProject, filesByProject, projects]);
 
   /* ---- #33: Promote subtask to top-level ---- */
-  const promoteSubtask = useCallback((taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
+  const promoteSubtask = useCallback((projectId: string, taskId: string) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const task = projectTasks.find(t => t.id === taskId);
     if (!task || !task.parentId) return;
     const newLevel = Math.max(0, (task.level || 1) - 1);
-    commit(tasks.map(t => t.id === taskId ? { ...t, parentId: null, level: newLevel } : t));
+    commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, parentId: null, level: newLevel } : t));
     const member = TEAM.find(m => m.id === CURRENT_USER_ID);
-    logActivity(taskId, 'created', `${member?.name || 'Someone'} promoted subtask to top-level`);
+    logActivity(projectId, taskId, 'created', `${member?.name || 'Someone'} promoted subtask to top-level`);
     toast.success('Subtask promoted', { description: task.name });
-  }, [tasks, commit, logActivity]);
+  }, [tasksByProject, commit, logActivity]);
 
   /* ---- #33: Demote task to subtask ---- */
-  const demoteToSubtask = useCallback((taskId: string, newParentId: string) => {
+  const demoteToSubtask = useCallback((projectId: string, taskId: string, newParentId: string) => {
     if (taskId === newParentId) return;
-    const task = tasks.find(t => t.id === taskId);
+    const projectTasks = tasksByProject[projectId] || [];
+    const task = projectTasks.find(t => t.id === taskId);
     if (!task) return;
     const newLevel = Math.min(4, (task.level || 0) + 1);
-    commit(tasks.map(t => t.id === taskId ? { ...t, parentId: newParentId, level: newLevel } : t));
-    const parentTask = tasks.find(t => t.id === newParentId);
+    commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, parentId: newParentId, level: newLevel } : t));
+    const parentTask = projectTasks.find(t => t.id === newParentId);
     const member = TEAM.find(m => m.id === CURRENT_USER_ID);
-    logActivity(taskId, 'created', `${member?.name || 'Someone'} converted task to subtask of "${parentTask?.name || 'task'}"`);
+    logActivity(projectId, taskId, 'created', `${member?.name || 'Someone'} converted task to subtask of "${parentTask?.name || 'task'}"`);
     toast.success('Converted to subtask', { description: task.name });
-  }, [tasks, commit, logActivity]);
+  }, [tasksByProject, commit, logActivity]);
 
   /* ---- #34: Bulk set due date / add tag / set status ---- */
   const bulkSetDueDate = useCallback((ids: Set<string>, date: string | null) => {
@@ -1237,57 +1294,58 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [updateTasksBulk]);
 
   /* ---- #35: Sections ---- */
-  const addSection = useCallback((name: string) => {
-    if (!currentProjectId) return;
+  const addSection = useCallback((projectId: string, name: string) => {
+    if (!projectId) return;
     const id = defaultIdGenerator.generate('sec');
-    const currentSections = sectionsByProject[currentProjectId] || [];
-    const newSection: Section = { id, projectId: currentProjectId, name, position: currentSections.length, collapsed: false };
-    setSectionsByProject(prev => ({ ...prev, [currentProjectId]: [...(prev[currentProjectId] || []), newSection] }));
+    const currentSections = sectionsByProject[projectId] || [];
+    const newSection: Section = { id, projectId, name, position: currentSections.length, collapsed: false };
+    setSectionsByProject(prev => ({ ...prev, [projectId]: [...(prev[projectId] || []), newSection] }));
     toast.success('Section added', { description: name });
-  }, [currentProjectId, sectionsByProject]);
+  }, [sectionsByProject]);
 
-  const renameSection = useCallback((sectionId: string, name: string) => {
-    if (!currentProjectId) return;
+  const renameSection = useCallback((projectId: string, sectionId: string, name: string) => {
+    if (!projectId) return;
     setSectionsByProject(prev => ({
       ...prev,
-      [currentProjectId]: (prev[currentProjectId] || []).map(s => s.id === sectionId ? { ...s, name } : s),
+      [projectId]: (prev[projectId] || []).map(s => s.id === sectionId ? { ...s, name } : s),
     }));
-  }, [currentProjectId]);
+  }, []);
 
-  const deleteSection = useCallback((sectionId: string) => {
-    if (!currentProjectId) return;
-    /* Unlink tasks from this section */
-    commit(tasks.map(t => t.sectionId === sectionId ? { ...t, sectionId: null } : t));
+  const deleteSection = useCallback((projectId: string, sectionId: string) => {
+    if (!projectId) return;
+    const projectTasks = tasksByProject[projectId] || [];
+    commit(projectId, projectTasks.map(t => t.sectionId === sectionId ? { ...t, sectionId: null } : t));
     setSectionsByProject(prev => ({
       ...prev,
-      [currentProjectId]: (prev[currentProjectId] || []).filter(s => s.id !== sectionId),
+      [projectId]: (prev[projectId] || []).filter(s => s.id !== sectionId),
     }));
     toast.success('Section removed');
-  }, [currentProjectId, tasks, commit]);
+  }, [tasksByProject, commit]);
 
-  const toggleSectionCollapsed = useCallback((sectionId: string) => {
-    if (!currentProjectId) return;
+  const toggleSectionCollapsed = useCallback((projectId: string, sectionId: string) => {
+    if (!projectId) return;
     setSectionsByProject(prev => ({
       ...prev,
-      [currentProjectId]: (prev[currentProjectId] || []).map(s => s.id === sectionId ? { ...s, collapsed: !s.collapsed } : s),
+      [projectId]: (prev[projectId] || []).map(s => s.id === sectionId ? { ...s, collapsed: !s.collapsed } : s),
     }));
-  }, [currentProjectId]);
+  }, []);
 
-  const reorderSection = useCallback((sectionId: string, toIndex: number) => {
-    if (!currentProjectId) return;
-    const currentSections = [...(sectionsByProject[currentProjectId] || [])];
+  const reorderSection = useCallback((projectId: string, sectionId: string, toIndex: number) => {
+    if (!projectId) return;
+    const currentSections = [...(sectionsByProject[projectId] || [])];
     const idx = currentSections.findIndex(s => s.id === sectionId);
     if (idx === -1 || idx === toIndex) return;
     const [removed] = currentSections.splice(idx, 1);
     currentSections.splice(toIndex, 0, removed);
     /* Re-number positions */
     const renumbered = currentSections.map((s, i) => ({ ...s, position: i }));
-    setSectionsByProject(prev => ({ ...prev, [currentProjectId]: renumbered }));
-  }, [currentProjectId, sectionsByProject]);
+    setSectionsByProject(prev => ({ ...prev, [projectId]: renumbered }));
+  }, [sectionsByProject]);
 
-  const setTaskSection = useCallback((taskId: string, sectionId: string | null) => {
-    commit(tasks.map(t => t.id === taskId ? { ...t, sectionId } : t));
-  }, [tasks, commit]);
+  const setTaskSection = useCallback((projectId: string, taskId: string, sectionId: string | null) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, sectionId } : t));
+  }, [tasksByProject, commit]);
 
   const bulkSetStatus = useCallback((ids: Set<string>, status: string) => {
     const s = status as TaskStatus;

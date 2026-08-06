@@ -19,7 +19,7 @@ export default function MyTasksRoutePage() {
         router.push(routes.task(projectId, taskId));
       }}
       onToggleComplete={(taskId, projectId) => {
-        state.toggleComplete(taskId);
+        state.toggleComplete(projectId, taskId);
       }}
     />
   );
