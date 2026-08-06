@@ -91,7 +91,16 @@ interface ThemeContextValue extends ThemeTokens {
   toggle: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextValue | null>(null);
+const defaultThemeValue: ThemeContextValue = {
+  isDark: false,
+  toggle: () => {},
+  colors: COLORS,
+  layout: LAYOUT,
+  statusMeta: STATUS_META,
+  priorityMeta: PRIORITY_META,
+};
+
+const ThemeContext = createContext<ThemeContextValue>(defaultThemeValue);
 
 /* ------------------------------------------------------------------ */
 /*  Provider                                                            */
@@ -175,7 +184,5 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 /* ------------------------------------------------------------------ */
 
 export function useTheme(): ThemeContextValue {
-  const ctx = useContext(ThemeContext);
-  if (!ctx) throw new Error('useTheme must be used inside <ThemeProvider>');
-  return ctx;
+  return useContext(ThemeContext);
 }

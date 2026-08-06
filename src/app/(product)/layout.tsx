@@ -16,6 +16,7 @@ import { KeyboardShortcutsModal, BulkActionBar, CommandPalette, DuplicateTaskDia
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { routes, getRouteForView, getViewFromPathname } from '@/shared/navigation/routes';
 import type { TopBarHandle } from '@/features/flowdeck/components/layout/TopBar';
+import { Toaster } from '@/components/ui/sonner';
 
 export default function ProductLayout({ children, modal }: { children: React.ReactNode; modal?: React.ReactNode }) {
   const auth = useAuth();
@@ -45,6 +46,7 @@ export default function ProductLayout({ children, modal }: { children: React.Rea
         <ProductShellInner onLogout={auth.logout} modal={modal}>
           {children}
         </ProductShellInner>
+        <Toaster />
       </FlowdekDataProvider>
     </ThemeProvider>
   );

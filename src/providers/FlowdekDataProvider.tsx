@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext } from 'react';
-import { useFlowDeckStore, FlowDeckState } from '@/features/flowdeck/store/useFlowDeck';
+import { useFlowDeckStore, FlowDeckState, fallbackFlowDeckState } from '@/features/flowdeck/store/useFlowDeck';
 
 const FlowdekDataContext = createContext<FlowDeckState | null>(null);
 

@@ -4,6 +4,7 @@ import React from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
 import { TaskDetailPanel } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { getTaskForProject } from '@/features/tasks/selectors/getTaskForProject';
 import { useCloseOverlay } from '@/shared/navigation/useCloseOverlay';
 import { routes } from '@/shared/navigation/routes';
 
@@ -15,19 +16,19 @@ export default function InterceptedTaskDetailPage() {
   const state = useFlowDeck();
   const close = useCloseOverlay(routes.projectTasks(projectId));
 
-  const task = state.tasks.find(t => t.id === taskId);
-  if (!task || (task.projectId && task.projectId !== projectId)) {
-    return null;
+  const task = getTaskForProject(state.tasksByProject, projectId, taskId);
+  if (!task) {
+    notFound();
   }
 
-  const tasks = state.tasksByProject[projectId] || state.tasks;
+  const tasks = state.tasksByProject[projectId] || [];
   const parentTask = task.parentId ? tasks.find(t => t.id === task.parentId) : undefined;
 
   return (
     <TaskDetailPanel
       task={task}
       allTasks={tasks}
-      files={state.files}
+      files={state.filesByProject[projectId] || []}
       tags={state.tags}
       comments={state.taskComments}
       activity={state.taskActivity}

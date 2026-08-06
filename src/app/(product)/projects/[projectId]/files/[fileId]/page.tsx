@@ -5,6 +5,7 @@ import { useParams, useRouter, notFound } from 'next/navigation';
 import ProjectFilesPage from '../page';
 import { FileViewerModal } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { getFileForProject } from '@/features/files/selectors/getFileForProject';
 import { routes } from '@/shared/navigation/routes';
 
 export default function FileViewerRoutePage() {
@@ -14,19 +15,19 @@ export default function FileViewerRoutePage() {
   const fileId = typeof params.fileId === 'string' ? params.fileId : '';
   const state = useFlowDeck();
 
-  const file = state.files.find(f => f.id === fileId);
-  if (!file || (file.projectId && file.projectId !== projectId)) {
+  const file = getFileForProject(state.filesByProject, projectId, fileId);
+  if (!file) {
     notFound();
   }
 
-  const tasks = state.tasksByProject[projectId] || state.tasks;
+  const tasks = state.tasksByProject[projectId] || [];
 
   return (
     <>
       <ProjectFilesPage />
       <FileViewerModal
         file={file}
-        allFiles={state.files}
+        allFiles={state.filesByProject[projectId] || []}
         allTasks={tasks}
         onClose={() => router.push(routes.projectFiles(projectId))}
         onNavigateFile={fid => router.push(routes.file(projectId, fid))}

@@ -5,6 +5,7 @@ import { useParams, useRouter, notFound } from 'next/navigation';
 import ProjectTasksPage from '../page';
 import { TaskDetailPanel } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { getTaskForProject } from '@/features/tasks/selectors/getTaskForProject';
 import { routes } from '@/shared/navigation/routes';
 
 export default function TaskDetailRoutePage() {
@@ -14,12 +15,12 @@ export default function TaskDetailRoutePage() {
   const taskId = typeof params.taskId === 'string' ? params.taskId : '';
   const state = useFlowDeck();
 
-  const task = state.tasks.find(t => t.id === taskId);
-  if (!task || (task.projectId && task.projectId !== projectId)) {
+  const task = getTaskForProject(state.tasksByProject, projectId, taskId);
+  if (!task) {
     notFound();
   }
 
-  const tasks = state.tasksByProject[projectId] || state.tasks;
+  const tasks = state.tasksByProject[projectId] || [];
   const parentTask = task.parentId ? tasks.find(t => t.id === task.parentId) : undefined;
 
   return (
@@ -28,7 +29,7 @@ export default function TaskDetailRoutePage() {
       <TaskDetailPanel
         task={task}
         allTasks={tasks}
-        files={state.files}
+        files={state.filesByProject[projectId] || []}
         tags={state.tags}
         comments={state.taskComments}
         activity={state.taskActivity}
