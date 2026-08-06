@@ -11,10 +11,10 @@ import { useAuth } from '@/features/flowdeck/components/auth';
 import {
   Sidebar, MobileSidebar, TopBar, MobileSearchRow, BottomNav, MoreMenu,
 } from '@/features/flowdeck/components/layout';
-import { NewProjectModal, NewTaskModal, TaskDetailPanel, ShareModal, FileViewerModal, CustomFieldsModal } from '@/features/flowdeck/components/modals';
-import { KeyboardShortcutsModal, BulkActionBar, CommandPalette, DuplicateTaskDialog } from '@/features/flowdeck/components/ui';
+import { BulkActionBar } from '@/features/flowdeck/components/ui';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { routes, getRouteForView, getViewFromPathname } from '@/shared/navigation/routes';
+import { getSingleParam } from '@/shared/utils/routeParams';
 import type { TopBarHandle } from '@/features/flowdeck/components/layout/TopBar';
 import { Toaster } from '@/components/ui/sonner';
 
@@ -60,10 +60,6 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
   const theme = useTheme();
   const { isMobile } = useViewport();
   const [mounted, setMounted] = useState(false);
-  const [shortcutsOpenState, setShortcutsOpenState] = useState(false);
-  const [customFieldsOpenState, setCustomFieldsOpenState] = useState(false);
-  const [commandPaletteOpenState, setCommandPaletteOpenState] = useState(false);
-  const [duplicateDialogTaskIdState, setDuplicateDialogTaskIdState] = useState<string | null>(null);
 
   const topBarRef = useRef<TopBarHandle>(null);
 
@@ -73,72 +69,21 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
 
   const state = useFlowDeck();
   const {
-    project, tasks, files, gridActions,
+    project, tasks, gridActions,
     searchQuery, projectMenuOpen, sidebarOpen, moreMenuOpen,
-    showNewTask, showNewProject, shareOpen, projects,
-    searchFilters, setSearchFilters, activeFilterCount, clearFilters,
-    selectedTaskId, currentProjectId,
+    projects, searchFilters, setSearchFilters, activeFilterCount, clearFilters,
   } = state;
 
-  // Extract route parameters & current view
-  const routeProjectId = (params?.projectId as string) || currentProjectId || Object.keys(projects)[0] || 'p1';
+  // Extract route parameters & current view without fallbacks
+  const routeProjectId = getSingleParam(params?.projectId);
   const activeView = getViewFromPathname(pathname);
 
   // Sync route projectId with store state
   useEffect(() => {
-    if (routeProjectId && routeProjectId !== currentProjectId && projects[routeProjectId]) {
+    if (routeProjectId && projects[routeProjectId]) {
       state.openProject(routeProjectId);
     }
-  }, [routeProjectId, currentProjectId, projects, state]);
-
-  // Derived overlay visibility flags driven by URL or state fallback
-  const isNewProjectRoute = pathname === routes.newProject() || showNewProject;
-  const isNewTaskRoute = pathname === routes.newTask(routeProjectId) || showNewTask;
-  const isShareRoute = pathname === routes.projectShare(routeProjectId) || shareOpen;
-  const isCustomFieldsRoute = pathname === routes.projectCustomFields(routeProjectId) || customFieldsOpenState;
-  const isShortcutsRoute = pathname === routes.shortcuts() || shortcutsOpenState;
-  const isCommandRoute = pathname === routes.command() || commandPaletteOpenState;
-
-  // Task Detail Modal derived from URL or state
-  let urlTaskId: string | null = null;
-  if (pathname.includes('/tasks/') && !pathname.endsWith('/tasks/new')) {
-    const parts = pathname.split('/');
-    const taskIdx = parts.indexOf('tasks');
-    if (taskIdx !== -1 && parts.length > taskIdx + 1) {
-      const candidate = parts[taskIdx + 1];
-      if (candidate && candidate !== 'new') {
-        urlTaskId = decodeURIComponent(candidate);
-      }
-    }
-  }
-  const effectiveSelectedTaskId = urlTaskId || selectedTaskId;
-  const activeSelectedTask = effectiveSelectedTaskId ? tasks.find(t => t.id === effectiveSelectedTaskId) || null : null;
-  const parentTask = activeSelectedTask?.parentId ? tasks.find(t => t.id === activeSelectedTask.parentId) || null : null;
-
-  // File viewer derived from URL or state
-  let urlFileId: string | null = null;
-  if (pathname.includes('/files/')) {
-    const parts = pathname.split('/');
-    const fileIdx = parts.indexOf('files');
-    if (fileIdx !== -1 && parts.length > fileIdx + 1) {
-      urlFileId = decodeURIComponent(parts[fileIdx + 1]);
-    }
-  }
-  const activeViewingFile = urlFileId
-    ? files.find(f => f.id === urlFileId) || null
-    : state.viewingFile;
-
-  // Duplicate task dialog derived from URL or state
-  let urlDuplicateTaskId: string | null = null;
-  if (pathname.endsWith('/duplicate')) {
-    const parts = pathname.split('/');
-    const dupIdx = parts.indexOf('duplicate');
-    if (dupIdx > 0) {
-      urlDuplicateTaskId = decodeURIComponent(parts[dupIdx - 1]);
-    }
-  }
-  const effectiveDuplicateTaskId = urlDuplicateTaskId || duplicateDialogTaskIdState;
-  const duplicateDialogTask = effectiveDuplicateTaskId ? tasks.find(t => t.id === effectiveDuplicateTaskId) : null;
+  }, [routeProjectId, projects, state]);
 
   // Keyboard shortcut listeners
   useKeyboardShortcuts({
@@ -151,16 +96,18 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
     onDelete: gridActions.onDeleteSelected,
     onUndo: gridActions.onUndo,
     onRedo: gridActions.onRedo,
-    onShowNewTask: () => router.push(routes.newTask(routeProjectId)),
+    onShowNewTask: () => {
+      if (routeProjectId) router.push(routes.newTask(routeProjectId));
+    },
     onSearchFocus: () => topBarRef.current?.focusSearch(),
     onShowShortcuts: () => router.push(routes.shortcuts()),
     onOpenCommandPalette: () => router.push(routes.command()),
     onDuplicate: () => {
-      if (effectiveSelectedTaskId) {
-        router.push(routes.taskDuplicate(routeProjectId, effectiveSelectedTaskId));
-      } else if (state.selectedIds.size === 1) {
+      if (state.selectedIds.size === 1) {
         const singleId = [...state.selectedIds][0];
-        router.push(routes.taskDuplicate(routeProjectId, singleId));
+        if (routeProjectId) {
+          router.push(routes.taskDuplicate(routeProjectId, singleId));
+        }
       }
     },
   });
@@ -173,7 +120,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
       router.push(routes.projectOverview(targetProjId));
       return;
     }
-    const targetRoute = getRouteForView(viewId, routeProjectId);
+    const targetRoute = getRouteForView(viewId, routeProjectId || undefined);
     router.push(targetRoute);
   };
 
@@ -181,21 +128,6 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
     state.openProject(projId);
     state.setProjectMenuOpen(false);
     router.push(routes.projectOverview(projId));
-  };
-
-  const handleCloseModal = (fallbackRoute?: string) => {
-    state.setShowNewProject(false);
-    state.setShowNewTask(false);
-    state.setShareOpen(false);
-    state.setSelectedTaskId(null);
-    state.setViewingFileId(null);
-    setShortcutsOpenState(false);
-    setCustomFieldsOpenState(false);
-    setCommandPaletteOpenState(false);
-    setDuplicateDialogTaskIdState(null);
-
-    const defaultFallback = routes.projectTasks(routeProjectId);
-    router.push(fallbackRoute || defaultFallback);
   };
 
   const bottomNavHeight = isMobile ? 64 : 0;
@@ -206,7 +138,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
       state.setMoreMenuOpen(o => !o);
       return;
     }
-    const targetRoute = getRouteForView(id, routeProjectId);
+    const targetRoute = getRouteForView(id, routeProjectId || undefined);
     router.push(targetRoute);
     state.setMoreMenuOpen(false);
   }
@@ -269,7 +201,9 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
           onToggleSidebar={() => state.setSidebarOpen(o => !o)}
           onToggleProjectMenu={() => state.setProjectMenuOpen(o => !o)}
           onOpenProject={handleOpenProject}
-          onShowNewTask={() => router.push(routes.newTask(routeProjectId))}
+          onShowNewTask={() => {
+            if (routeProjectId) router.push(routes.newTask(routeProjectId));
+          }}
           onShowNewProject={() => router.push(routes.newProject())}
           onSearchChange={state.setSearchQuery}
           onSearchFiltersChange={setSearchFilters}

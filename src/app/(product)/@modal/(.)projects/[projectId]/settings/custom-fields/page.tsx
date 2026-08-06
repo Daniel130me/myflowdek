@@ -6,18 +6,21 @@ import { CustomFieldsModal } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useCloseOverlay } from '@/shared/navigation/useCloseOverlay';
 import { routes } from '@/shared/navigation/routes';
+import { getSingleParam } from '@/shared/utils/routeParams';
 
 export default function InterceptedCustomFieldsPage() {
   const params = useParams();
-  const projectId = typeof params.projectId === 'string' ? params.projectId : '';
+  const projectId = getSingleParam(params.projectId);
   const state = useFlowDeck();
   const close = useCloseOverlay(routes.projectOverview(projectId));
 
+  const columns = state.customColsByProject[projectId] ?? [];
+
   return (
     <CustomFieldsModal
-      columns={state.customCols}
-      onAdd={state.addColumn}
-      onRemove={state.removeColumn}
+      columns={columns}
+      onAdd={col => state.addColumn(col)}
+      onRemove={id => state.removeColumn(id)}
       onClose={close}
     />
   );

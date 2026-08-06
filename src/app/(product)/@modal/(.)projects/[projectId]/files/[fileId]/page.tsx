@@ -7,12 +7,13 @@ import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { getFileForProject } from '@/features/files/selectors/getFileForProject';
 import { useCloseOverlay } from '@/shared/navigation/useCloseOverlay';
 import { routes } from '@/shared/navigation/routes';
+import { getSingleParam } from '@/shared/utils/routeParams';
 
 export default function InterceptedFileViewerPage() {
   const params = useParams();
   const router = useRouter();
-  const projectId = typeof params.projectId === 'string' ? params.projectId : '';
-  const fileId = typeof params.fileId === 'string' ? params.fileId : '';
+  const projectId = getSingleParam(params.projectId);
+  const fileId = getSingleParam(params.fileId);
   const state = useFlowDeck();
   const close = useCloseOverlay(routes.projectFiles(projectId));
 

@@ -20,19 +20,36 @@ export default function TaskDetailRoutePage() {
     notFound();
   }
 
-  const tasks = state.tasksByProject[projectId] || [];
-  const parentTask = task.parentId ? tasks.find(t => t.id === task.parentId) : undefined;
+  const projectTasks = state.tasksByProject[projectId] ?? [];
+  const projectFiles = state.filesByProject[projectId] ?? [];
+  const projectTags = state.tagsByProject[projectId] ?? [];
+  const projectComments = state.commentsByProject[projectId] ?? [];
+  const projectActivity = state.activityByProject[projectId] ?? [];
+  const projectTimeLogs = state.timeLogsByProject[projectId] ?? [];
+  const projectCustomFields = state.customColsByProject[projectId] ?? [];
+
+  const taskComments = projectComments.filter(
+    comment => comment.taskId === taskId
+  );
+  const taskActivity = projectActivity.filter(
+    activity => activity.taskId === taskId
+  );
+  const taskTimeLogs = projectTimeLogs.filter(
+    log => log.taskId === taskId
+  );
+
+  const parentTask = task.parentId ? projectTasks.find(t => t.id === task.parentId) : undefined;
 
   return (
     <>
       <ProjectTasksPage />
       <TaskDetailPanel
         task={task}
-        allTasks={tasks}
-        files={state.filesByProject[projectId] || []}
-        tags={state.tags}
-        comments={state.taskComments}
-        activity={state.taskActivity}
+        allTasks={projectTasks}
+        files={projectFiles}
+        tags={projectTags}
+        comments={taskComments}
+        activity={taskActivity}
         parentTask={parentTask}
         onClose={() => router.push(routes.projectTasks(projectId))}
         onUpdate={patch => state.updateTask(task.id, patch)}
@@ -46,11 +63,11 @@ export default function TaskDetailRoutePage() {
         onEditComment={state.editComment}
         onToggleReaction={state.toggleReaction}
         onToggleFollower={state.toggleFollower}
-        timeLogs={state.taskTimeLogs}
+        timeLogs={taskTimeLogs}
         onAddTimeLog={state.addTimeLog}
         onDeleteTimeLog={state.deleteTimeLog}
         currentUserId={state.currentUserId}
-        customCols={state.customCols}
+        customCols={projectCustomFields}
         onViewFile={fileId => router.push(routes.file(projectId, fileId))}
         onRemoveFile={state.removeFile}
         onAddFiles={state.addFiles}

@@ -1,30 +1,6 @@
 import type { Metadata } from "next";
 import React from "react";
 import "./globals.css";
-import { FlowdekDataProvider } from "@/providers/FlowdekDataProvider";
-
-if (typeof window === 'undefined') {
-  try {
-    const originalUseContext = React.useContext;
-    if (originalUseContext && !((originalUseContext as unknown as { __isSafePatch?: boolean }).__isSafePatch)) {
-      const safeUseContext = function (Context: unknown) {
-        try {
-          const internals = (React as unknown as { __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED?: { ReactCurrentDispatcher?: { current?: unknown } } }).__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED;
-          if (!internals?.ReactCurrentDispatcher?.current) {
-            return null;
-          }
-          return originalUseContext(Context as never);
-        } catch {
-          return null;
-        }
-      };
-      (safeUseContext as unknown as { __isSafePatch: boolean }).__isSafePatch = true;
-      (React as unknown as { useContext: typeof safeUseContext }).useContext = safeUseContext;
-    }
-  } catch {
-    // ignore
-  }
-}
 
 export const dynamic = 'force-dynamic';
 
@@ -53,9 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased bg-background text-foreground" style={{ margin: 0, padding: 0 }} suppressHydrationWarning>
-        <FlowdekDataProvider>
-          {children}
-        </FlowdekDataProvider>
+        {children}
       </body>
     </html>
   );

@@ -16,21 +16,11 @@ import {
 import type { GridActions } from '../components/toolbar/types';
 import type { ProjectStatusUpdate } from '@/features/flowdeck/model';
 import { useOptionalFlowdekData } from '@/providers/FlowdekDataProvider';
+import { loadPersistedState, savePersistedState, STORAGE_KEY } from '@/data/local-storage/storageAdapter';
+import { defaultIdGenerator } from '@/shared/utils/id';
 
 /* ---- LocalStorage persistence ---- */
-const STORAGE_KEY = 'flowdeck-state-v1';
 const SAVE_DEBOUNCE = 500;
-
-function loadPersistedState(): Record<string, unknown> | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    localStorage.removeItem(STORAGE_KEY);
-    return null;
-  }
-}
 
 function initFromStorage<T>(key: string, fallback: T, persisted: Record<string, unknown> | null): T {
   if (persisted && key in persisted) return persisted[key] as T;
@@ -66,6 +56,8 @@ export interface FlowDeckState {
   tagsByProject: Record<string, Tag[]>;
   commentsByProject: Record<string, Comment[]>;
   activityByProject: Record<string, ActivityEntry[]>;
+  timeLogsByProject: Record<string, TimeLog[]>;
+  sectionsByProject: Record<string, Section[]>;
   currentUserId: string;
 
   /* UI state */
@@ -377,7 +369,7 @@ export function useFlowDeckStore(): FlowDeckState {
           goals, keyResults, savedFilters, currentProjectId, activeView,
           automations, forms, submissions, approvals, budgets, expenses, timesheets,
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        savePersistedState(state);
       } catch { /* storage full or private mode */ }
     }, SAVE_DEBOUNCE);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
@@ -423,7 +415,7 @@ export function useFlowDeckStore(): FlowDeckState {
   }, []);
 
   const createProject = useCallback(({ name, color, start, end }: { name: string; color: string; start: string; end: string }) => {
-    const id = 'p' + Math.random().toString(36).slice(2, 8);
+    const id = defaultIdGenerator.generate('p');
     setProjects(prev => ({ ...prev, [id]: { id, name, color, start, end } }));
     setTasksByProject(prev => ({ ...prev, [id]: [] }));
     setFilesByProject(prev => ({ ...prev, [id]: [] }));
@@ -443,7 +435,7 @@ export function useFlowDeckStore(): FlowDeckState {
   const createProjectFromTemplate = useCallback((templateId: string, name: string, color: string, start: string, end: string) => {
     const tpl = PROJECT_TEMPLATES.find(t => t.id === templateId);
     if (!tpl) return;
-    const id = 'p' + Math.random().toString(36).slice(2, 8);
+    const id = defaultIdGenerator.generate('p');
     const templateTasks = tpl.generateTasks(id, start);
     const templateTags: Tag[] = tpl.tags.map((t, i) => ({ id: `tag_${id}_${i}`, name: t.name, color: t.color }));
     setProjects(prev => ({ ...prev, [id]: { id, name, color, start, end } }));
@@ -482,7 +474,7 @@ export function useFlowDeckStore(): FlowDeckState {
   const logActivity = useCallback((taskId: string, type: ActivityEntry['type'], description: string) => {
     if (!currentProjectId) return;
     const entry: ActivityEntry = {
-      id: 'a' + Math.random().toString(36).slice(2, 8),
+      id: defaultIdGenerator.generate('a'),
       taskId, type, description,
       authorId: CURRENT_USER_ID,
       timestamp: new Date().toISOString(),
@@ -546,7 +538,7 @@ export function useFlowDeckStore(): FlowDeckState {
       if (task.recurrence) {
         const nextDue = task.dueDate ? computeNextDate(task.dueDate, task.recurrence) : undefined;
         const nextStart = nextDue || task.start;
-        const newId = 't' + Math.random().toString(36).slice(2, 8);
+        const newId = defaultIdGenerator.generate('t');
         const nextTask: Task = {
           id: newId,
           name: task.name,
@@ -659,7 +651,7 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [selectedIds, tasks, removeTasksBulk]);
   const paste = useCallback(() => {
     if (!clipboard.items.length) return;
-    const clones = clipboard.items.map(t => ({ ...t, id: 't' + Math.random().toString(36).slice(2, 8), name: t.name + ' (copy)' }));
+    const clones = clipboard.items.map(t => ({ ...t, id: defaultIdGenerator.generate('t'), name: t.name + ' (copy)' }));
     addTasksBulk(clones);
   }, [clipboard.items, addTasksBulk]);
 
@@ -669,7 +661,7 @@ export function useFlowDeckStore(): FlowDeckState {
       complete: (res) => {
         const rows = (res.data as Record<string, string>[]).map(r => {
           const member = TEAM.find(m => m.name.toLowerCase() === (r.assignee || '').toLowerCase());
-          return { id: 't' + Math.random().toString(36).slice(2, 8), name: r.name || 'Untitled task', description: r.description || undefined, assignee: member ? member.id : TEAM[0].id, start: r.start || TODAY.toISOString().slice(0, 10), duration: Number(r.duration) || 3, progress: Number(r.progress) || 0, priority: PRIORITY_META[r.priority] ? r.priority : 'medium', status: STATUS_META[r.status] ? r.status : 'backlog', deps: [] } as Task;
+          return { id: defaultIdGenerator.generate('t'), name: r.name || 'Untitled task', description: r.description || undefined, assignee: member ? member.id : TEAM[0].id, start: r.start || TODAY.toISOString().slice(0, 10), duration: Number(r.duration) || 3, progress: Number(r.progress) || 0, priority: PRIORITY_META[r.priority] ? r.priority : 'medium', status: STATUS_META[r.status] ? r.status : 'backlog', deps: [] } as Task;
         });
         if (rows.length) addTasksBulk(rows);
       },
@@ -691,7 +683,7 @@ export function useFlowDeckStore(): FlowDeckState {
     if (!selectedIds.size || !currentProjectId) return;
     const targetId = [...selectedIds][0];
     const now = TODAY.toISOString().slice(0, 10);
-    const newFiles = Array.from(fileList).map(f => ({ id: 'f' + Math.random().toString(36).slice(2, 8), name: f.name, size: f.size, uploadedBy: CURRENT_USER_ID, uploadedAt: now, linkedTaskId: targetId, url: URL.createObjectURL(f) }));
+    const newFiles = Array.from(fileList).map(f => ({ id: defaultIdGenerator.generate('f'), name: f.name, size: f.size, uploadedBy: CURRENT_USER_ID, uploadedAt: now, linkedTaskId: targetId, url: URL.createObjectURL(f) }));
     setFilesByProject(prev => ({ ...prev, [currentProjectId]: [...newFiles, ...(prev[currentProjectId] || [])] }));
   }, [selectedIds, currentProjectId]);
 
@@ -775,7 +767,7 @@ export function useFlowDeckStore(): FlowDeckState {
   /* ---- Quick Add ---- */
   const quickAddTask = useCallback((name: string, opts?: { status?: string; parentId?: string | null; startOverride?: string }) => {
     if (!name.trim()) return;
-    const id = 't' + Math.random().toString(36).slice(2, 8);
+    const id = defaultIdGenerator.generate('t');
     const todayStr = TODAY.toISOString().slice(0, 10);
     const newTask: Task = {
       id,
@@ -799,7 +791,7 @@ export function useFlowDeckStore(): FlowDeckState {
   const addComment = useCallback((taskId: string, text: string, parentId?: string | null) => {
     if (!currentProjectId || !text.trim()) return;
     const comment: Comment = {
-      id: 'c' + Math.random().toString(36).slice(2, 8),
+      id: defaultIdGenerator.generate('c'),
       taskId,
       authorId: CURRENT_USER_ID,
       text: text.trim(),
@@ -887,7 +879,7 @@ export function useFlowDeckStore(): FlowDeckState {
   const addTimeLog = useCallback((taskId: string, minutes: number, note: string) => {
     if (!currentProjectId || minutes <= 0) return;
     const entry: TimeLog = {
-      id: 'tl' + Math.random().toString(36).slice(2, 8),
+      id: defaultIdGenerator.generate('tl'),
       taskId, userId: CURRENT_USER_ID, minutes, note: note.trim(),
       loggedAt: new Date().toISOString(),
     };
@@ -964,7 +956,7 @@ export function useFlowDeckStore(): FlowDeckState {
   const duplicateTaskWithOptions = useCallback((id: string, opts?: { includeSubtasks?: boolean; includeComments?: boolean; includeAttachments?: boolean }) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
-    const newId = 't' + Math.random().toString(36).slice(2, 8);
+    const newId = defaultIdGenerator.generate('t');
     const idMap = new Map<string, string>();
     idMap.set(id, newId);
 
@@ -987,7 +979,7 @@ export function useFlowDeckStore(): FlowDeckState {
     if (opts?.includeSubtasks) {
       const subtasks = tasks.filter(t => t.parentId === id);
       for (const sub of subtasks) {
-        const subId = 't' + Math.random().toString(36).slice(2, 8);
+        const subId = defaultIdGenerator.generate('t');
         idMap.set(sub.id, subId);
         newTasks.push({
           ...sub,
@@ -1012,7 +1004,7 @@ export function useFlowDeckStore(): FlowDeckState {
       const taskComments = (commentsByProject[currentProjectId] || []).filter(c => c.taskId === id);
       if (taskComments.length) {
         const clonedComments = taskComments.map(c => ({
-          id: 'c' + Math.random().toString(36).slice(2, 8),
+          id: defaultIdGenerator.generate('c'),
           taskId: newId,
           authorId: c.authorId,
           text: c.text,
@@ -1031,7 +1023,7 @@ export function useFlowDeckStore(): FlowDeckState {
       if (taskFiles.length) {
         const clonedFiles = taskFiles.map(f => ({
           ...f,
-          id: 'f' + Math.random().toString(36).slice(2, 8),
+          id: defaultIdGenerator.generate('f'),
           linkedTaskId: newId,
         }));
         setFilesByProject(prev => ({
@@ -1056,7 +1048,7 @@ export function useFlowDeckStore(): FlowDeckState {
       if (!task) continue;
       newTasks.push({
         ...task,
-        id: 't' + Math.random().toString(36).slice(2, 8),
+        id: defaultIdGenerator.generate('t'),
         name: task.name + ' (copy)',
         status: 'backlog', progress: 0, deps: [],
         tags: [...(task.tags || [])],
@@ -1237,7 +1229,7 @@ export function useFlowDeckStore(): FlowDeckState {
   /* ---- #35: Sections ---- */
   const addSection = useCallback((name: string) => {
     if (!currentProjectId) return;
-    const id = 'sec_' + Math.random().toString(36).slice(2, 8);
+    const id = defaultIdGenerator.generate('sec');
     const currentSections = sectionsByProject[currentProjectId] || [];
     const newSection: Section = { id, projectId: currentProjectId, name, position: currentSections.length, collapsed: false };
     setSectionsByProject(prev => ({ ...prev, [currentProjectId]: [...(prev[currentProjectId] || []), newSection] }));
@@ -1343,7 +1335,7 @@ export function useFlowDeckStore(): FlowDeckState {
 
   const addProjectStatusUpdate = useCallback((text: string, color: 'green' | 'yellow' | 'red') => {
     if (!currentProjectId) return;
-    const id = 'su' + Math.random().toString(36).slice(2, 8);
+    const id = defaultIdGenerator.generate('su');
     const update: ProjectStatusUpdate = {
       id, projectId: currentProjectId, authorId: CURRENT_USER_ID,
       text, color, createdAt: new Date().toISOString(),
@@ -1367,7 +1359,7 @@ export function useFlowDeckStore(): FlowDeckState {
     if (!currentProjectId) return;
     const p = projects[currentProjectId];
     if (!p) return;
-    const tid = 'tpl_' + Math.random().toString(36).slice(2, 8);
+    const tid = defaultIdGenerator.generate('tpl');
     const taskList = includeTasks ? (tasksByProject[currentProjectId] || []) : [];
     const tagList = (tagsByProject[currentProjectId] || []).map(t => ({ name: t.name, color: t.color }));
     const colsList = customColsByProject[currentProjectId] || [];
@@ -1396,7 +1388,7 @@ export function useFlowDeckStore(): FlowDeckState {
 
   /* ---- #49: Saved Filters ---- */
   const saveFilter = useCallback((name: string, filters: SearchFilters) => {
-    const sf: SavedFilter = { id: 'sf' + Math.random().toString(36).slice(2, 8), name, filters, createdAt: new Date().toISOString() };
+    const sf: SavedFilter = { id: defaultIdGenerator.generate('sf'), name, filters, createdAt: new Date().toISOString() };
     setSavedFilters(prev => [...prev, sf]);
     toast.success(`Filter "${name}" saved`);
   }, []);
@@ -1465,7 +1457,7 @@ export function useFlowDeckStore(): FlowDeckState {
       const pid = form.projectId;
       if (pid && tasksByProject[pid]) {
         const newTask: Task = {
-          id: 't' + Date.now(),
+          id: defaultIdGenerator.generate('t'),
           name: taskName,
           status: 'backlog',
           assignee: CURRENT_USER_ID,
@@ -1526,7 +1518,7 @@ export function useFlowDeckStore(): FlowDeckState {
 
   return {
     projects, tasksByProject, filesByProject, raidByProject, customColsByProject,
-    tagsByProject, commentsByProject, activityByProject, timeLogsByProject,
+    tagsByProject, commentsByProject, activityByProject, timeLogsByProject, sectionsByProject,
     currentUserId: CURRENT_USER_ID,
     currentProjectId, activeView, selectedTaskId, selectedIds, searchQuery,
     showNewTask, showNewProject, projectMenuOpen, shareOpen, sidebarOpen, moreMenuOpen,
@@ -1583,108 +1575,14 @@ export function useFlowDeckStore(): FlowDeckState {
   } as FlowDeckState;
 }
 
-export const fallbackFlowDeckState: FlowDeckState = {
-    projects: {},
-    tasks: [],
-    tasksByProject: {},
-    files: [],
-    filesByProject: {},
-    tags: [],
-    tagsByProject: {},
-    commentsByProject: {},
-    activityByProject: {},
-    timeLogsByProject: {},
-    sectionsByProject: {},
-    statusUpdatesByProject: {},
-    customColsByProject: {},
-    raidByProject: {},
-    project: null,
-    currentProjectId: null,
-    currentUserId: 'u1',
-    searchQuery: '',
-    searchFilters: {},
-    activeFilterCount: 0,
-    sidebarOpen: false,
-    projectMenuOpen: false,
-    moreMenuOpen: false,
-    shareOpen: false,
-    showNewTask: false,
-    showNewProject: false,
-    selectedTaskId: null,
-    viewingFileId: null,
-    viewingFile: null,
-    selectedIds: new Set(),
-    clipboard: { type: 'copy', items: [] },
-    gridActions: {
-      onIndent: () => {},
-      onOutdent: () => {},
-      onDeleteSelected: () => {},
-      onUndo: () => {},
-      onRedo: () => {},
-    },
-    setSearchQuery: () => {},
-    setSearchFilters: () => {},
-    clearFilters: () => {},
-    setSidebarOpen: () => {},
-    setProjectMenuOpen: () => {},
-    setMoreMenuOpen: () => {},
-    setShareOpen: () => {},
-    setShowNewTask: () => {},
-    setShowNewProject: () => {},
-    setSelectedTaskId: () => {},
-    setViewingFileId: () => {},
-    setSelectedIds: () => {},
-    openProject: () => {},
-    createProject: () => {},
-    updateProject: () => {},
-    archiveProject: () => {},
-    toggleProjectFavorite: () => {},
-    createProjectFromTemplate: () => {},
-    addTask: () => {},
-    updateTask: () => {},
-    removeTask: () => {},
-    removeTasksBulk: () => {},
-    duplicateTask: () => {},
-    duplicateTaskWithOptions: () => {},
-    duplicateTasksBulk: () => {},
-    linkSelected: () => {},
-    unlinkSelected: () => {},
-    toggleBoldSelected: () => {},
-    toggleMilestoneSelected: () => {},
-    attachFilesToSelected: () => {},
-    bulkSetDueDate: () => {},
-    bulkAddTag: () => {},
-    bulkRemoveTag: () => {},
-    bulkSetStatus: () => {},
-    moveTasksToProjectBulk: () => {},
-    toggleComplete: () => {},
-    reorderTask: () => {},
-    quickAddTask: () => {},
-    addComment: () => {},
-    deleteComment: () => {},
-    editComment: () => {},
-    toggleReaction: () => {},
-    toggleFollower: () => {},
-    addTimeLog: () => {},
-    deleteTimeLog: () => {},
-    addColumn: () => {},
-    removeColumn: () => {},
-    addRaid: () => {},
-    updateRaid: () => {},
-    deleteRaid: () => {},
-    addSection: () => {},
-    deleteSection: () => {},
-    addStatusUpdate: () => {},
-    createSavedFilter: () => {},
-    deleteSavedFilter: () => {},
-    resetToDefaults: () => {},
-  } as unknown as FlowDeckState;
-
 export function useFlowDeck(): FlowDeckState {
   const context = useOptionalFlowdekData();
-  if (context) return context;
-  if (process.env.NODE_ENV === 'production') {
-    return fallbackFlowDeckState;
+
+  if (!context) {
+    throw new Error(
+      'useFlowDeck must be used within a FlowdekDataProvider'
+    );
   }
-  throw new Error('useFlowDeck must be used within a FlowdekDataProvider');
+
+  return context;
 }

@@ -7,12 +7,13 @@ import { FileViewerModal } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { getFileForProject } from '@/features/files/selectors/getFileForProject';
 import { routes } from '@/shared/navigation/routes';
+import { getSingleParam } from '@/shared/utils/routeParams';
 
 export default function FileViewerRoutePage() {
   const params = useParams();
   const router = useRouter();
-  const projectId = typeof params.projectId === 'string' ? params.projectId : '';
-  const fileId = typeof params.fileId === 'string' ? params.fileId : '';
+  const projectId = getSingleParam(params.projectId);
+  const fileId = getSingleParam(params.fileId);
   const state = useFlowDeck();
 
   const file = getFileForProject(state.filesByProject, projectId, fileId);
