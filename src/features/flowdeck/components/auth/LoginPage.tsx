@@ -6,8 +6,8 @@ import { COLORS, FF } from '@/features/flowdeck/model';
 import type { UserProfile } from './useAuth';
 
 interface LoginPageProps {
-  onLogin: (email: string, password: string, name?: string) => void;
-  onDemoLogin: () => void;
+  onLogin: (email: string, password: string, name?: string) => Promise<{ ok: boolean; error?: string }>;
+  onDemoLogin: () => Promise<{ ok: boolean; error?: string }>;
   onLogout?: () => void;
   hasExistingSession?: boolean;
 }
@@ -64,25 +64,37 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!email.trim()) { setError('Email is required'); return; }
     if (mode === 'signup' && !name.trim()) { setError('Name is required'); return; }
-    if (!password || password.length < 4) { setError('Password must be at least 4 characters'); return; }
+    if (!password || password.length < 6) { setError('Password must be at least 6 characters'); return; }
     setLoading(true);
-    setTimeout(() => {
-      onLogin(email.trim(), password, mode === 'signup' ? name.trim() : undefined);
+    try {
+      const result = await onLogin(email.trim(), password, mode === 'signup' ? name.trim() : undefined);
+      if (!result?.ok) {
+        setError(result?.error || 'Authentication failed');
+      }
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   }, [email, password, name, mode, onLogin]);
 
-  const handleDemo = useCallback(() => {
+  const handleDemo = useCallback(async () => {
     setLoading(true);
-    setTimeout(() => {
-      onDemoLogin();
+    try {
+      const result = await onDemoLogin();
+      if (!result?.ok) {
+        setError(result?.error || 'Demo login failed');
+      }
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   }, [onDemoLogin]);
 
   // ---- MOBILE LAYOUT (< 768px) ----

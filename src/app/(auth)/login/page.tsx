@@ -27,14 +27,20 @@ export default function AuthLoginPage() {
     );
   }
 
-  const handleLogin = (email: string, password: string, name?: string) => {
-    auth.login(email, password, name);
-    router.push(routes.projects());
+  const handleLogin = async (email: string, password: string, name?: string) => {
+    const result = await auth.login(email, password, name);
+    if (result.ok) {
+      router.push(routes.projects());
+    }
+    return result;
   };
 
-  const handleDemoLogin = () => {
-    auth.demoLogin();
-    router.push(routes.projects());
+  const handleDemoLogin = async () => {
+    const result = await auth.demoLogin();
+    if (result.ok) {
+      router.push(routes.projects());
+    }
+    return result;
   };
 
   return <LoginPage onLogin={handleLogin} onDemoLogin={handleDemoLogin} />;

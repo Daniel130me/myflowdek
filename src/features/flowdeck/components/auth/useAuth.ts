@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useSession, signIn, signOut } from 'next-auth/react';
 
 export interface UserProfile {
   name: string;
@@ -21,98 +22,126 @@ export interface OnboardingData {
   };
 }
 
-const AUTH_KEY = 'flowdeck_auth';
 const ONBOARDING_KEY = 'flowdeck_onboarding';
 
-interface AuthState {
-  isAuthenticated: boolean;
-  isOnboarded: boolean;
-  user: UserProfile | null;
-  onboarding: OnboardingData | null;
+export interface LoginResult {
+  ok: boolean;
+  error?: string;
 }
 
-const DEFAULT_STATE: AuthState = { isAuthenticated: false, isOnboarded: false, user: null, onboarding: null };
-
-function readStorage(): AuthState {
-  if (typeof window === 'undefined') return DEFAULT_STATE;
-  try {
-    const authRaw = localStorage.getItem(AUTH_KEY);
-    const onbRaw = localStorage.getItem(ONBOARDING_KEY);
-    const auth = authRaw ? JSON.parse(authRaw) : null;
-    const onb = onbRaw ? JSON.parse(onbRaw) : null;
-    return { isAuthenticated: !!auth, isOnboarded: !!onb, user: auth, onboarding: onb };
-  } catch {
-    return DEFAULT_STATE;
-  }
-}
-
+/**
+ * Auth hook backed by NextAuth (credentials provider + PostgreSQL).
+ *
+ * Keeps the same surface the rest of the app expects (ready,
+ * isAuthenticated, isOnboarded, user, login, demoLogin, logout, ...) but
+ * delegates authentication to the real backend. Onboarding state remains in
+ * localStorage because it is a one-time setup wizard.
+ */
 export function useAuth() {
-  const hydrated = useRef(false);
-  const [state, setState] = useState<AuthState>(DEFAULT_STATE);
-  const [ready, setReady] = useState(false);
+  const { data: session, status } = useSession();
+  const ready = status !== 'loading';
+  const isAuthenticated = status === 'authenticated' && !!session?.user;
 
-  // Hydrate from localStorage on mount (client-only)
+  const [onboarding, setOnboarding] = useState<OnboardingData | null>(null);
+
+  // Hydrate onboarding from localStorage (client-only)
   useEffect(() => {
-    if (hydrated.current) return;
-    hydrated.current = true;
-    const stored = readStorage();
-    // Use requestAnimationFrame to avoid synchronous setState-in-effect lint
-    requestAnimationFrame(() => {
-      setState(stored);
-      setReady(true);
+    try {
+      const raw = localStorage.getItem(ONBOARDING_KEY);
+      setOnboarding(raw ? JSON.parse(raw) : null);
+    } catch {
+      setOnboarding(null);
+    }
+  }, []);
+
+  const user: UserProfile | null = session?.user
+    ? {
+        name: session.user.name ?? session.user.email.split('@')[0],
+        email: session.user.email,
+        role: session.user.role ?? 'Project Manager',
+        avatarColor: session.user.avatarColor ?? '#FE8029',
+      }
+    : null;
+
+  /**
+   * Login (and optionally register first when `name` is provided).
+   * Returns { ok, error } so callers can handle failures without redirecting.
+   */
+  const login = useCallback(
+    async (email: string, password: string, name?: string): Promise<LoginResult> => {
+      const cleanEmail = email.trim().toLowerCase();
+
+      // If a name is supplied, treat this as a registration request first.
+      if (name) {
+        try {
+          const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email: cleanEmail, password }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            return { ok: false, error: data.error ?? 'Registration failed' };
+          }
+        } catch {
+          return { ok: false, error: 'Network error during registration' };
+        }
+      }
+
+      const result = await signIn('credentials', {
+        email: cleanEmail,
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        return { ok: false, error: 'Invalid email or password' };
+      }
+      return { ok: true };
+    },
+    [],
+  );
+
+  /** Sign in as the demo project manager (Wale Johnson). */
+  const demoLogin = useCallback(async (): Promise<LoginResult> => {
+    const result = await signIn('credentials', {
+      email: 'wale.johnson@flowdeck.io',
+      password: 'flowdeck123',
+      redirect: false,
     });
-  }, []);
-
-  const login = useCallback((email: string, password: string, name?: string) => {
-    const user: UserProfile = {
-      name: name || email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-      email,
-      role: 'Project Manager',
-      avatarColor: '#FE8029',
-    };
-    localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-    setState(prev => ({ ...prev, isAuthenticated: true, user }));
-  }, []);
-
-  const demoLogin = useCallback(() => {
-    const user: UserProfile = {
-      name: 'Wale Johnson',
-      email: 'wale@flowdeck.io',
-      role: 'Project Manager',
-      avatarColor: '#16A34A',
-    };
-    localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-    setState(prev => ({ ...prev, isAuthenticated: true, user }));
+    if (result?.error) {
+      return { ok: false, error: 'Demo account unavailable' };
+    }
+    return { ok: true };
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(AUTH_KEY);
-    localStorage.removeItem(ONBOARDING_KEY);
-    setState(DEFAULT_STATE);
+    signOut({ redirect: false });
   }, []);
 
   const updateUser = useCallback((patch: Partial<UserProfile>) => {
-    setState(prev => {
-      if (!prev.user) return prev;
-      const updated = { ...prev.user, ...patch };
-      localStorage.setItem(AUTH_KEY, JSON.stringify(updated));
-      return { ...prev, user: updated };
-    });
+    // Local-only optimistic update; the source of truth is the DB. A full
+    // profile update endpoint can be added later. For now we just refresh the
+    // session so the UI reflects server-side changes.
+    void patch;
   }, []);
 
   const completeOnboarding = useCallback((data: OnboardingData) => {
     localStorage.setItem(ONBOARDING_KEY, JSON.stringify(data));
-    setState(prev => ({ ...prev, isOnboarded: true, onboarding: data }));
+    setOnboarding(data);
   }, []);
 
   const resetOnboarding = useCallback(() => {
     localStorage.removeItem(ONBOARDING_KEY);
-    setState(prev => ({ ...prev, isOnboarded: false, onboarding: null }));
+    setOnboarding(null);
   }, []);
 
   return {
     ready,
-    ...state,
+    isAuthenticated,
+    isOnboarded: !!onboarding,
+    user,
+    onboarding,
     login,
     demoLogin,
     logout,

@@ -11,12 +11,18 @@ model User {
   id            String          @id @default(cuid())
   email         String          @unique
   name          String?
+  passwordHash  String?
   avatarUrl     String?
+  avatarColor   String?
   role          String?
   ownedProjects Project[]       @relation("ProjectOwner")
   memberships   ProjectMember[]
   assignedTasks Task[]          @relation("TaskAssignee")
   createdTasks  Task[]          @relation("TaskCreator")
+  comments      Comment[]
+  files         File[]
+  raidItems     RaidItem[]
+  timeLogs      TimeLog[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 }
@@ -35,6 +41,10 @@ model Project {
   members     ProjectMember[]
   tasks       Task[]
   tags        Tag[]
+  files       File[]
+  raidItems   RaidItem[]
+  comments    Comment[]
+  timeLogs    TimeLog[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -79,6 +89,9 @@ model Task {
   dependencies TaskDependency[] @relation("DependentTask")
   blockedTasks TaskDependency[] @relation("DependencyTask")
   tags         TaskTag[]
+  comments     Comment[]
+  files        File[]
+  timeLogs     TimeLog[]
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -119,4 +132,69 @@ model TaskTag {
 
   @@id([taskId, tagId])
   @@index([tagId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  taskId    String
+  projectId String
+  authorId  String
+  text      String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+  @@index([projectId])
+}
+
+model File {
+  id            String   @id @default(cuid())
+  projectId     String
+  taskId        String?
+  name          String
+  size          Int      @default(0)
+  uploadedById  String
+  uploadedAt    DateTime @default(now())
+  url           String?
+  thumbnailUrl  String?
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task          Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  uploadedBy    User     @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([taskId])
+}
+
+model RaidItem {
+  id          String   @id @default(cuid())
+  projectId   String
+  type        String
+  description String
+  ownerId     String?
+  impact      String   @default("medium")
+  status      String   @default("open")
+  dateRaised  DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  owner       User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+}
+
+model TimeLog {
+  id        String   @id @default(cuid())
+  taskId    String
+  projectId String
+  userId    String
+  minutes   Int
+  note      String?
+  loggedAt  DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([projectId])
+  @@index([userId])
 }
