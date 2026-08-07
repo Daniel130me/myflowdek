@@ -19,13 +19,14 @@ import {
   initialRaid,
   initialTimeLogs,
 } from '../src/features/flowdeck/model/data';
+import { DEMO_PASSWORD, BCRYPT_ROUNDS, DEMO_EMAIL_DOMAIN } from '../src/lib/auth.constants';
 
 const prisma = new PrismaClient();
 
-const DEMO_PASSWORD = 'flowdeck123';
-
+/** Build a deterministic demo email from a display name
+ *  (e.g. "Wale Johnson" -> "wale.johnson@flowdeck.io"). */
 function emailFromName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z]+/g, '.') + '@flowdeck.io';
+  return name.toLowerCase().replace(/[^a-z]+/g, '.') + '@' + DEMO_EMAIL_DOMAIN;
 }
 
 function toDate(value?: string | null): Date | null {
@@ -36,7 +37,7 @@ function toDate(value?: string | null): Date | null {
 
 async function main() {
   console.log('🔐 Hashing demo password…');
-  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_ROUNDS);
 
   console.log('🧹 Cleaning existing data…');
   // Delete in reverse dependency order to respect foreign keys.

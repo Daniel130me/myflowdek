@@ -2,18 +2,35 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { db } from '@/server/db/client';
+import {
+  BCRYPT_ROUNDS,
+  DEFAULT_USER_ROLE,
+  AVATAR_COLORS,
+  PASSWORD_MIN_LENGTH,
+  NAME_MAX_LENGTH,
+} from '@/lib/auth.constants';
 
+/** Request body validation for registration. Constraints live as named
+ *  constants so the UI can reference the same limits if needed. */
 const registerSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100),
+  name: z.string().min(1, 'Name is required').max(NAME_MAX_LENGTH, 'Name is too long'),
   email: z.string().email('Invalid email address').toLowerCase(),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
 });
 
-const AVATAR_COLORS = ['#FE8029', '#0891B2', '#16A34A', '#D97706', '#DC2626', '#7C3AED', '#DB2777'];
+/** Pick a random avatar colour from the shared palette. Kept tiny and
+ *  self-contained so callers don't import `Math.random` boilerplate. */
+function pickAvatarColor(): string {
+  return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+}
 
 /**
  * POST /api/auth/register
- * Creates a new user with a bcrypt-hashed password.
+ *
+ * Creates a new user with a bcrypt-hashed password. Two DB calls:
+ *   1. `findUnique` on the email unique index — cheap, no scan.
+ *   2. `create` — single insert.
+ * No N+1; the avatar colour is chosen in memory.
  */
 export async function POST(request: Request) {
   try {
@@ -28,6 +45,7 @@ export async function POST(request: Request) {
 
     const { name, email, password } = parsed.data;
 
+    // Existence check against the email unique index (not a table scan).
     const existing = await db.user.findUnique({ where: { email } });
     if (existing) {
       return NextResponse.json(
@@ -36,17 +54,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     const user = await db.user.create({
       data: {
         name,
         email,
         passwordHash,
-        avatarColor,
-        role: 'Project Manager',
+        avatarColor: pickAvatarColor(),
+        role: DEFAULT_USER_ROLE,
       },
+      // Only return the safe, non-sensitive fields.
       select: { id: true, email: true, name: true },
     });
 

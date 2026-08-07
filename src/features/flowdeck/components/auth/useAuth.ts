@@ -2,6 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
+import {
+  ONBOARDING_STORAGE_KEY,
+  DEFAULT_USER_ROLE,
+  DEFAULT_AVATAR_COLOR,
+  DEMO_CREDENTIALS,
+} from '@/lib/auth.constants';
 
 export interface UserProfile {
   name: string;
@@ -22,11 +28,14 @@ export interface OnboardingData {
   };
 }
 
-const ONBOARDING_KEY = 'flowdeck_onboarding';
-
 export interface LoginResult {
   ok: boolean;
   error?: string;
+}
+
+/** Derive a display name from an email when the user has none set. */
+function nameFromEmail(email: string): string {
+  return email.split('@')[0];
 }
 
 /**
@@ -44,10 +53,10 @@ export function useAuth() {
 
   const [onboarding, setOnboarding] = useState<OnboardingData | null>(null);
 
-  // Hydrate onboarding from localStorage (client-only)
+  // Hydrate onboarding from localStorage (client-only).
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(ONBOARDING_KEY);
+      const raw = localStorage.getItem(ONBOARDING_STORAGE_KEY);
       setOnboarding(raw ? JSON.parse(raw) : null);
     } catch {
       setOnboarding(null);
@@ -56,10 +65,10 @@ export function useAuth() {
 
   const user: UserProfile | null = session?.user
     ? {
-        name: session.user.name ?? session.user.email.split('@')[0],
+        name: session.user.name ?? nameFromEmail(session.user.email),
         email: session.user.email,
-        role: session.user.role ?? 'Project Manager',
-        avatarColor: session.user.avatarColor ?? '#FE8029',
+        role: session.user.role ?? DEFAULT_USER_ROLE,
+        avatarColor: session.user.avatarColor ?? DEFAULT_AVATAR_COLOR,
       }
     : null;
 
@@ -102,11 +111,11 @@ export function useAuth() {
     [],
   );
 
-  /** Sign in as the demo project manager (Wale Johnson). */
+  /** Sign in as the seeded demo project manager (Wale Johnson). */
   const demoLogin = useCallback(async (): Promise<LoginResult> => {
     const result = await signIn('credentials', {
-      email: 'wale.johnson@flowdeck.io',
-      password: 'flowdeck123',
+      email: DEMO_CREDENTIALS.email,
+      password: DEMO_CREDENTIALS.password,
       redirect: false,
     });
     if (result?.error) {
@@ -127,12 +136,12 @@ export function useAuth() {
   }, []);
 
   const completeOnboarding = useCallback((data: OnboardingData) => {
-    localStorage.setItem(ONBOARDING_KEY, JSON.stringify(data));
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(data));
     setOnboarding(data);
   }, []);
 
   const resetOnboarding = useCallback(() => {
-    localStorage.removeItem(ONBOARDING_KEY);
+    localStorage.removeItem(ONBOARDING_STORAGE_KEY);
     setOnboarding(null);
   }, []);
 

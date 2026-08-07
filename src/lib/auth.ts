@@ -2,6 +2,12 @@ import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { db } from '@/server/db/client';
+import {
+  SESSION_STRATEGY,
+  LOGIN_PATH,
+  DEFAULT_USER_ROLE,
+  DEFAULT_AVATAR_COLOR,
+} from '@/lib/auth.constants';
 
 /**
  * NextAuth configuration for FlowDeck.
@@ -23,6 +29,7 @@ export const authOptions: NextAuthOptions = {
         if (!email || !password) return null;
 
         try {
+          // Single keyed lookup — no scan, no N+1.
           const user = await db.user.findUnique({ where: { email } });
           if (!user || !user.passwordHash) return null;
 
@@ -43,10 +50,12 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  session: { strategy: 'jwt' },
-  pages: { signIn: '/login' },
+  session: { strategy: SESSION_STRATEGY },
+  pages: { signIn: LOGIN_PATH },
   callbacks: {
     async jwt({ token, user }) {
+      // `user` is only present on the first sign-in; copy its fields onto the
+      // token so subsequent requests carry them without re-querying the DB.
       if (user) {
         token.id = (user as AuthUser).id;
         token.role = (user as AuthUser).role;
@@ -55,16 +64,20 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
+      // Expose the persisted token fields on the session object consumed by
+      // the client. Falls back to the defaults if the token is incomplete.
       if (session.user) {
         (session.user as AuthUser).id = token.id as string;
-        (session.user as AuthUser).role = token.role as string | undefined;
-        (session.user as AuthUser).avatarColor = token.avatarColor as string | undefined;
+        (session.user as AuthUser).role = (token.role as string | undefined) ?? DEFAULT_USER_ROLE;
+        (session.user as AuthUser).avatarColor =
+          (token.avatarColor as string | undefined) ?? DEFAULT_AVATAR_COLOR;
       }
       return session;
     },
   },
 };
 
+/** Shape of the user object enriched onto the NextAuth session/JWT. */
 interface AuthUser {
   id: string;
   email: string;
