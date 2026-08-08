@@ -125,8 +125,8 @@ task followers. Mentions → notifications (foundation only).
 
 | Phase | Commit | Status |
 |-------|--------|--------|
-| 1 | — | pending |
-| 2 | — | pending |
-| 3 | — | pending |
-| 4 | — | pending |
-| 5 | — | pending |
+| 1 | `a7196bd` | ✅ done |
+| 2 | `812719d` | ✅ done |
+| 3 | `7a44ed6` | ✅ done |
+| 4 | `d903ac4` | ✅ done |
+| 5 | `8d3de75` | ✅ done |
