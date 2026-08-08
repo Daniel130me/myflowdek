@@ -345,6 +345,9 @@ model File {
   taskId        String?
   name          String
   size          Int      @default(0)
+  mimeType      String?
+  /** R2 object key (the storage path, not a public URL). */
+  r2Key         String?
   uploadedById  String?
   uploadedAt    DateTime @default(now())
   url           String?
