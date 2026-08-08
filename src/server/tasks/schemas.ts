@@ -1,35 +1,31 @@
-import { z } from "zod";
+import { z } from 'zod';
+import { TASK_NAME_MAX_LENGTH, TASK_NAME_MIN_LENGTH, TASK_DESCRIPTION_MAX_LENGTH, TASK_STATUSES, TASK_PRIORITIES } from './constants';
 
-export const taskStatuses = ["backlog", "inprogress", "review", "done"] as const;
-export const taskPriorities = ["low", "medium", "high", "urgent"] as const;
+const optionalDate = z.iso.datetime().optional().nullable();
 
-const taskFields = {
-  name: z.string().trim().min(1).max(200),
-  description: z.string().trim().max(10_000).optional().nullable(),
-  status: z.enum(taskStatuses).optional(),
-  priority: z.enum(taskPriorities).optional(),
-  startDate: z.iso.datetime().optional().nullable(),
-  dueDate: z.iso.datetime().optional().nullable(),
-  duration: z.number().int().min(1).max(3_650).optional(),
-  progress: z.number().int().min(0).max(100).optional(),
-  sortOrder: z.number().int().min(0).optional(),
-  isMilestone: z.boolean().optional(),
-  assigneeId: z.string().trim().min(1).optional().nullable(),
-  createdById: z.string().trim().min(1).optional().nullable(),
-  parentId: z.string().trim().min(1).optional().nullable(),
-};
-
-export const taskListQuerySchema = z.object({
-  status: z.enum(taskStatuses).optional(),
-  assigneeId: z.string().trim().min(1).optional(),
+export const createTaskSchema = z.object({
+  name: z.string().trim().min(TASK_NAME_MIN_LENGTH, 'Task name is required').max(TASK_NAME_MAX_LENGTH),
+  description: z.string().trim().max(TASK_DESCRIPTION_MAX_LENGTH).optional().nullable(),
+  status: z.enum(TASK_STATUSES).optional(),
+  priority: z.enum(TASK_PRIORITIES).optional(),
+  startDate: optionalDate,
+  dueDate: optionalDate,
+  duration: z.number().int().nonnegative().optional(),
+  parentId: z.string().optional().nullable(),
 });
 
-export const createTaskSchema = z.object(taskFields);
-export const updateTaskSchema = z.object(taskFields).partial().refine(
-  (value) => Object.keys(value).length > 0,
-  "At least one task field must be provided.",
-);
+export const updateTaskSchema = z.object({
+  name: z.string().trim().min(TASK_NAME_MIN_LENGTH).max(TASK_NAME_MAX_LENGTH).optional(),
+  description: z.string().trim().max(TASK_DESCRIPTION_MAX_LENGTH).optional().nullable(),
+  status: z.enum(TASK_STATUSES).optional(),
+  priority: z.enum(TASK_PRIORITIES).optional(),
+  startDate: optionalDate,
+  dueDate: optionalDate,
+  duration: z.number().int().nonnegative().optional(),
+  progress: z.number().min(0).max(100).optional(),
+  assigneeId: z.string().optional().nullable(),
+  parentId: z.string().optional().nullable(),
+});
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
-

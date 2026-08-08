@@ -1,35 +1,50 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import {
+  requireAuthenticatedUser,
+  requireProjectMember,
+  authErrorResponse,
+} from '@/server/auth/authorization';
+import { listTasks, createTask } from '@/server/tasks/task.service';
+import { createTaskSchema } from '@/server/tasks/schemas';
 
-import { apiError, validationError } from "@/server/http/responses";
-import { createTaskSchema, taskListQuerySchema } from "@/server/tasks/schemas";
-import { addTask, listTasks } from "@/server/tasks/service";
-
-type RouteContext = { params: Promise<{ projectId: string }> };
-
-export async function GET(request: Request, { params }: RouteContext) {
-  const url = new URL(request.url);
-  const parsed = taskListQuerySchema.safeParse(Object.fromEntries(url.searchParams));
-  if (!parsed.success) return validationError(parsed.error);
-
+/** GET /api/projects/:projectId/tasks — list tasks. Any project member. */
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ projectId: string }> },
+) {
   try {
+    const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    const tasks = await listTasks(projectId, parsed.data);
+    await requireProjectMember(user.id, projectId);
+    const tasks = await listTasks(projectId);
     return NextResponse.json({ tasks });
   } catch (error) {
-    return apiError(error, "List tasks failed");
+    return authErrorResponse(error);
   }
 }
 
-export async function POST(request: Request, { params }: RouteContext) {
+/** POST /api/projects/:projectId/tasks — create task. createdById from session. */
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ projectId: string }> },
+) {
   try {
-    const parsed = createTaskSchema.safeParse(await request.json());
-    if (!parsed.success) return validationError(parsed.error);
-
+    const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    const task = await addTask(projectId, parsed.data);
+    await requireProjectMember(user.id, projectId);
+
+    const body = await request.json().catch(() => null);
+    const parsed = createTaskSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? 'Invalid input' },
+        { status: 400 },
+      );
+    }
+
+    const task = await createTask(projectId, user.id, parsed.data);
     return NextResponse.json({ task }, { status: 201 });
   } catch (error) {
-    return apiError(error, "Create task failed");
+    return authErrorResponse(error);
   }
 }
-

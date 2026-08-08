@@ -1,31 +1,68 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import {
+  requireAuthenticatedUser,
+  requireProjectMember,
+  authErrorResponse,
+} from '@/server/auth/authorization';
+import { getTask, updateTask, deleteTask } from '@/server/tasks/task.service';
+import { updateTaskSchema } from '@/server/tasks/schemas';
 
-import { apiError, validationError } from "@/server/http/responses";
-import { updateTaskSchema } from "@/server/tasks/schemas";
-import { editTask, removeTask } from "@/server/tasks/service";
-
-type RouteContext = { params: Promise<{ taskId: string }> };
-
-export async function PATCH(request: Request, { params }: RouteContext) {
+/** GET /api/tasks/:taskId — get a single task. */
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ taskId: string }> },
+) {
   try {
-    const parsed = updateTaskSchema.safeParse(await request.json());
-    if (!parsed.success) return validationError(parsed.error);
-
+    const user = await requireAuthenticatedUser();
     const { taskId } = await params;
-    const task = await editTask(taskId, parsed.data);
+    const task = await getTask(taskId);
+    await requireProjectMember(user.id, task.projectId);
     return NextResponse.json({ task });
   } catch (error) {
-    return apiError(error, "Update task failed");
+    return authErrorResponse(error);
   }
 }
 
-export async function DELETE(_request: Request, { params }: RouteContext) {
+/** PATCH /api/tasks/:taskId — update a task. */
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ taskId: string }> },
+) {
   try {
+    const user = await requireAuthenticatedUser();
     const { taskId } = await params;
-    await removeTask(taskId);
-    return new NextResponse(null, { status: 204 });
+    const task = await getTask(taskId);
+    await requireProjectMember(user.id, task.projectId);
+
+    const body = await request.json().catch(() => null);
+    const parsed = updateTaskSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? 'Invalid input' },
+        { status: 400 },
+      );
+    }
+
+    const updated = await updateTask(taskId, parsed.data);
+    return NextResponse.json({ task: updated });
   } catch (error) {
-    return apiError(error, "Delete task failed");
+    return authErrorResponse(error);
   }
 }
 
+/** DELETE /api/tasks/:taskId — delete a task. */
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ taskId: string }> },
+) {
+  try {
+    const user = await requireAuthenticatedUser();
+    const { taskId } = await params;
+    const task = await getTask(taskId);
+    await requireProjectMember(user.id, task.projectId);
+    await deleteTask(taskId);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return authErrorResponse(error);
+  }
+}
