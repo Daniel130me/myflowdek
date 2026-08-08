@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { AuthError } from '@/server/auth/authorization';
 import { recordActivity } from '@/server/activity/activity.service';
 import { ACTIVITY_TYPES } from '@/server/activity/constants';
+import { createNotification } from '@/server/notifications/notification.service';
+import { NOTIFICATION_TYPES } from '@/server/notifications/constants';
 import type { CreateTaskInput, UpdateTaskInput } from './schemas';
 
 /** Shape returned by task queries — safe public fields. */
@@ -152,6 +154,21 @@ export async function updateTask(
       if (input.assigneeId) {
         await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.ASSIGNED,
           'was assigned', { after: input.assigneeId });
+
+        // Notify the new assignee (don't notify if self-assigning).
+        if (input.assigneeId !== actingUserId) {
+          const assigneeName = await db.user.findUnique({
+            where: { id: actingUserId ?? '' },
+            select: { name: true },
+          }).then(u => u?.name ?? 'Someone').catch(() => 'Someone');
+          const taskName = input.name ?? before.name;
+          await createNotification(
+            input.assigneeId,
+            NOTIFICATION_TYPES.TASK_ASSIGNED,
+            `${assigneeName} assigned you to "${taskName}"`,
+            { actorId: actingUserId ?? null, projectId: pid, taskId },
+          );
+        }
       } else {
         await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.UNASSIGNED, 'was unassigned');
       }

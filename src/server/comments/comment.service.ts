@@ -4,6 +4,8 @@ import { AuthError } from '@/server/auth/authorization';
 import { z } from 'zod';
 import { recordActivity } from '@/server/activity/activity.service';
 import { ACTIVITY_TYPES } from '@/server/activity/constants';
+import { createNotification } from '@/server/notifications/notification.service';
+import { NOTIFICATION_TYPES } from '@/server/notifications/constants';
 
 export const createCommentSchema = z.object({
   text: z.string().trim().min(1, 'Comment cannot be empty').max(5000),
@@ -124,6 +126,62 @@ export async function createComment(
       ACTIVITY_TYPES.COMMENT_ADDED,
       'added a comment',
     );
+
+    // Notify the parent comment's author (if this is a reply and not self).
+    if (input.parentId) {
+      const parentComment = await db.comment.findUnique({
+        where: { id: input.parentId },
+        select: { authorId: true },
+      });
+      if (parentComment?.authorId && parentComment.authorId !== authorId) {
+        const authorName = await db.user.findUnique({
+          where: { id: authorId },
+          select: { name: true },
+        }).then(u => u?.name ?? 'Someone').catch(() => 'Someone');
+        await createNotification(
+          parentComment.authorId,
+          NOTIFICATION_TYPES.REPLIED,
+          `${authorName} replied to your comment`,
+          { actorId: authorId, projectId, taskId: input.taskId },
+        );
+      }
+    }
+
+    // Notify @mentioned users (extract @word patterns, resolve to workspace members).
+    const mentions = extractMentions(input.text);
+    if (mentions.length > 0) {
+      // Resolve mentions to users by email within the workspace.
+      const mentionedUsers = await db.user.findMany({
+        where: {
+          email: { in: mentions.map(m => m.toLowerCase()) },
+          // Must be a member of the workspace that owns this project.
+          workspaces: {
+            some: {
+              workspace: {
+                projects: { some: { id: projectId } },
+              },
+            },
+          },
+        },
+        select: { id: true, name: true },
+      });
+
+      const authorName = await db.user.findUnique({
+        where: { id: authorId },
+        select: { name: true },
+      }).then(u => u?.name ?? 'Someone').catch(() => 'Someone');
+
+      for (const mentionedUser of mentionedUsers) {
+        if (mentionedUser.id !== authorId) {
+          await createNotification(
+            mentionedUser.id,
+            NOTIFICATION_TYPES.MENTIONED,
+            `${authorName} mentioned you in a comment`,
+            { actorId: authorId, projectId, taskId: input.taskId },
+          );
+        }
+      }
+    }
 
     return comment;
   } catch (err) {

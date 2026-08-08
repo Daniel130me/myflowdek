@@ -73,6 +73,7 @@ model User {
   raidItems        RaidItem[]
   timeLogs         TimeLog[]
   activity         ActivityEntry[]
+  notifications    Notification[]
   verificationTokens VerificationToken[]
   auditLogs        AuditLog[]
   sentInvitations  Invitation[]
@@ -451,4 +452,32 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+}
+
+/* --------------------------- notifications ----------------------------- */
+
+/**
+ * User-facing notification. Created when a significant event happens that the
+ * user should know about: task assignment, @mention, reply, due date
+ * approaching, invitation received, etc.
+ *
+ * `readAt` is null until the user marks it read. `actorId` is the user who
+ * triggered the notification (null for system-generated events like overdue
+ * checks).
+ */
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // 'task_assigned' | 'mentioned' | 'replied' | 'due_soon' | 'overdue' | 'invitation' | 'approval' | 'status_changed'
+  actorId   String?
+  projectId String?
+  taskId    String?
+  message   String
+  readAt    DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@index([type])
 }
