@@ -60,6 +60,7 @@ export interface FlowDeckState {
   timeLogsByProject: Record<string, TimeLog[]>;
   sectionsByProject: Record<string, Section[]>;
   currentUserId: string;
+  setCurrentUserId: (id: string) => void;
 
   /* UI state */
   currentProjectId: string | null;
@@ -279,6 +280,19 @@ export function useFlowDeckStore(): FlowDeckState {
   }, []);
 
   const [activityByProject, setActivityByProject] = useState<Record<string, ActivityEntry[]>>({});
+
+  // Authenticated user identity. Initialized from the demo constant as a
+  // fallback (for the mock-only store), but overridden by the session via
+  // setCurrentUserId() in FlowdekDataProvider. The ref lets useCallback
+  // actions read the latest value without re-creating on every change.
+  const [currentUserId, setCurrentUserIdState] = useState<string>(CURRENT_USER_ID);
+  const userIdRef = useRef(currentUserId);
+  userIdRef.current = currentUserId;
+  const setCurrentUserId = useCallback((id: string) => {
+    userIdRef.current = id;
+    setCurrentUserIdState(id);
+  }, []);
+
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState('projects');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -470,7 +484,7 @@ export function useFlowDeckStore(): FlowDeckState {
     const entry: ActivityEntry = {
       id: defaultIdGenerator.generate('a'),
       taskId, type, description,
-      authorId: CURRENT_USER_ID,
+      authorId: userIdRef.current,
       timestamp: new Date().toISOString(),
     };
     setActivityByProject(prev => ({
@@ -507,15 +521,15 @@ export function useFlowDeckStore(): FlowDeckState {
     const task = projectTasks.find(t => t.id === id);
     commit(projectId, projectTasks.map(t => t.id === id ? { ...t, ...patch } : t));
     if (task && patch.status && patch.status !== task.status) {
-      const member = TEAM.find(m => m.id === CURRENT_USER_ID);
+      const member = TEAM.find(m => m.id === userIdRef.current);
       logActivity(projectId, id, 'status_change', `${member?.name || 'Someone'} changed status to ${STATUS_META[patch.status]?.label || patch.status}`);
     }
     if (task && patch.priority && patch.priority !== task.priority) {
-      const member = TEAM.find(m => m.id === CURRENT_USER_ID);
+      const member = TEAM.find(m => m.id === userIdRef.current);
       logActivity(projectId, id, 'priority_change', `${member?.name || 'Someone'} changed priority to ${PRIORITY_META[patch.priority]?.label || patch.priority}`);
     }
     if (task && patch.dueDate && patch.dueDate !== task.dueDate) {
-      const member = TEAM.find(m => m.id === CURRENT_USER_ID);
+      const member = TEAM.find(m => m.id === userIdRef.current);
       logActivity(projectId, id, 'due_date_change', `${member?.name || 'Someone'} changed due date`);
     }
   }, [tasksByProject, commit, logActivity]);
@@ -524,7 +538,7 @@ export function useFlowDeckStore(): FlowDeckState {
     const projectTasks = tasksByProject[projectId] || [];
     const task = projectTasks.find(t => t.id === id);
     if (!task) return;
-    const member = TEAM.find(m => m.id === CURRENT_USER_ID);
+    const member = TEAM.find(m => m.id === userIdRef.current);
     if (task.status === 'done') {
       commit(projectId, projectTasks.map(t => t.id === id ? { ...t, status: 'in_progress', progress: 0 } : t));
       logActivity(projectId, id, 'reopened', `${member?.name || 'Someone'} reopened this task`);
@@ -590,7 +604,7 @@ export function useFlowDeckStore(): FlowDeckState {
       name: input.name,
       description: input.description,
       status: (input.status || 'backlog') as TaskStatus,
-      assignee: input.assignee || CURRENT_USER_ID,
+      assignee: input.assignee || userIdRef.current,
       start: input.start || TODAY.toISOString().slice(0, 10),
       duration: input.duration ?? 3,
       dueDate: input.dueDate,
@@ -772,7 +786,7 @@ export function useFlowDeckStore(): FlowDeckState {
     if (!selectedIds.size || !projectId) return;
     const targetId = [...selectedIds][0];
     const now = TODAY.toISOString().slice(0, 10);
-    const newFiles = Array.from(fileList).map(f => ({ id: defaultIdGenerator.generate('f'), name: f.name, size: f.size, uploadedBy: CURRENT_USER_ID, uploadedAt: now, linkedTaskId: targetId, url: URL.createObjectURL(f) }));
+    const newFiles = Array.from(fileList).map(f => ({ id: defaultIdGenerator.generate('f'), name: f.name, size: f.size, uploadedBy: userIdRef.current, uploadedAt: now, linkedTaskId: targetId, url: URL.createObjectURL(f) }));
     setFilesByProject(prev => ({ ...prev, [projectId]: [...newFiles, ...(prev[projectId] || [])] }));
   }, [selectedIds]);
 
@@ -868,7 +882,7 @@ export function useFlowDeckStore(): FlowDeckState {
       projectId,
       name: name.trim(),
       status: (opts?.status || 'backlog') as TaskStatus,
-      assignee: CURRENT_USER_ID,
+      assignee: userIdRef.current,
       start: opts?.startOverride || todayStr,
       duration: 3,
       progress: 0,
@@ -889,7 +903,7 @@ export function useFlowDeckStore(): FlowDeckState {
     const comment: Comment = {
       id: defaultIdGenerator.generate('c'),
       taskId,
-      authorId: CURRENT_USER_ID,
+      authorId: userIdRef.current,
       text: text.trim(),
       createdAt: new Date().toISOString(),
       parentId: parentId || null,
@@ -899,7 +913,7 @@ export function useFlowDeckStore(): FlowDeckState {
       ...prev,
       [projectId]: [...(prev[projectId] || []), comment],
     }));
-    const member = TEAM.find(m => m.id === CURRENT_USER_ID);
+    const member = TEAM.find(m => m.id === userIdRef.current);
     logActivity(projectId, taskId, 'comment', `${member?.name || 'Someone'} ${parentId ? 'replied' : 'commented'}`);
   }, [logActivity]);
 
@@ -938,20 +952,20 @@ export function useFlowDeckStore(): FlowDeckState {
         const reactions = [...(c.reactions || [])];
         const existing = reactions.find(r => r.emoji === emoji);
         if (existing) {
-          if (existing.userIds.includes(CURRENT_USER_ID)) {
+          if (existing.userIds.includes(userIdRef.current)) {
             /* Remove user from reaction */
-            const newUserIds = existing.userIds.filter(u => u !== CURRENT_USER_ID);
+            const newUserIds = existing.userIds.filter(u => u !== userIdRef.current);
             if (newUserIds.length === 0) {
               return { ...c, reactions: reactions.filter(r => r.emoji !== emoji) };
             }
             return { ...c, reactions: reactions.map(r => r.emoji === emoji ? { ...r, userIds: newUserIds } : r) };
           } else {
             /* Add user to existing reaction */
-            return { ...c, reactions: reactions.map(r => r.emoji === emoji ? { ...r, userIds: [...r.userIds, CURRENT_USER_ID] } : r) };
+            return { ...c, reactions: reactions.map(r => r.emoji === emoji ? { ...r, userIds: [...r.userIds, userIdRef.current] } : r) };
           }
         } else {
           /* Create new reaction */
-          return { ...c, reactions: [...reactions, { emoji, userIds: [CURRENT_USER_ID] }] };
+          return { ...c, reactions: [...reactions, { emoji, userIds: [userIdRef.current] }] };
         }
       }),
     }));
@@ -977,7 +991,7 @@ export function useFlowDeckStore(): FlowDeckState {
     if (!projectId || minutes <= 0) return;
     const entry: TimeLog = {
       id: defaultIdGenerator.generate('tl'),
-      taskId, userId: CURRENT_USER_ID, minutes, note: note.trim(),
+      taskId, userId: userIdRef.current, minutes, note: note.trim(),
       loggedAt: new Date().toISOString(),
     };
     setTimeLogsByProject(prev => ({
@@ -1292,7 +1306,7 @@ export function useFlowDeckStore(): FlowDeckState {
     if (!task || !task.parentId) return;
     const newLevel = Math.max(0, (task.level || 1) - 1);
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, parentId: null, level: newLevel } : t));
-    const member = TEAM.find(m => m.id === CURRENT_USER_ID);
+    const member = TEAM.find(m => m.id === userIdRef.current);
     logActivity(projectId, taskId, 'created', `${member?.name || 'Someone'} promoted subtask to top-level`);
     toast.success('Subtask promoted', { description: task.name });
   }, [tasksByProject, commit, logActivity]);
@@ -1306,7 +1320,7 @@ export function useFlowDeckStore(): FlowDeckState {
     const newLevel = Math.min(4, (task.level || 0) + 1);
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, parentId: newParentId, level: newLevel } : t));
     const parentTask = projectTasks.find(t => t.id === newParentId);
-    const member = TEAM.find(m => m.id === CURRENT_USER_ID);
+    const member = TEAM.find(m => m.id === userIdRef.current);
     logActivity(projectId, taskId, 'created', `${member?.name || 'Someone'} converted task to subtask of "${parentTask?.name || 'task'}"`);
     toast.success('Converted to subtask', { description: task.name });
   }, [tasksByProject, commit, logActivity]);
@@ -1418,7 +1432,7 @@ export function useFlowDeckStore(): FlowDeckState {
     if (!projectId) return;
     const id = defaultIdGenerator.generate('su');
     const update: ProjectStatusUpdate = {
-      id, projectId: projectId, authorId: CURRENT_USER_ID,
+      id, projectId: projectId, authorId: userIdRef.current,
       text, color, createdAt: new Date().toISOString(),
     };
     setStatusUpdatesByProject(prev => ({
@@ -1541,7 +1555,7 @@ export function useFlowDeckStore(): FlowDeckState {
           projectId: pid,
           name: taskName,
           status: 'backlog',
-          assignee: CURRENT_USER_ID,
+          assignee: userIdRef.current,
           start: TODAY.toISOString().slice(0, 10),
           duration: 5,
           progress: 0,
@@ -1601,7 +1615,8 @@ export function useFlowDeckStore(): FlowDeckState {
     projects, tasksByProject, filesByProject, raidByProject, customColsByProject,
     statusUpdatesByProject,
     tagsByProject, commentsByProject, activityByProject, timeLogsByProject, sectionsByProject,
-    currentUserId: CURRENT_USER_ID,
+    currentUserId,
+    setCurrentUserId,
     currentProjectId, activeView, selectedTaskId, selectedIds, searchQuery,
     showNewTask, showNewProject, projectMenuOpen, shareOpen, sidebarOpen, moreMenuOpen,
     durationUnit, clipboard, past, future,

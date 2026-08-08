@@ -13,7 +13,14 @@ export const TEAM: TeamMember[] = [
 ];
 export const teamById: Record<string, TeamMember> = Object.fromEntries(TEAM.map(t => [t.id, t]));
 
-/** Current user for My Tasks view and comment authoring */
+/**
+ * Demo-only constant: the "current user" for the mock seed data.
+ *
+ * In production this is NOT used — the authenticated user identity comes from
+ * session.user.id (set via FlowdekDataProvider → setCurrentUserId). This
+ * constant exists solely so the mock store / seed script have a deterministic
+ * current-user reference during local development.
+ */
 export const CURRENT_USER_ID = 'u5';
 
 /* ---------------------------------- projects ---------------------------------- */
