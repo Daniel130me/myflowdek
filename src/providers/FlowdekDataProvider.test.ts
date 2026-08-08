@@ -2,8 +2,17 @@ import assert from 'node:assert';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { SessionProvider } from '@/components/providers/SessionProvider';
 import { FlowdekDataProvider, useFlowdekData } from './FlowdekDataProvider';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+
+/**
+ * Wrap a component tree with the SessionProvider so that FlowdekDataProvider's
+ * useSession() call doesn't throw during server-side test rendering.
+ */
+function wrapWithSession(children: React.ReactNode): React.ReactElement {
+  return React.createElement(SessionProvider, null, children);
+}
 
 test('FlowdekDataProvider exposes shared state to layout and child components', () => {
   let layoutState: ReturnType<typeof useFlowdekData> | null = null;
@@ -20,10 +29,12 @@ test('FlowdekDataProvider exposes shared state to layout and child components', 
   }
 
   renderToStaticMarkup(
-    React.createElement(
-      FlowdekDataProvider,
-      null,
-      React.createElement(LayoutComponent)
+    wrapWithSession(
+      React.createElement(
+        FlowdekDataProvider,
+        null,
+        React.createElement(LayoutComponent)
+      )
     )
   );
 
@@ -40,6 +51,6 @@ test('useFlowDeck throws when called outside FlowdekDataProvider', () => {
   }
 
   assert.throws(() => {
-    renderToStaticMarkup(React.createElement(StandaloneComponent));
-  }, /useFlowDeck must be used within a FlowdekDataProvider/);
+    renderToStaticMarkup(wrapWithSession(React.createElement(StandaloneComponent)));
+  }, /must be used within a FlowdekDataProvider/);
 });
