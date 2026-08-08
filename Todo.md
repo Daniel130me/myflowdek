@@ -130,7 +130,7 @@ Each phase = one Conventional Commit after implementation + testing, then push.
 | 2 | `81acf1d` | ✅ done |
 | 3 | `34cf8cb` | ✅ done |
 | 4 | `28ea07f` | ✅ done |
-| 5 | — | pending |
+| 5 | `5d27425` | ✅ done |
 | 6 | — | pending |
 | 7 | — | pending |
 | 8 | — | pending |
