@@ -14,6 +14,7 @@ export const createProjectSchema = z.object({
   startDate: optionalDate,
   endDate: optionalDate,
   ownerId: z.string().trim().min(1),
+  workspaceId: z.string().trim().min(1),
 });
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;

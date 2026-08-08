@@ -30,7 +30,10 @@ export default function AuthLoginPage() {
   const handleLogin = async (email: string, password: string, name?: string) => {
     const result = await auth.login(email, password, name);
     if (result.ok) {
-      router.push(routes.projects());
+      // Full-page redirect so the new session cookie is picked up by the
+      // server-rendered product layout (router.push would race the session
+      // update and bounce back to /login).
+      window.location.href = routes.projects();
     }
     return result;
   };
@@ -38,7 +41,7 @@ export default function AuthLoginPage() {
   const handleDemoLogin = async () => {
     const result = await auth.demoLogin();
     if (result.ok) {
-      router.push(routes.projects());
+      window.location.href = routes.projects();
     }
     return result;
   };

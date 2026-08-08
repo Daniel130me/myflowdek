@@ -10,9 +10,10 @@
  *  baseline and keeps auth latency under ~100ms on typical hardware. */
 export const BCRYPT_ROUNDS = 10;
 
-/** Role assigned to a newly registered user. Kept as a single source of truth
- *  so role-based checks elsewhere can reference the same string. */
-export const DEFAULT_USER_ROLE = 'Project Manager';
+/** Job title assigned to a newly registered user. This is a DISPLAY-ONLY
+ *  field (e.g. shown on a profile badge). Authorization NEVER derives from
+ *  this — it comes from WorkspaceMember.role / ProjectMember.role. */
+export const DEFAULT_JOB_TITLE = 'Project Manager';
 
 /** Avatar colour assigned at registration (picked at random from this palette).
  *  Mirrors the team-member palette in `features/flowdeck/model/data.ts` so a
@@ -29,6 +30,9 @@ export const AVATAR_COLORS = [
 
 /** Fallback avatar colour when a session has none (e.g. legacy users). */
 export const DEFAULT_AVATAR_COLOR = '#FE8029';
+
+/** Fallback job title when a session has none set. */
+export const DEFAULT_JOB_TITLE_FALLBACK = 'Project Manager';
 
 /** NextAuth session strategy. JWT keeps the app stateless (no session table). */
 export const SESSION_STRATEGY = 'jwt' as const;

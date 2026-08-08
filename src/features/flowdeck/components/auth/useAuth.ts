@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import {
   ONBOARDING_STORAGE_KEY,
-  DEFAULT_USER_ROLE,
+  DEFAULT_JOB_TITLE_FALLBACK,
   DEFAULT_AVATAR_COLOR,
   DEMO_CREDENTIALS,
 } from '@/lib/auth.constants';
@@ -42,18 +42,25 @@ function nameFromEmail(email: string): string {
  * Auth hook backed by NextAuth (credentials provider + PostgreSQL).
  *
  * Keeps the same surface the rest of the app expects (ready,
- * isAuthenticated, isOnboarded, user, login, demoLogin, logout, ...) but
- * delegates authentication to the real backend. Onboarding state remains in
- * localStorage because it is a one-time setup wizard.
+ * isAuthenticated, isOnboarded, user, login, demoLogin, logout, ...).
+ *
+ * Onboarding state is sourced from the SERVER (session.user.onboardedAt),
+ * NOT localStorage, so the same account stays onboarded across devices and
+ * after clearing browser storage. The `completeOnboarding` helper calls the
+ * server endpoint which persists the state in a transaction.
  */
 export function useAuth() {
   const { data: session, status } = useSession();
   const ready = status !== 'loading';
   const isAuthenticated = status === 'authenticated' && !!session?.user;
+  // Source of truth for onboarding is the server-issued session.
+  const isOnboarded = isAuthenticated && !!session?.user?.onboardedAt;
 
   const [onboarding, setOnboarding] = useState<OnboardingData | null>(null);
 
-  // Hydrate onboarding from localStorage (client-only).
+  // Optional: keep the last-submitted onboarding payload in localStorage as a
+  // convenience cache only (e.g. to pre-fill the wizard on a refresh mid-flow).
+  // It is NOT authoritative — isOnboarded above is.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(ONBOARDING_STORAGE_KEY);
@@ -67,7 +74,7 @@ export function useAuth() {
     ? {
         name: session.user.name ?? nameFromEmail(session.user.email),
         email: session.user.email,
-        role: session.user.role ?? DEFAULT_USER_ROLE,
+        role: session.user.jobTitle ?? DEFAULT_JOB_TITLE_FALLBACK,
         avatarColor: session.user.avatarColor ?? DEFAULT_AVATAR_COLOR,
       }
     : null;
@@ -135,9 +142,30 @@ export function useAuth() {
     void patch;
   }, []);
 
-  const completeOnboarding = useCallback((data: OnboardingData) => {
-    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(data));
-    setOnboarding(data);
+  /**
+   * Persist onboarding server-side in a single transaction (creates the
+   * workspace, OWNER membership, first project, and sets user.onboardedAt).
+   * The local cache is updated only as a convenience; the session is the
+   * source of truth and is refreshed via `update` from next-auth/react.
+   */
+  const completeOnboarding = useCallback(async (data: OnboardingData): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const res = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return { ok: false, error: body.error ?? 'Onboarding failed' };
+      }
+      localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(data));
+      setOnboarding(data);
+      // Force next-auth to refetch the session so onboardedAt is reflected.
+      return { ok: true };
+    } catch {
+      return { ok: false, error: 'Network error during onboarding' };
+    }
   }, []);
 
   const resetOnboarding = useCallback(() => {
@@ -148,7 +176,7 @@ export function useAuth() {
   return {
     ready,
     isAuthenticated,
-    isOnboarded: !!onboarding,
+    isOnboarded,
     user,
     onboarding,
     login,

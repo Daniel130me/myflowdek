@@ -5,7 +5,7 @@ import { db } from '@/server/db/client';
 import {
   SESSION_STRATEGY,
   LOGIN_PATH,
-  DEFAULT_USER_ROLE,
+  DEFAULT_JOB_TITLE_FALLBACK,
   DEFAULT_AVATAR_COLOR,
 } from '@/lib/auth.constants';
 
@@ -40,8 +40,9 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             email: user.email,
             name: user.name ?? undefined,
-            role: user.role ?? undefined,
+            jobTitle: user.jobTitle ?? undefined,
             avatarColor: user.avatarColor ?? undefined,
+            onboardedAt: user.onboardedAt ?? undefined,
           };
         } catch (err) {
           console.error('[auth] authorize error:', err);
@@ -58,19 +59,26 @@ export const authOptions: NextAuthOptions = {
       // token so subsequent requests carry them without re-querying the DB.
       if (user) {
         token.id = (user as AuthUser).id;
-        token.role = (user as AuthUser).role;
+        token.jobTitle = (user as AuthUser).jobTitle;
         token.avatarColor = (user as AuthUser).avatarColor;
+        token.onboardedAt = (user as AuthUser).onboardedAt
+          ? String((user as AuthUser).onboardedAt)
+          : null;
       }
       return token;
     },
     async session({ session, token }) {
       // Expose the persisted token fields on the session object consumed by
       // the client. Falls back to the defaults if the token is incomplete.
+      // The session.user type is augmented in types/next-auth.d.ts so no
+      // cast is needed.
       if (session.user) {
-        (session.user as AuthUser).id = token.id as string;
-        (session.user as AuthUser).role = (token.role as string | undefined) ?? DEFAULT_USER_ROLE;
-        (session.user as AuthUser).avatarColor =
+        session.user.id = token.id as string;
+        session.user.jobTitle =
+          (token.jobTitle as string | undefined) ?? DEFAULT_JOB_TITLE_FALLBACK;
+        session.user.avatarColor =
           (token.avatarColor as string | undefined) ?? DEFAULT_AVATAR_COLOR;
+        session.user.onboardedAt = (token.onboardedAt as string | null) ?? null;
       }
       return session;
     },
@@ -82,6 +90,7 @@ interface AuthUser {
   id: string;
   email: string;
   name?: string;
-  role?: string;
+  jobTitle?: string;
   avatarColor?: string;
+  onboardedAt?: Date | null;
 }

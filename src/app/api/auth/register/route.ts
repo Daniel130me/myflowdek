@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { db } from '@/server/db/client';
 import {
   BCRYPT_ROUNDS,
-  DEFAULT_USER_ROLE,
+  DEFAULT_JOB_TITLE,
   AVATAR_COLORS,
   PASSWORD_MIN_LENGTH,
   NAME_MAX_LENGTH,
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
         email,
         passwordHash,
         avatarColor: pickAvatarColor(),
-        role: DEFAULT_USER_ROLE,
+        jobTitle: DEFAULT_JOB_TITLE,
       },
       // Only return the safe, non-sensitive fields.
       select: { id: true, email: true, name: true },

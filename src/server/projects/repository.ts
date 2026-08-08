@@ -7,9 +7,9 @@ const projectSummarySelect = {
   color: true,
   startDate: true,
   endDate: true,
-  isFavorite: true,
   isArchived: true,
   ownerId: true,
+  workspaceId: true,
   createdAt: true,
   updatedAt: true,
   _count: { select: { members: true, tasks: true } },
@@ -30,6 +30,7 @@ export function createProject(data: {
   startDate?: Date | null;
   endDate?: Date | null;
   ownerId: string;
+  workspaceId: string;
 }) {
   return db.project.create({ data, select: projectSummarySelect });
 }

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useAuth, OnboardingFlow } from '@/features/flowdeck/components/auth';
 import { ThemeProvider } from '@/features/flowdeck/hooks/useTheme';
 import { routes } from '@/shared/navigation/routes';
@@ -9,7 +10,10 @@ import { routes } from '@/shared/navigation/routes';
 export default function AuthOnboardingPage() {
   const auth = useAuth();
   const router = useRouter();
+  const { update: updateSession } = useSession();
+  const [submitting, setSubmitting] = useState(false);
 
+  // Redirect unauthenticated users to login; fully-onboarded users to the app.
   useEffect(() => {
     if (auth.ready) {
       if (!auth.isAuthenticated) {
@@ -28,21 +32,33 @@ export default function AuthOnboardingPage() {
     );
   }
 
-  const handleComplete = (data: any) => {
-    auth.completeOnboarding(data);
-    router.push(routes.projects());
+  // Persist onboarding server-side, then refresh the session so the JWT
+  // carries the new onboardedAt timestamp, then navigate to the app.
+  const submitOnboarding = async (data: any) => {
+    setSubmitting(true);
+    const result = await auth.completeOnboarding(data);
+    if (result.ok) {
+      // Refetch the session so `isOnboarded` flips to true before navigate.
+      await updateSession();
+      router.push(routes.projects());
+    } else {
+      setSubmitting(false);
+      // On error the wizard stays mounted; the OnboardingFlow can surface the
+      // message via a toast (not wired here to keep the diff minimal).
+      console.error('[onboarding] failed:', result.error);
+    }
   };
 
-  const handleSkip = () => {
-    auth.completeOnboarding({
+  const handleComplete = (data: any) => submitOnboarding(data);
+
+  const handleSkip = () =>
+    submitOnboarding({
       projectName: '',
       projectColor: '#FE8029',
       projectDesc: '',
       invitedMembers: [],
       preferences: { defaultView: 'dashboard', enableNotifications: true, theme: 'light' },
     });
-    router.push(routes.projects());
-  };
 
   return (
     <ThemeProvider>

@@ -1,3 +1,13 @@
+// Flowdeck Prisma schema — multi-tenant SaaS foundation.
+//
+// Tenancy:  Workspace → Project → Task.  Every project belongs to exactly one
+// workspace; permissions are derived from WorkspaceMember / ProjectMember
+// roles (enums), never from a user's job title.
+//
+// Historical data:  Comment / File / TimeLog / RaidItem keep their author FK
+// as SetNull so offboarding a user (status=DELETED) never erases project
+// history.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,6 +17,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/* ------------------------------- enums -------------------------------- */
+
+/** Authorization role within a workspace. Drives workspace-level permissions. */
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  GUEST
+}
+
+/** Authorization role within a single project. */
+enum ProjectRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+/** Account lifecycle. Offboarding sets DELETED + deletedAt without removing
+ *  the row, so historical records stay attributable. */
+enum UserStatus {
+  ACTIVE
+  DISABLED
+  DELETED
+}
+
+/* ------------------------------- user --------------------------------- */
+
 model User {
   id            String          @id @default(cuid())
   email         String          @unique
@@ -14,9 +52,18 @@ model User {
   passwordHash  String?
   avatarUrl     String?
   avatarColor   String?
-  role          String?
+  /** Display-only job title (e.g. "Project Manager"). NOT used for authz. */
+  jobTitle      String?
+  status        UserStatus      @default(ACTIVE)
+  deletedAt     DateTime?
+  /** Timestamp set when the user finishes onboarding. Null = not onboarded.
+   *  Source of truth for onboarding state (not localStorage). */
+  onboardedAt   DateTime?
+  /** Set when the user clicks the email verification link. */
+  emailVerifiedAt DateTime?
   ownedProjects Project[]       @relation("ProjectOwner")
   memberships   ProjectMember[]
+  workspaces    WorkspaceMember[]
   assignedTasks Task[]          @relation("TaskAssignee")
   createdTasks  Task[]          @relation("TaskCreator")
   comments      Comment[]
@@ -27,6 +74,34 @@ model User {
   updatedAt     DateTime        @updatedAt
 }
 
+/* ----------------------------- workspace ------------------------------ */
+
+model Workspace {
+  id        String            @id @default(cuid())
+  name      String
+  slug      String            @unique
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  members   WorkspaceMember[]
+  projects  Project[]
+}
+
+model WorkspaceMember {
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  joinedAt    DateTime      @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId])
+  @@index([userId])
+}
+
+/* ------------------------------ project ------------------------------- */
+
 model Project {
   id          String          @id @default(cuid())
   name        String
@@ -34,10 +109,11 @@ model Project {
   color       String          @default("#FE8029")
   startDate   DateTime?
   endDate     DateTime?
-  isFavorite  Boolean         @default(false)
   isArchived  Boolean         @default(false)
   ownerId     String
+  workspaceId String
   owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   members     ProjectMember[]
   tasks       Task[]
   tags        Tag[]
@@ -49,20 +125,27 @@ model Project {
   updatedAt   DateTime        @updatedAt
 
   @@index([ownerId])
+  @@index([workspaceId])
   @@index([isArchived, updatedAt])
 }
 
 model ProjectMember {
   projectId String
   userId    String
-  role      String   @default("member")
+  role      ProjectRole @default(MEMBER)
+  /** User-specific favourite flag. Moved off the shared Project model so one
+   *  user starring a project does not star it for everyone. */
+  isFavorite Boolean     @default(false)
+  joinedAt  DateTime     @default(now())
+
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  joinedAt  DateTime @default(now())
 
   @@id([projectId, userId])
   @@index([userId])
 }
+
+/* ------------------------------- task --------------------------------- */
 
 model Task {
   id           String           @id @default(cuid())
@@ -134,19 +217,27 @@ model TaskTag {
   @@index([tagId])
 }
 
+/* --------------------- historical business data ---------------------- */
+//
+// These models deliberately use onDelete: SetNull on the author/uploader/user
+// FK so that removing a user account (offboarding) never cascades into the
+// project's comment/file/timelog history. The record stays attributable by id
+// even after the user row is gone (or marked DELETED).
+
 model Comment {
   id        String   @id @default(cuid())
   taskId    String
   projectId String
-  authorId  String
+  authorId  String?
   text      String
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
 
   @@index([taskId])
   @@index([projectId])
+  @@index([authorId])
 }
 
 model File {
@@ -155,16 +246,17 @@ model File {
   taskId        String?
   name          String
   size          Int      @default(0)
-  uploadedById  String
+  uploadedById  String?
   uploadedAt    DateTime @default(now())
   url           String?
   thumbnailUrl  String?
   project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   task          Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  uploadedBy    User     @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  uploadedBy    User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
 
   @@index([projectId])
   @@index([taskId])
+  @@index([uploadedById])
 }
 
 model RaidItem {
@@ -186,13 +278,13 @@ model TimeLog {
   id        String   @id @default(cuid())
   taskId    String
   projectId String
-  userId    String
+  userId    String?
   minutes   Int
   note      String?
   loggedAt  DateTime @default(now())
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([taskId])
   @@index([projectId])

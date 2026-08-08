@@ -93,6 +93,8 @@ async function main() {
   await prisma.tag.deleteMany();
   await prisma.projectMember.deleteMany();
   await prisma.project.deleteMany();
+  await prisma.workspaceMember.deleteMany();
+  await prisma.workspace.deleteMany();
   await prisma.user.deleteMany();
 
   console.log(`👥 Creating ${TEAM.length} users…`);
@@ -103,9 +105,31 @@ async function main() {
         id: member.id,
         email: emailFromName(member.name),
         name: member.name,
-        role: member.role,
+        jobTitle: member.role, // display-only job title, NOT an authz role
         avatarColor: member.color,
         passwordHash,
+        onboardedAt: new Date(), // seeded users are considered onboarded
+      },
+    });
+  }
+
+  console.log(`🏢 Creating demo workspace…`);
+  const workspace = await prisma.workspace.create({
+    data: {
+      id: 'ws1',
+      name: 'Flowdeck Demo',
+      slug: 'flowdeck-demo',
+    },
+  });
+
+  // Add every seeded user to the workspace. The project owner becomes the
+  // workspace OWNER; the rest are MEMBERs.
+  for (const member of TEAM) {
+    await prisma.workspaceMember.create({
+      data: {
+        workspaceId: workspace.id,
+        userId: member.id,
+        role: member.id === ownerId ? 'OWNER' : 'MEMBER',
       },
     });
   }
@@ -120,20 +144,21 @@ async function main() {
         color: p.color,
         startDate: toDate(p.start),
         endDate: toDate(p.end),
-        isFavorite: p.isFavorite ?? false,
         isArchived: p.isArchived ?? false,
         ownerId,
+        workspaceId: workspace.id,
       },
     });
 
-    // Project members
+    // Project members — isFavorite is now per-user (on ProjectMember).
     const members = p.members ?? [];
     for (const userId of members) {
       await prisma.projectMember.create({
         data: {
           projectId,
           userId,
-          role: userId === ownerId ? 'owner' : 'member',
+          role: userId === ownerId ? 'OWNER' : 'MEMBER',
+          isFavorite: userId === ownerId && (p.isFavorite ?? false),
         },
       });
     }
