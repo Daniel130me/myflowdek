@@ -1,100 +1,76 @@
-# Flowdek Workspace Management & Invitations — TODO
+# Flowdek Real Project Backend & Frontend Migration — TODO
 
-> Source of truth for the workspace-management and invitation-system work.
-> Each item is tracked from requirement → phase → commit. Check off as work
-> lands.
+> Source of truth for the project-backend and mock-to-real frontend migration.
+> Each item is tracked from requirement → phase → commit.
 >
-> Previous foundation phases (1–8, commits `bd55ef4` → `941ae10`) are complete.
-> This file now tracks the next priority: letting users actually manage
-> workspaces and invite teammates.
+> Previous work (foundation + workspace/invitation management, commits up to
+> `ff02c14`) is complete.
 
-## 1. Workspace management
-
-Flowdek's core hierarchy is now:
-
-```
-Account
-   │
-   ├── Workspace A
-   │      ├── Team
-   │      ├── Projects
-   │      └── Settings
-   │
-   └── Workspace B
-          ├── Team
-          ├── Projects
-          └── Settings
-```
+## 3. Real Project backend
 
 Implement:
 
-- Create workspace
-- List workspaces the authenticated user belongs to
-- Get workspace details
-- Rename / update workspace
-- Workspace settings
-- Switch between workspaces
-- Leave workspace
-- Delete workspace — owner only, with safeguards
-- Transfer workspace ownership
-- Workspace member listing
-- Workspace roles: Owner, Admin, Member, Guest
-
-Example APIs:
-
 ```
-GET    /api/workspaces
-POST   /api/workspaces
+GET    /api/workspaces/:workspaceId/projects
+POST   /api/workspaces/:workspaceId/projects
 
-GET    /api/workspaces/:workspaceId
-PATCH  /api/workspaces/:workspaceId
-DELETE /api/workspaces/:workspaceId
+GET    /api/projects/:projectId
+PATCH  /api/projects/:projectId
+DELETE /api/projects/:projectId
 
-GET    /api/workspaces/:workspaceId/members
-PATCH  /api/workspaces/:workspaceId/members/:userId
-DELETE /api/workspaces/:workspaceId/members/:userId
+POST   /api/projects/:projectId/archive
+POST   /api/projects/:projectId/restore
 ```
 
-## 2. Real invitation system
+And member management:
 
 ```
-Workspace owner/admin
-        ↓
-Enter email
-        ↓
-Choose role
-        ↓
-Invitation created
-        ↓
-Email sent
-        ↓
-Recipient follows token
-        ↓
-Existing user → join
-New user → register → join
-        ↓
-WorkspaceMember created
+GET    /api/projects/:projectId/members
+POST   /api/projects/:projectId/members
+PATCH  /api/projects/:projectId/members/:userId
+DELETE /api/projects/:projectId/members/:userId
 ```
 
-Statuses:
+All routes must use the authorization helpers (`requireAuthenticatedUser`,
+`requireWorkspaceRole`, `requireProjectMember`, `requireProjectRole`).
 
-- PENDING
-- ACCEPTED
-- DECLINED
-- EXPIRED
-- REVOKED
-
-Endpoints:
-
+Create project flow:
 ```
-POST   /api/workspaces/:workspaceId/invitations
-GET    /api/workspaces/:workspaceId/invitations
-DELETE /api/workspaces/:workspaceId/invitations/:id
-
-GET    /api/invitations/:token
-POST   /api/invitations/:token/accept
-POST   /api/invitations/:token/decline
+requireAuthenticatedUser()
+    ↓
+requireWorkspaceRole(OWNER | ADMIN | MEMBER)
+    ↓
+create Project (ownerId = session user, NOT from browser)
+    ↓
+create ProjectMember (OWNER)
 ```
+
+**Do not accept an arbitrary `ownerId` from the browser.**
+
+## 4. Replace mock portfolio data with real projects
+
+Target:
+```
+Login
+ ↓
+PostgreSQL user
+ ↓
+Workspace
+ ↓
+GET /api/workspaces/:id/projects
+ ↓
+Real projects
+```
+
+Migrate feature-by-feature (not a big-bang rewrite), in this order:
+
+1. Workspace selector
+2. Project portfolio / list
+3. Project overview
+4. Tasks
+5. Tags / sections
+6. Comments / activity
+7. Files
 
 ---
 
@@ -102,33 +78,47 @@ POST   /api/invitations/:token/decline
 
 Each phase = one Conventional Commit after implementation + testing, then push.
 
-### Phase 1 — Workspace CRUD APIs  (req 1a)
-- [ ] `src/server/workspaces/service.ts` — create/list/get/update/delete
-- [ ] `src/server/workspaces/schemas.ts` — Zod validation
-- [ ] `GET/POST /api/workspaces`, `GET/PATCH/DELETE /api/workspaces/:id`
-- [ ] Delete safeguard: owner-only, block if other members exist (or require transfer first)
-- [ ] Use `requireAuthenticatedUser` + `requireWorkspaceRole` helpers
+### Phase 1 — Project backend APIs  (req 3)
+- [ ] `src/server/projects/workspace-projects.service.ts` — list/create by workspace
+- [ ] `src/server/projects/project.service.ts` — get/update/delete/archive/restore
+- [ ] `src/server/projects/project-members.service.ts` — list/add/update/remove
+- [ ] API routes for all endpoints above
+- [ ] ownerId from session only; all routes use authorization helpers
 - [ ] Lint + typecheck + curl tests
-- **Commit:** `feat(workspaces): add workspace CRUD APIs`
+- **Commit:** `feat(projects): add project CRUD and member management APIs`
 
-### Phase 2 — Workspace membership management  (req 1b)
-- [ ] `GET /api/workspaces/:id/members` — list members
-- [ ] `PATCH /api/workspaces/:id/members/:userId` — change role
-- [ ] `DELETE /api/workspaces/:id/members/:userId` — remove member (leave = remove self)
-- [ ] Transfer ownership endpoint: `POST /api/workspaces/:id/transfer`
-- [ ] Role-change guards (only OWNER can change roles; can't demote the last owner)
-- [ ] Switch workspace: client-side selected-workspace state + `POST /api/workspaces/:id/select` (sets a cookie/preference)
-- **Commit:** `feat(workspaces): add membership management and ownership transfer`
+### Phase 2 — Workspace selector  (req 4a)
+- [ ] Fetch workspaces from `GET /api/workspaces`
+- [ ] Workspace switcher UI (dropdown in sidebar/topbar)
+- [ ] Persist selected workspace (cookie or localStorage + URL param)
+- [ ] Redirect to selected workspace's projects
+- **Commit:** `feat(ui): add workspace selector backed by real API`
 
-### Phase 3 — Invitation system  (req 2)
-- [ ] Add `Invitation` model + `InvitationStatus` enum to schema + migration
-- [ ] `src/server/invitations/service.ts` — create/list/revoke/get-by-token/accept/decline
-- [ ] `POST/GET/DELETE /api/workspaces/:id/invitations`
-- [ ] `GET /api/invitations/:token`, `POST /api/invitations/:token/accept`, `/decline`
-- [ ] Accept flow: existing user → create WorkspaceMember; new user → redirect to register (token preserved)
-- [ ] Expiry (24h TTL), status transitions, audit logging
-- [ ] Lint + typecheck + curl tests
-- **Commit:** `feat(invitations): add workspace invitation system`
+### Phase 3 — Project portfolio/list  (req 4b)
+- [ ] Replace mock `INITIAL_PROJECTS` with `GET /api/workspaces/:id/projects`
+- [ ] PortfolioView reads real projects
+- [ ] Create project via `POST /api/workspaces/:id/projects`
+- **Commit:** `feat(ui): replace mock portfolio with real projects API`
+
+### Phase 4 — Project overview  (req 4c)
+- [ ] DashboardView reads real project + task data
+- **Commit:** `feat(ui): wire project overview to real backend data`
+
+### Phase 5 — Tasks  (req 4d)
+- [ ] Task list/sheet/board views use real tasks
+- **Commit:** `feat(ui): wire task views to real backend data`
+
+### Phase 6 — Tags/sections  (req 4e)
+- [ ] Tags and sections from real data
+- **Commit:** `feat(ui): wire tags and sections to real backend data`
+
+### Phase 7 — Comments/activity  (req 4f)
+- [ ] Comments and activity from real data
+- **Commit:** `feat(ui): wire comments and activity to real backend data`
+
+### Phase 8 — Files  (req 4g)
+- [ ] Files from real data
+- **Commit:** `feat(ui): wire files to real backend data`
 
 ---
 
@@ -136,6 +126,11 @@ Each phase = one Conventional Commit after implementation + testing, then push.
 
 | Phase | Commit | Status |
 |-------|--------|--------|
-| 1 | `ff834bc` | ✅ done |
-| 2 | `0d8a970` | ✅ done |
+| 1 | — | pending |
+| 2 | — | pending |
 | 3 | — | pending |
+| 4 | — | pending |
+| 5 | — | pending |
+| 6 | — | pending |
+| 7 | — | pending |
+| 8 | — | pending |
