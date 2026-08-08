@@ -6,6 +6,7 @@ import { BoardView } from '@/features/flowdeck/components/views';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { useProjectTags } from '@/features/flowdeck/hooks/useProjectTags';
+import { useProjectFiles } from '@/features/flowdeck/hooks/useProjectFiles';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
 import { TEAM } from '@/features/flowdeck/model';
@@ -16,9 +17,10 @@ export default function ProjectBoardPage() {
   const projectId = getSingleParam(params.projectId);
   const state = useFlowDeck();
 
-  // Fetch real tasks and tags from the API and sync into the store.
+  // Fetch real tasks, tags, and files from the API and sync into the store.
   useProjectTasks(projectId);
   useProjectTags(projectId);
+  useProjectFiles(projectId);
 
   const projectTasks = useMemo(() => state.tasksByProject[projectId] ?? [], [state.tasksByProject, projectId]);
   const projectFiles = useMemo(() => state.filesByProject[projectId] ?? [], [state.filesByProject, projectId]);

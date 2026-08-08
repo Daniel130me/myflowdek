@@ -6,6 +6,8 @@ import { DashboardView } from '@/features/flowdeck/components/views';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useProject } from '@/features/flowdeck/hooks/useProject';
 import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
+import { useProjectComments } from '@/features/flowdeck/hooks/useProjectComments';
+import { useProjectFiles } from '@/features/flowdeck/hooks/useProjectFiles';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
 
@@ -21,9 +23,10 @@ export default function ProjectOverviewPage() {
   const state = useFlowDeck();
   const { project: apiProject, loading } = useProject(projectId);
 
-  // Fetch real tasks from the API and sync into the store so the
-  // dashboard's task stats (progress, done, overdue) use real data.
+  // Fetch real tasks, comments, and files from the API and sync into the store.
   useProjectTasks(projectId);
+  useProjectComments(projectId);
+  useProjectFiles(projectId);
 
   if (!projectId) {
     notFound();

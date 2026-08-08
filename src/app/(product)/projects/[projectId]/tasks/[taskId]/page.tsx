@@ -5,6 +5,7 @@ import { useParams, useRouter, notFound } from 'next/navigation';
 import ProjectTasksPage from '../page';
 import { TaskDetailPanel } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { useProjectComments } from '@/features/flowdeck/hooks/useProjectComments';
 import { getTaskForProject } from '@/features/tasks/selectors/getTaskForProject';
 import { routes } from '@/shared/navigation/routes';
 
@@ -14,6 +15,9 @@ export default function TaskDetailRoutePage() {
   const projectId = typeof params.projectId === 'string' ? params.projectId : '';
   const taskId = typeof params.taskId === 'string' ? params.taskId : '';
   const state = useFlowDeck();
+
+  // Fetch real comments from the API and sync into the store.
+  useProjectComments(projectId);
 
   const task = getTaskForProject(state.tasksByProject, projectId, taskId);
   if (!task) {
