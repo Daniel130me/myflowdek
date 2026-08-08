@@ -77,6 +77,6 @@ PostgreSQL full-text/trigram search + indexes. No Elasticsearch yet.
 
 | Phase | Commit | Status |
 |-------|--------|--------|
-| 1 | — | pending |
-| 2 | — | pending |
-| 3 | — | pending |
+| 1 | `e9b159c` | ✅ done |
+| 2 | `0763ecd` | ✅ done |
+| 3 | `a43b4b4` | ✅ done |
