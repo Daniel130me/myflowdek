@@ -1,11 +1,22 @@
 /**
- * Seed script: migrates FlowDeck mock data into the Neon PostgreSQL database.
+ * DEMO seed script — populates the database with mock FlowDeck data.
  *
- * Run with: bunx tsx prisma/seed.ts
+ * Run with: `npm run seed:demo` (a.k.a. `tsx prisma/seed.ts`)
  *
- * Creates 7 demo users (from TEAM), 2 projects, ~28 tasks, tags, comments,
+ * Creates 7 demo users (from TEAM), 2 projects, ~35 tasks, tags, comments,
  * files, RAID items, and time logs. All demo users share the password
- * "flowdeck123" (bcrypt-hashed) so login can be tested.
+ * defined by `DEMO_PASSWORD` (bcrypt-hashed) so login can be tested.
+ *
+ * ─── PRODUCTION SAFETY ───────────────────────────────────────────
+ * This script DELETES all existing users, projects, tasks and related
+ * records before inserting demo data. It will REFUSE to run unless BOTH
+ * of the following are true:
+ *
+ *   1. NODE_ENV is not "production"
+ *   2. ALLOW_DESTRUCTIVE_SEED === "true"
+ *
+ * This guard prevents accidental data loss on a real deployment.
+ * ──────────────────────────────────────────────────────────────────
  */
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -23,6 +34,34 @@ import { DEMO_PASSWORD, BCRYPT_ROUNDS, DEMO_EMAIL_DOMAIN } from '../src/lib/auth
 
 const prisma = new PrismaClient();
 
+/** Hard production guard. Exits with a non-zero code (no data touched) if the
+ *  environment is not explicitly authorised for a destructive demo seed. */
+function assertDestructiveSeedAllowed(): void {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const explicitlyAllowed = process.env.ALLOW_DESTRUCTIVE_SEED === 'true';
+
+  if (isProduction || !explicitlyAllowed) {
+    console.error('');
+    console.error('╔══════════════════════════════════════════════════════════════╗');
+    console.error('║  DEMO SEED BLOCKED                                          ║');
+    console.error('╠══════════════════════════════════════════════════════════════╣');
+    console.error('║  This script deletes all existing data before inserting     ║');
+    console.error('║  demo records. It is blocked for safety.                    ║');
+    console.error('║                                                             ║');
+    if (isProduction) {
+      console.error('║  Reason: NODE_ENV=production                               ║');
+    } else {
+      console.error('║  Reason: ALLOW_DESTRUCTIVE_SEED is not "true"              ║');
+    }
+    console.error('║                                                             ║');
+    console.error('║  To run locally:  ALLOW_DESTRUCTIVE_SEED=true npm run seed:demo ║');
+    console.error('║  Production runs are never allowed.                          ║');
+    console.error('╚══════════════════════════════════════════════════════════════╝');
+    console.error('');
+    process.exit(1);
+  }
+}
+
 /** Build a deterministic demo email from a display name
  *  (e.g. "Wale Johnson" -> "wale.johnson@flowdeck.io"). */
 function emailFromName(name: string): string {
@@ -36,6 +75,9 @@ function toDate(value?: string | null): Date | null {
 }
 
 async function main() {
+  // Hard guard — exits before touching any data if not authorised.
+  assertDestructiveSeedAllowed();
+
   console.log('🔐 Hashing demo password…');
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_ROUNDS);
 
