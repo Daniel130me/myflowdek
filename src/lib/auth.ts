@@ -36,15 +36,22 @@ export const authOptions: NextAuthOptions = {
         // --- Rate limit (per email, 10/min) ---
         const rl = rateLimit(`login:${email}`, RATE_LIMITS.login);
         if (!rl.allowed) {
-          // Return null so NextAuth shows "invalid credentials" — we don't
-          // reveal that the rate limit was hit, to avoid leaking info.
           return null;
         }
 
-        const ip = req?.headers?.get('x-forwarded-for')?.split(',')[0]?.trim()
-          ?? req?.headers?.get('x-real-ip')
-          ?? null;
-        const userAgent = req?.headers?.get('user-agent') ?? null;
+        // Extract IP/user-agent defensively — the req object shape varies
+        // between NextAuth versions and runtime environments.
+        let ip: string | null = null;
+        let userAgent: string | null = null;
+        try {
+          const headers = (req as { headers?: Headers })?.headers;
+          ip = headers?.get('x-forwarded-for')?.split(',')[0]?.trim()
+            ?? headers?.get('x-real-ip')
+            ?? null;
+          userAgent = headers?.get('user-agent') ?? null;
+        } catch {
+          // Headers not available in this runtime — proceed without them.
+        }
 
         try {
           // Single keyed lookup — no scan, no N+1.
