@@ -43,7 +43,7 @@ export async function PATCH(
       );
     }
 
-    const updated = await updateTask(taskId, parsed.data);
+    const updated = await updateTask(taskId, parsed.data, user.id);
     return NextResponse.json({ task: updated });
   } catch (error) {
     return authErrorResponse(error);

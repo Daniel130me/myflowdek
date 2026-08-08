@@ -1,6 +1,8 @@
 import { db } from '@/server/db/client';
 import { Prisma } from '@prisma/client';
 import { AuthError } from '@/server/auth/authorization';
+import { recordActivity } from '@/server/activity/activity.service';
+import { ACTIVITY_TYPES } from '@/server/activity/constants';
 import type { CreateTaskInput, UpdateTaskInput } from './schemas';
 
 /** Shape returned by task queries — safe public fields. */
@@ -46,7 +48,7 @@ export async function createTask(
     select: { sortOrder: true },
   });
 
-  return db.task.create({
+  const task = await db.task.create({
     data: {
       projectId,
       name: input.name,
@@ -62,6 +64,17 @@ export async function createTask(
     },
     select: taskSelect,
   });
+
+  // Record activity: "X created this task"
+  await recordActivity(
+    task.id,
+    projectId,
+    createdById,
+    ACTIVITY_TYPES.CREATED,
+    'created this task',
+  );
+
+  return task;
 }
 
 /** Get a single task. */
@@ -71,10 +84,26 @@ export async function getTask(taskId: string) {
   return task;
 }
 
-/** Update a task's editable fields. */
-export async function updateTask(taskId: string, input: UpdateTaskInput) {
+/**
+ * Update a task's editable fields. Records activity entries for significant
+ * changes (status, priority, assignee, due date, name).
+ *
+ * The `actingUserId` is used as the activity author; pass the session user.
+ */
+export async function updateTask(
+  taskId: string,
+  input: UpdateTaskInput,
+  actingUserId?: string,
+) {
+  // Fetch the current state to diff against (for activity descriptions).
+  const before = await db.task.findUnique({
+    where: { id: taskId },
+    select: { status: true, priority: true, assigneeId: true, dueDate: true, name: true, projectId: true },
+  });
+  if (!before) throw new AuthError('Task not found', 404);
+
   try {
-    return await db.task.update({
+    const updated = await db.task.update({
       where: { id: taskId },
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
@@ -97,6 +126,54 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
       },
       select: taskSelect,
     });
+
+    // Record activity for significant changes (non-blocking, best-effort).
+    const pid = before.projectId;
+
+    if (input.status !== undefined && input.status !== before.status) {
+      if (input.status === 'done') {
+        await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.COMPLETED, 'completed this task');
+      } else if (before.status === 'done') {
+        await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.REOPENED, 'reopened this task');
+      } else {
+        await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.STATUS_CHANGE,
+          `Status changed from ${before.status} → ${input.status}`,
+          { before: before.status, after: input.status });
+      }
+    }
+
+    if (input.priority !== undefined && input.priority !== before.priority) {
+      await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.PRIORITY_CHANGE,
+        `Priority changed from ${before.priority} → ${input.priority}`,
+        { before: before.priority, after: input.priority });
+    }
+
+    if (input.assigneeId !== undefined && input.assigneeId !== before.assigneeId) {
+      if (input.assigneeId) {
+        await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.ASSIGNED,
+          'was assigned', { after: input.assigneeId });
+      } else {
+        await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.UNASSIGNED, 'was unassigned');
+      }
+    }
+
+    if (input.dueDate !== undefined) {
+      const beforeStr = before.dueDate ? before.dueDate.toISOString() : null;
+      const afterStr = input.dueDate ?? null;
+      if (beforeStr !== afterStr) {
+        await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.DUE_DATE_CHANGE,
+          input.dueDate ? `Due date changed to ${input.dueDate}` : 'Due date removed',
+          { before: beforeStr, after: afterStr });
+      }
+    }
+
+    if (input.name !== undefined && input.name !== before.name) {
+      await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.NAME_CHANGE,
+        `Renamed from "${before.name}" to "${input.name}"`,
+        { before: before.name, after: input.name });
+    }
+
+    return updated;
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
       throw new AuthError('Task not found', 404);
