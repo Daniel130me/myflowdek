@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter, useParams } from 'next/navigation';
 import { FONT_FAMILY as FF, type TaskPriority } from '@/features/flowdeck/model';
 import { useViewport } from '@/features/flowdeck/hooks/useViewport';
+import { useWorkspaces } from '@/features/flowdeck/hooks/useWorkspaces';
 import { useKeyboardShortcuts } from '@/features/flowdeck/hooks/useKeyboardShortcuts';
 import { ThemeProvider, useTheme } from '@/features/flowdeck/hooks/useTheme';
 import { FlowdekDataProvider } from '@/providers/FlowdekDataProvider';
@@ -59,6 +60,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
 
   const theme = useTheme();
   const { isMobile } = useViewport();
+  const wsHook = useWorkspaces();
   const [mounted, setMounted] = useState(false);
 
   const topBarRef = useRef<TopBarHandle>(null);
@@ -157,6 +159,9 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
           onToggleFavorite={state.toggleProjectFavorite}
           onArchive={state.archiveProject}
           onLogout={onLogout}
+          workspaces={wsHook.workspaces}
+          selectedWorkspace={wsHook.selectedWorkspace}
+          onSelectWorkspace={wsHook.setSelectedWorkspace}
         />
       )}
 

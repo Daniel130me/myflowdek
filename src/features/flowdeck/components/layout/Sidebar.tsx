@@ -6,9 +6,11 @@ import { FONT_FAMILY as FF } from '@/features/flowdeck/model';
 import { Avatar } from '../ui';
 import { useTheme } from '../../hooks/useTheme';
 import { NAV } from './navItems';
+import { WorkspaceSelector } from './WorkspaceSelector';
+import type { WorkspaceSummary } from '../../hooks/useWorkspaces';
 import type { Project } from '@/features/flowdeck/model';
 
-export function Sidebar({ project, projects, activeView, onNavigate, goToPortfolio, pendingMyTasks = 0, onToggleFavorite, onArchive, onLogout }: {
+export function Sidebar({ project, projects, activeView, onNavigate, goToPortfolio, pendingMyTasks = 0, onToggleFavorite, onArchive, onLogout, workspaces, selectedWorkspace, onSelectWorkspace }: {
   project: Project | null;
   projects: Record<string, Project>;
   activeView: string;
@@ -18,6 +20,9 @@ export function Sidebar({ project, projects, activeView, onNavigate, goToPortfol
   onToggleFavorite?: (id: string) => void;
   onArchive?: (id: string) => void;
   onLogout?: () => void;
+  workspaces?: WorkspaceSummary[];
+  selectedWorkspace?: WorkspaceSummary | null;
+  onSelectWorkspace?: (id: string) => void;
 }) {
   const { isDark, toggle, colors, layout } = useTheme();
   const S = layout.sidebar;
@@ -38,6 +43,15 @@ export function Sidebar({ project, projects, activeView, onNavigate, goToPortfol
         </div>
         <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: 18, fontFamily: FF, letterSpacing: -0.5 }}>FlowDeck</span>
       </div>
+
+      {/* Workspace selector — establishes the tenant context */}
+      {workspaces && selectedWorkspace && onSelectWorkspace && (
+        <WorkspaceSelector
+          workspaces={workspaces}
+          selectedWorkspace={selectedWorkspace}
+          onSelect={onSelectWorkspace}
+        />
+      )}
 
       <div style={{ padding: '0 12px 8px' }}>
         <button onClick={goToPortfolio} style={{

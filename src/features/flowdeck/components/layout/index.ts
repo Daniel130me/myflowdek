@@ -5,3 +5,4 @@ export { TopBar } from './TopBar';
 export { MobileSearchRow } from './MobileSearchRow';
 export { BottomNav } from './BottomNav';
 export { MoreMenu } from './MoreMenu';
+export { WorkspaceSelector } from './WorkspaceSelector';
