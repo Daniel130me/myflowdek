@@ -72,11 +72,21 @@ model User {
   timeLogs      TimeLog[]
   verificationTokens VerificationToken[]
   auditLogs     AuditLog[]
+  sentInvitations Invitation[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 }
 
 /* ----------------------------- workspace ------------------------------ */
+
+/** Status of a workspace invitation. */
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REVOKED
+}
 
 model Workspace {
   id        String            @id @default(cuid())
@@ -85,8 +95,9 @@ model Workspace {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
-  members   WorkspaceMember[]
-  projects  Project[]
+  members      WorkspaceMember[]
+  projects     Project[]
+  invitations  Invitation[]
 }
 
 model WorkspaceMember {
@@ -100,6 +111,36 @@ model WorkspaceMember {
 
   @@id([workspaceId, userId])
   @@index([userId])
+}
+
+/**
+ * A workspace invitation issued by an owner/admin to an email address.
+ *
+ * The recipient follows the token URL to accept or decline. If they are a
+ * new user, they register first (the token is preserved in the URL). Once
+ * accepted, a WorkspaceMember row is created and the invitation is marked
+ * ACCEPTED. Tokens expire after INVITATION_TTL_HOURS (see constants).
+ */
+model Invitation {
+  id          String           @id @default(cuid())
+  workspaceId String
+  email       String
+  role        WorkspaceRole    @default(MEMBER)
+  token       String           @unique
+  status      InvitationStatus @default(PENDING)
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  declinedAt  DateTime?
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy   User      @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId])
+  @@index([email])
+  @@index([status])
 }
 
 /* ------------------------------ project ------------------------------- */
