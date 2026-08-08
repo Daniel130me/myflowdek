@@ -1,124 +1,123 @@
-# Flowdek Real Project Backend & Frontend Migration — TODO
+# Flowdek Task Backend, Sections, Activity, Comments — TODO
 
-> Source of truth for the project-backend and mock-to-real frontend migration.
-> Each item is tracked from requirement → phase → commit.
+> Source of truth for the task-backend, sections, activity-history, and
+> collaboration work. Each item is tracked from requirement → phase → commit.
 >
-> Previous work (foundation + workspace/invitation management, commits up to
-> `ff02c14`) is complete.
+> Previous work (foundation + workspace/invitation + project APIs + frontend
+> wiring, commits up to `0bfc52c`) is complete.
 
-## 3. Real Project backend
+## 5. Tasks — the biggest core domain
 
-Implement:
-
-```
-GET    /api/workspaces/:workspaceId/projects
-POST   /api/workspaces/:workspaceId/projects
-
-GET    /api/projects/:projectId
-PATCH  /api/projects/:projectId
-DELETE /api/projects/:projectId
-
-POST   /api/projects/:projectId/archive
-POST   /api/projects/:projectId/restore
-```
-
-And member management:
+Basic CRUD (already partially done — extend with relationships + bulk):
 
 ```
-GET    /api/projects/:projectId/members
-POST   /api/projects/:projectId/members
-PATCH  /api/projects/:projectId/members/:userId
-DELETE /api/projects/:projectId/members/:userId
+GET    /api/projects/:projectId/tasks
+POST   /api/projects/:projectId/tasks
+GET    /api/projects/:projectId/tasks/:taskId
+PATCH  /api/projects/:projectId/tasks/:taskId
+DELETE /api/projects/:projectId/tasks/:taskId
 ```
 
-All routes must use the authorization helpers (`requireAuthenticatedUser`,
-`requireWorkspaceRole`, `requireProjectMember`, `requireProjectRole`).
+Relationships to support:
+- Assignee, Creator, Parent, Subtasks
+- Dependencies (blocking/blocked-by)
+- Tags, Section, Followers
+- Comments, Files, Time logs
 
-Create project flow:
+Bulk operations (use DB transactions):
+- Bulk status, priority, assignment, due date
+- Bulk delete, complete, move, tags
+
+## 6. Sections + Tags + dependencies
+
+Sections (project-level task grouping):
 ```
-requireAuthenticatedUser()
-    ↓
-requireWorkspaceRole(OWNER | ADMIN | MEMBER)
-    ↓
-create Project (ownerId = session user, NOT from browser)
-    ↓
-create ProjectMember (OWNER)
-```
-
-**Do not accept an arbitrary `ownerId` from the browser.**
-
-## 4. Replace mock portfolio data with real projects
-
-Target:
-```
-Login
- ↓
-PostgreSQL user
- ↓
-Workspace
- ↓
-GET /api/workspaces/:id/projects
- ↓
-Real projects
+Project
+ ├── Backlog
+ ├── Phase 1
+ ├── Design
+ └── QA
 ```
 
-Migrate feature-by-feature (not a big-bang rewrite), in this order:
+Tags (already have basic CRUD — extend with task-tag management):
+```
+Design, Backend, Urgent, Customer Request, Bug
+```
 
-1. Workspace selector
-2. Project portfolio / list
-3. Project overview
-4. Tasks
-5. Tags / sections
-6. Comments / activity
-7. Files
+Dependencies (already have TaskDependency model — add API):
+```
+Design approved → Frontend implementation → QA → Deployment
+```
+
+## 7. Activity history
+
+Record business events (separate from security AuditLog):
+- Task created/assigned/completed/reopened
+- Status/priority/due-date changed
+- Comment added, file uploaded, member added
+
+```
+09:41  Oluwagbenga created this task
+10:03  Ada was assigned
+12:17  Status changed from Backlog → In Progress
+14:42  Due date changed to 14 August
+```
+
+Two concepts:
+- `AuditLog` → security/system activity (already exists)
+- `ActivityEntry` → business/project activity (NEW)
+
+## 8. Comments and collaboration
+
+```
+Task
+ └── Comment
+       ├── Reply
+       ├── Reaction
+       └── Mention
+```
+
+Implement: comments, replies, editing, deletion rules, @mentions, reactions,
+task followers. Mentions → notifications (foundation only).
 
 ---
 
 ## Phased implementation plan
 
-Each phase = one Conventional Commit after implementation + testing, then push.
+### Phase 1 — Schema: Sections, Followers, ActivityEntry, Comment replies/reactions
+- [ ] Add `Section` model (id, projectId, name, position, collapsed)
+- [ ] Add `sectionId` to Task
+- [ ] Add `TaskFollower` model (taskId, userId)
+- [ ] Add `ActivityEntry` model (id, taskId, projectId, type, description, authorId, meta, timestamp)
+- [ ] Add `parentId` to Comment (replies), `editedAt`, `CommentReaction` model
+- [ ] Generate + apply migration
+- **Commit:** `feat(schema): add sections, followers, activity, comment replies/reactions`
 
-### Phase 1 — Project backend APIs  (req 3)
-- [ ] `src/server/projects/workspace-projects.service.ts` — list/create by workspace
-- [ ] `src/server/projects/project.service.ts` — get/update/delete/archive/restore
-- [ ] `src/server/projects/project-members.service.ts` — list/add/update/remove
-- [ ] API routes for all endpoints above
-- [ ] ownerId from session only; all routes use authorization helpers
-- [ ] Lint + typecheck + curl tests
-- **Commit:** `feat(projects): add project CRUD and member management APIs`
+### Phase 2 — Task relationships API (assignee, dependencies, tags, sections, followers)
+- [ ] PATCH task to set assignee/section/parent
+- [ ] POST/DELETE /api/tasks/:taskId/dependencies
+- [ ] POST/DELETE /api/tasks/:taskId/tags
+- [ ] POST/DELETE /api/tasks/:taskId/followers
+- [ ] GET/POST/DELETE /api/projects/:projectId/sections
+- **Commit:** `feat(tasks): add task relationships and sections APIs`
 
-### Phase 2 — Workspace selector  (req 4a)
-- [ ] Fetch workspaces from `GET /api/workspaces`
-- [ ] Workspace switcher UI (dropdown in sidebar/topbar)
-- [ ] Persist selected workspace (cookie or localStorage + URL param)
-- [ ] Redirect to selected workspace's projects
-- **Commit:** `feat(ui): add workspace selector backed by real API`
+### Phase 3 — Bulk operations
+- [ ] POST /api/projects/:projectId/tasks/bulk with typed actions
+- [ ] All bulk ops in a single db.$transaction
+- [ ] Actions: status, priority, assignee, dueDate, delete, complete, move, tags
+- **Commit:** `feat(tasks): add bulk operations with transactions`
 
-### Phase 3 — Project portfolio/list  (req 4b)
-- [ ] Replace mock `INITIAL_PROJECTS` with `GET /api/workspaces/:id/projects`
-- [ ] PortfolioView reads real projects
-- [ ] Create project via `POST /api/workspaces/:id/projects`
-- **Commit:** `feat(ui): replace mock portfolio with real projects API`
+### Phase 4 — Activity history
+- [ ] Activity service that records entries on task mutations
+- [ ] Wire activity recording into task create/update/delete/assign
+- [ ] GET /api/tasks/:taskId/activity
+- **Commit:** `feat(activity): record and expose business activity history`
 
-### Phase 4 — Project overview  (req 4c)
-- [ ] DashboardView reads real project + task data
-- **Commit:** `feat(ui): wire project overview to real backend data`
-
-### Phase 5 — Tasks  (req 4d)
-- [ ] Task list/sheet/board views use real tasks
-- **Commit:** `feat(ui): wire task views to real backend data`
-
-### Phase 6 — Tags/sections  (req 4e)
-- [ ] Tags and sections from real data
-- **Commit:** `feat(ui): wire tags and sections to real backend data`
-
-### Phase 7 — Comments/activity  (req 4f)
-- [ ] Comments and activity from real data
-- **Commit:** `feat(ui): wire comments and activity to real backend data`
-
-### Phase 8 — Files  (req 4g)
-- [ ] Files from real data
-- **Commit:** `feat(ui): wire files to real backend data`
+### Phase 5 — Comments collaboration (replies, reactions, mentions, edit)
+- [ ] Extend comment service: replies, edit (editedAt), delete rules
+- [ ] POST/DELETE /api/comments/:commentId/reactions
+- [ ] @mention parsing + Mention model
+- **Commit:** `feat(comments): add replies, reactions, mentions, and editing`
 
 ---
 
@@ -126,11 +125,8 @@ Each phase = one Conventional Commit after implementation + testing, then push.
 
 | Phase | Commit | Status |
 |-------|--------|--------|
-| 1 | `eef035b` | ✅ done |
-| 2 | `81acf1d` | ✅ done |
-| 3 | `34cf8cb` | ✅ done |
-| 4 | `28ea07f` | ✅ done |
-| 5 | `5d27425` | ✅ done |
-| 6 | `2c5365a` | ✅ done |
-| 7 | `2c5365a` | ✅ done |
-| 8 | `2c5365a` | ✅ done |
+| 1 | — | pending |
+| 2 | — | pending |
+| 3 | — | pending |
+| 4 | — | pending |
+| 5 | — | pending |
