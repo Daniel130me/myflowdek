@@ -1,25 +1,26 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import { db } from '@/server/db/client';
 import {
   BCRYPT_ROUNDS,
   DEFAULT_JOB_TITLE,
   AVATAR_COLORS,
-  PASSWORD_MIN_LENGTH,
   NAME_MAX_LENGTH,
 } from '@/lib/auth.constants';
+import { passwordSchema } from '@/lib/password-policy';
+import { rateLimit, RATE_LIMITS, getClientId, retryAfterSeconds } from '@/lib/rate-limit';
+import { audit } from '@/server/audit/log';
 
-/** Request body validation for registration. Constraints live as named
- *  constants so the UI can reference the same limits if needed. */
+/** Request body validation. Password uses the central password policy. */
 const registerSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(NAME_MAX_LENGTH, 'Name is too long'),
-  email: z.string().email('Invalid email address').toLowerCase(),
-  password: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
+  name: z.string().trim().min(1, 'Name is required').max(NAME_MAX_LENGTH, 'Name is too long'),
+  email: z.string().email('Invalid email address').toLowerCase().trim(),
+  password: passwordSchema,
 });
 
-/** Pick a random avatar colour from the shared palette. Kept tiny and
- *  self-contained so callers don't import `Math.random` boilerplate. */
+/** Pick a random avatar colour from the shared palette. */
 function pickAvatarColor(): string {
   return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 }
@@ -27,12 +28,27 @@ function pickAvatarColor(): string {
 /**
  * POST /api/auth/register
  *
- * Creates a new user with a bcrypt-hashed password. Two DB calls:
- *   1. `findUnique` on the email unique index — cheap, no scan.
- *   2. `create` — single insert.
- * No N+1; the avatar colour is chosen in memory.
+ * Creates a new user with a bcrypt-hashed password. Handles the duplicate-email
+ * race condition by catching Prisma's P2002 unique-constraint error and
+ * returning a clean 409 (the pre-check + insert can race under concurrent
+ * requests; the DB constraint is the source of truth).
+ *
+ * Rate-limited per IP (5 requests/minute) to slow brute-force registration.
+ * Audit-logs every attempt (success and failure).
  */
 export async function POST(request: Request) {
+  // --- Rate limit ---
+  const clientId = getClientId(request);
+  const rl = rateLimit(`register:${clientId}`, RATE_LIMITS.register);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many registration attempts. Please try again later.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfterSeconds(rl.retryAfterMs ?? 0)) } },
+    );
+  }
+
+  const userAgent = request.headers.get('user-agent') ?? null;
+
   try {
     const body = await request.json().catch(() => null);
     const parsed = registerSchema.safeParse(body);
@@ -45,9 +61,11 @@ export async function POST(request: Request) {
 
     const { name, email, password } = parsed.data;
 
-    // Existence check against the email unique index (not a table scan).
+    // Pre-check for a friendlier error (the DB constraint below is the real
+    // guard against the race condition).
     const existing = await db.user.findUnique({ where: { email } });
     if (existing) {
+      await audit({ action: 'register_failed', ip: clientId, userAgent, meta: { reason: 'duplicate_email', email } });
       return NextResponse.json(
         { error: 'An account with this email already exists' },
         { status: 409 },
@@ -68,9 +86,29 @@ export async function POST(request: Request) {
       select: { id: true, email: true, name: true },
     });
 
+    // TODO (future): generate an email-verification token and send the email.
+    // For now, the VerificationToken model exists in the schema as a
+    // foundation — the send-email step is not yet wired.
+
+    await audit({ userId: user.id, action: 'register', ip: clientId, userAgent });
+
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
+    // P2002 = unique constraint violation. This handles the race condition
+    // where two concurrent registrations pass the pre-check but the second
+    // insert hits the DB's unique index on email.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      await audit({ action: 'register_failed', ip: clientId, userAgent, meta: { reason: 'race_duplicate_email' } });
+      return NextResponse.json(
+        { error: 'An account with this email already exists' },
+        { status: 409 },
+      );
+    }
+
+    // Any other error: log the real detail internally, return a generic
+    // message. Never expose internal failure details to the client.
     console.error('[register] error:', error);
+    await audit({ action: 'register_failed', ip: clientId, userAgent, meta: { reason: 'internal_error' } });
     return NextResponse.json(
       { error: 'Registration failed. Please try again.' },
       { status: 500 },
