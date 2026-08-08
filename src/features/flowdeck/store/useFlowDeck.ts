@@ -114,6 +114,16 @@ export interface FlowDeckState {
   /* Actions */
   openProject: (id: string) => void;
   syncProjectFromRoute: (id: string) => void;
+  /** Replace a project's tasks with data fetched from the API. Used during
+   *  the mock-to-real migration so existing views/mutations work with real
+   *  data without rewiring every handler. */
+  syncProjectTasks: (projectId: string, tasks: Task[]) => void;
+  /** Replace a project's tags with API data. */
+  syncProjectTags: (projectId: string, tags: Tag[]) => void;
+  /** Replace a project's comments with API data. */
+  syncProjectComments: (projectId: string, comments: Comment[]) => void;
+  /** Replace a project's files with API data. */
+  syncProjectFiles: (projectId: string, files: FileItem[]) => void;
   goToPortfolio: () => void;
   createProject: (p: { name: string; color: string; start: string; end: string }) => void;
   createProjectFromTemplate: (templateId: string, name: string, color: string, start: string, end: string) => void;
@@ -414,6 +424,26 @@ export function useFlowDeckStore(): FlowDeckState {
     setSelectedTaskId(null);
     setSelectedIds(new Set());
     setSidebarOpen(false);
+  }, []);
+
+  // --- API sync actions ---
+  // Replace a project's data with what the API returned. These are one-way
+  // merges: local mutations after the sync still go through the existing
+  // store actions. A future phase can wire mutations to the API too.
+  const syncProjectTasks = useCallback((projectId: string, tasks: Task[]) => {
+    setTasksByProject(prev => ({ ...prev, [projectId]: tasks }));
+  }, []);
+
+  const syncProjectTags = useCallback((projectId: string, tags: Tag[]) => {
+    setTagsByProject(prev => ({ ...prev, [projectId]: tags }));
+  }, []);
+
+  const syncProjectComments = useCallback((projectId: string, comments: Comment[]) => {
+    setCommentsByProject(prev => ({ ...prev, [projectId]: comments }));
+  }, []);
+
+  const syncProjectFiles = useCallback((projectId: string, files: FileItem[]) => {
+    setFilesByProject(prev => ({ ...prev, [projectId]: files }));
   }, []);
 
   const goToPortfolio = useCallback(() => {
@@ -1626,7 +1656,7 @@ export function useFlowDeckStore(): FlowDeckState {
     searchFilters, setSearchFilters, activeFilterCount, clearFilters,
     timeLogs, taskTimeLogs,
     gridActions,
-    openProject, syncProjectFromRoute, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
+    openProject, syncProjectFromRoute, syncProjectTasks, syncProjectTags, syncProjectComments, syncProjectFiles, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
     updateTask, addTask, removeTask, removeTasksBulk, moveStatus, toggleComplete,
     duplicateTask, duplicateTaskWithOptions, duplicateTasksBulk,
     moveTaskToProject, moveTasksToProjectBulk,

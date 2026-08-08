@@ -5,6 +5,7 @@ import { useRouter, useParams, notFound } from 'next/navigation';
 import { DashboardView } from '@/features/flowdeck/components/views';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useProject } from '@/features/flowdeck/hooks/useProject';
+import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
 
@@ -19,6 +20,10 @@ export default function ProjectOverviewPage() {
   const projectId = getSingleParam(params.projectId);
   const state = useFlowDeck();
   const { project: apiProject, loading } = useProject(projectId);
+
+  // Fetch real tasks from the API and sync into the store so the
+  // dashboard's task stats (progress, done, overdue) use real data.
+  useProjectTasks(projectId);
 
   if (!projectId) {
     notFound();

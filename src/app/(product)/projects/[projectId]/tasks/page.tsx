@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { TaskListView } from '@/features/flowdeck/components/views';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
 import { TEAM } from '@/features/flowdeck/model';
@@ -13,6 +14,9 @@ export default function ProjectTasksPage() {
   const params = useParams();
   const projectId = getSingleParam(params.projectId);
   const state = useFlowDeck();
+
+  // Fetch real tasks from the API and sync into the store.
+  useProjectTasks(projectId);
 
   const projectTasks = useMemo(() => state.tasksByProject[projectId] ?? [], [state.tasksByProject, projectId]);
   

@@ -4,12 +4,16 @@ import React from 'react';
 import { useParams, notFound } from 'next/navigation';
 import { SheetView } from '@/features/flowdeck/components/views';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { getSingleParam } from '@/shared/utils/routeParams';
 
 export default function ProjectSheetPage() {
   const params = useParams();
   const projectId = getSingleParam(params.projectId);
   const state = useFlowDeck();
+
+  // Fetch real tasks from the API and sync into the store.
+  useProjectTasks(projectId);
 
   if (!projectId) {
     notFound();
