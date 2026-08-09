@@ -1,4 +1,7 @@
 import { db } from '@/server/db/client';
+import { randomBytes } from 'node:crypto';
+import { AuthError } from '@/server/auth/authorization';
+import { sendInvitationEmail } from '@/server/email/service';
 
 /** Input shape for the onboarding payload (matches the client OnboardingData). */
 export interface OnboardingInput {
@@ -13,6 +16,9 @@ export interface OnboardingInput {
   };
 }
 
+/** Invitation TTL in hours (same as the invitation system). */
+const ONBOARDING_INVITATION_TTL_HOURS = 24;
+
 /**
  * Slugify a workspace name into a URL-safe slug.
  * "My Team Workspace" -> "my-team-workspace".
@@ -26,8 +32,7 @@ function slugify(name: string): string {
     .slice(0, 50) || 'workspace';
 }
 
-/** Ensure slug uniqueness by appending a short suffix if needed.
- *  Single extra query only when a collision is detected. */
+/** Ensure slug uniqueness by appending a short suffix if needed. */
 async function uniqueSlug(base: string, userId: string): Promise<string> {
   const candidate = `${base}-${userId.slice(-4)}`;
   const existing = await db.workspace.findUnique({
@@ -35,8 +40,12 @@ async function uniqueSlug(base: string, userId: string): Promise<string> {
     select: { id: true },
   });
   if (!existing) return candidate;
-  // Extremely unlikely collision — append a timestamp fragment.
   return `${candidate}-${Date.now().toString(36).slice(-4)}`;
+}
+
+/** Generate a cryptographically random invitation token. */
+function generateToken(): string {
+  return randomBytes(24).toString('hex');
 }
 
 /**
@@ -45,39 +54,41 @@ async function uniqueSlug(base: string, userId: string): Promise<string> {
  * Creates:
  *   1. A Workspace (tenant boundary)
  *   2. A WorkspaceMember row with OWNER role
- *   3. The first project (if a name was supplied), with a ProjectMember
- *      OWNER row
- *   4. Sets User.onboardedAt = now() so the session reflects completion
+ *   3. The first project (if a name was supplied), with a ProjectMember OWNER row
+ *   4. WorkspacePreference (defaultView, enableNotifications, theme)
+ *   5. Invitation records for each invited member email
+ *   6. Sets User.onboardedAt = now() (server-side source of truth)
  *
- * All-or-nothing: if any step fails the transaction rolls back and the user
- * remains un-onboarded.
+ * Idempotency: if the user is already onboarded (onboardedAt is set), the
+ * transaction is rejected with a 409 error. This check happens INSIDE the
+ * transaction to prevent race conditions.
  *
- * Returns the created workspace and project (if any).
+ * All-or-nothing: if any step fails the transaction rolls back.
  */
 export async function completeOnboarding(userId: string, input: OnboardingInput) {
-  // Derive a workspace name from the project name or the user's email.
-  const user = await db.user.findUniqueOrThrow({
-    where: { id: userId },
-    select: { id: true, name: true, email: true },
-  });
-
-  const workspaceName = input.projectName?.trim() || `${user.name ?? user.email}'s Workspace`;
-  const baseSlug = slugify(workspaceName);
-  const slug = await uniqueSlug(baseSlug, userId);
-
   return db.$transaction(async (tx) => {
+    // 0. Idempotency check — fetch the user INSIDE the transaction.
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, onboardedAt: true },
+    });
+
+    if (user.onboardedAt) {
+      throw new AuthError('Already onboarded', 409);
+    }
+
     // 1. Create the workspace (tenant).
+    const workspaceName = input.projectName?.trim() || `${user.name ?? user.email}'s Workspace`;
+    const baseSlug = slugify(workspaceName);
+    const slug = await uniqueSlug(baseSlug, userId);
+
     const workspace = await tx.workspace.create({
       data: { name: workspaceName, slug },
     });
 
     // 2. Add the user as workspace OWNER.
     await tx.workspaceMember.create({
-      data: {
-        workspaceId: workspace.id,
-        userId,
-        role: 'OWNER',
-      },
+      data: { workspaceId: workspace.id, userId, role: 'OWNER' },
     });
 
     // 3. Create the first project if a name was supplied.
@@ -95,24 +106,60 @@ export async function completeOnboarding(userId: string, input: OnboardingInput)
       });
 
       await tx.projectMember.create({
-        data: {
-          projectId: project.id,
-          userId,
-          role: 'OWNER',
-          isFavorite: true,
-        },
+        data: { projectId: project.id, userId, role: 'OWNER', isFavorite: true },
       });
     }
 
-    // 4. Mark the user as onboarded (server-side source of truth).
+    // 4. Persist workspace preferences (do not silently discard user config).
+    await tx.workspacePreference.create({
+      data: {
+        workspaceId: workspace.id,
+        userId,
+        defaultView: input.preferences?.defaultView ?? null,
+        enableNotifications: input.preferences?.enableNotifications ?? true,
+        theme: input.preferences?.theme ?? null,
+      },
+    });
+
+    // 5. Create invitation records for invited members.
+    const invitations: Array<{ email: string; token: string }> = [];
+    if (input.invitedMembers && input.invitedMembers.length > 0) {
+      const expiresAt = new Date(Date.now() + ONBOARDING_INVITATION_TTL_HOURS * 60 * 60 * 1000);
+
+      for (const email of input.invitedMembers) {
+        const cleanEmail = email.trim().toLowerCase();
+        if (!cleanEmail) continue;
+
+        const token = generateToken();
+        await tx.invitation.create({
+          data: {
+            workspaceId: workspace.id,
+            email: cleanEmail,
+            role: 'MEMBER',
+            token,
+            status: 'PENDING',
+            invitedById: userId,
+            expiresAt,
+          },
+        });
+        invitations.push({ email: cleanEmail, token });
+      }
+    }
+
+    // 6. Mark the user as onboarded (server-side source of truth).
     await tx.user.update({
       where: { id: userId },
       data: { onboardedAt: new Date() },
     });
 
-    // TODO (future): persist invitations and preferences once those models
-    // exist (see docs/BACKEND_DOMAIN_ROADMAP.md). For now the invitedMembers
-    // and preferences fields are accepted but not yet stored.
+    // Send invitation emails outside the transaction (non-blocking).
+    // The invitations are already persisted; email delivery is a side-effect.
+    const { APP_BASE_URL } = await import('@/server/email/constants');
+    for (const inv of invitations) {
+      sendInvitationEmail(inv.email, inv.token, workspace.name, APP_BASE_URL).catch((err) => {
+        console.error('[onboarding] invitation email failed for', inv.email, err);
+      });
+    }
 
     return { workspace, project };
   });

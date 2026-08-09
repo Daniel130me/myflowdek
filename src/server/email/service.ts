@@ -128,3 +128,34 @@ export async function sendPasswordResetEmail(
     `,
   });
 }
+
+/**
+ * Send a workspace invitation email with a token link.
+ *
+ * The link points to the frontend invitation accept page, which will
+ * POST the token to /api/invitations/:token/accept.
+ */
+export async function sendInvitationEmail(
+  email: string,
+  token: string,
+  workspaceName: string,
+  baseUrl: string,
+): Promise<boolean> {
+  const link = `${baseUrl}/invitations/${token}`;
+  return sendEmail({
+    to: email,
+    subject: `You're invited to join "${workspaceName}" on FlowDeck`,
+    text: `You've been invited to join "${workspaceName}" on FlowDeck.\n\nClick the link below to accept the invitation:\n\n${link}\n\nThis invitation expires in 24 hours.\n\nIf you weren't expecting this invitation, you can safely ignore this email.`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color: #FE8029;">You're invited to FlowDeck!</h2>
+        <p>You've been invited to join <strong>${workspaceName}</strong> on FlowDeck.</p>
+        <p style="margin: 24px 0;">
+          <a href="${link}" style="background: #FE8029; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; display: inline-block;">Accept Invitation</a>
+        </p>
+        <p style="color: #6B7280; font-size: 13px;">This invitation expires in 24 hours.</p>
+        <p style="color: #6B7280; font-size: 13px;">If you weren't expecting this invitation, you can safely ignore this email.</p>
+      </div>
+    `,
+  });
+}
