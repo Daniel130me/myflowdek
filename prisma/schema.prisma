@@ -67,6 +67,10 @@ model User {
   /** Platform-level role. SUPER_ADMIN = internal Flowdeck team with access
    *  to the admin dashboard. Completely distinct from workspace/project roles. */
   platformRole  PlatformRole    @default(USER)
+  /** Incremented on password reset / account disable / logout-all to
+   *  invalidate existing JWT sessions. The JWT carries sessionVersion;
+   *  mismatch = session revoked. */
+  sessionVersion Int             @default(0)
   deletedAt     DateTime?
   /** Timestamp set when the user finishes onboarding. Null = not onboarded.
    *  Source of truth for onboarding state (not localStorage). */
@@ -86,6 +90,10 @@ model User {
   timeLogs         TimeLog[]
   activity         ActivityEntry[]
   notifications    Notification[]
+  savedFilters     SavedFilter[]
+  commentMentions  CommentMention[]
+  projectStatusUpdates ProjectStatusUpdate[]
+  workspacePreferences WorkspacePreference[]
   approvalRequests ApprovalRequest[] @relation("ApprovalRequester")
   approvalsToResolve ApprovalRequest[] @relation("ApprovalApprover")
   timesheets      TimesheetEntry[]
@@ -117,6 +125,7 @@ model Workspace {
   members      WorkspaceMember[]
   projects     Project[]
   invitations  Invitation[]
+  preferences  WorkspacePreference[]
 }
 
 model WorkspaceMember {
@@ -192,6 +201,8 @@ model Project {
   timesheets  TimesheetEntry[]
   budgets     Budget[]
   expenses    Expense[]
+  statusUpdates ProjectStatusUpdate[]
+  customFields CustomField[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -231,6 +242,9 @@ model Task {
   progress     Int              @default(0)
   sortOrder    Int              @default(0)
   isMilestone  Boolean          @default(false)
+  /** Recurrence pattern: 'daily' | 'weekly' | 'monthly' | null. When set,
+   *  a background job creates the next occurrence after completion. */
+  recurrence   String?
   completedAt  DateTime?
   assigneeId   String?
   createdById  String?
@@ -251,6 +265,7 @@ model Task {
   followers    TaskFollower[]
   activity     ActivityEntry[]
   approvals    ApprovalRequest[]
+  customFieldValues TaskCustomFieldValue[]
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -341,6 +356,7 @@ model Comment {
   parent     Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies    Comment[] @relation("CommentReplies")
   reactions  CommentReaction[]
+  mentions   CommentMention[]
   createdAt  DateTime @default(now())
 
   @@index([taskId])
@@ -679,4 +695,89 @@ model Expense {
 
   @@index([budgetId])
   @@index([projectId])
+}
+
+/* --------------------- missing existing domains ------------------------ */
+
+/** Per-user workspace preferences (onboarding + settings). */
+model WorkspacePreference {
+  id                  String   @id @default(cuid())
+  workspaceId         String
+  userId              String
+  defaultView         String?
+  enableNotifications Boolean  @default(true)
+  theme               String?  // 'light' | 'dark' | 'system'
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+/** Structured @mention on a comment (replaces text-based parsing). */
+model CommentMention {
+  commentId String
+  userId    String
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@index([userId])
+}
+
+/** Pinned status update on a project dashboard (green/yellow/red). */
+model ProjectStatusUpdate {
+  id        String   @id @default(cuid())
+  projectId String
+  authorId  String?
+  text      String
+  color     String   @default("green") // 'green' | 'yellow' | 'red'
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+/** User-specific saved search filter. */
+model SavedFilter {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  filters   Json
+  isPinned  Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+/** Project-specific custom field definition. */
+model CustomField {
+  id        String   @id @default(cuid())
+  projectId String
+  key       String
+  label     String
+  type      String   // 'text' | 'number' | 'date' | 'select'
+  options   Json?
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  values    TaskCustomFieldValue[]
+
+  @@unique([projectId, key])
+  @@index([projectId])
+}
+
+/** Per-task custom field value. */
+model TaskCustomFieldValue {
+  id        String   @id @default(cuid())
+  taskId    String
+  fieldId   String
+  value     String?
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  field     CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, fieldId])
+  @@index([taskId])
 }
