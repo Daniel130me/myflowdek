@@ -42,6 +42,31 @@ export async function requireAuthenticatedUser() {
 }
 
 /**
+ * Require the authenticated user to have SUPER_ADMIN platform role.
+ *
+ * This is completely distinct from workspace/project roles. A SUPER_ADMIN
+ * can access the internal admin dashboard (users, workspaces, audit, system
+ * health). The check queries the DB — never trusts the session for the
+ * platform role (the session JWT doesn't carry it).
+ *
+ * Throws 401 if not authenticated, 403 if not a super admin.
+ */
+export async function requireSuperAdmin() {
+  const user = await requireAuthenticatedUser();
+
+  const dbUser = await db.user.findUnique({
+    where: { id: user.id },
+    select: { platformRole: true },
+  });
+
+  if (!dbUser || dbUser.platformRole !== 'SUPER_ADMIN') {
+    throw new AuthError('Super admin access required', 403);
+  }
+
+  return user;
+}
+
+/**
  * Verify the user is a member of the workspace. Returns the membership row
  * (which includes the role). Throws 403 if not a member.
  *

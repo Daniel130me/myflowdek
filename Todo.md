@@ -1,47 +1,46 @@
-# Flowdek Email Verification + Password Reset — TODO
+# Flowdek Product-Level Admin — TODO
 
-> Source of truth for the email verification and password reset features.
-> Previous work (notifications, R2 files, search — commits up to `5398132`)
-> is complete.
+> Source of truth for the internal Super Admin system.
+> Previous work (email verification, password reset — commit `e2b5c6f`) is complete.
 
-## 12. Email verification + password reset
+## 13. Product-level admin
 
-```
-Registration → Verification email → Verify account
+Internal Flowdek Admin, separate from customer workspace admins.
 
-Forgot password → Email token → Reset password → Invalidate token
-```
+**Do NOT confuse:**
+- `Flowdeck Super Admin` (platform-level, sees everything)
+- `Workspace OWNER` (tenant-level, sees one workspace)
 
-Uses Twilio SendGrid for email delivery (sender: kosokodaniel@gmail.com).
-
-The `VerificationToken` model already exists in the schema (Phase 6 of the
-foundation). This phase completes the flow: generate tokens, send emails,
-verify, and reset.
+Admin dashboard shows:
+- Users, Workspaces, Active users, New registrations
+- Disabled accounts, Storage usage, Failed logins
+- Audit events, Feature usage, System health
 
 ---
 
 ## Phased implementation plan
 
-### Phase 1 — Email service + constants
-- [ ] Install `@sendgrid/mail`
-- [ ] `src/server/email/service.ts` — sendEmail via SendGrid
-- [ ] `src/server/email/constants.ts` — sender, subjects, TTLs, URLs
-- [ ] `src/lib/auth.constants.ts` — add token TTL + type constants
-- **Commit:** `feat(email): add SendGrid email service`
+### Phase 1 — Schema: add platformRole to User + migration
+- [ ] Add `platformRole` field (SUPER_ADMIN | USER) to User model
+- [ ] Generate + apply migration
+- [ ] Seed: make wale.johnson a SUPER_ADMIN
+- **Commit:** `feat(schema): add platform role for super admin`
 
-### Phase 2 — Email verification flow
-- [ ] `src/server/auth/verification.service.ts` — generate + verify tokens
-- [ ] Wire into register route: send verification email on signup
-- [ ] `POST /api/auth/verify-email` — verify the token, set emailVerifiedAt
-- [ ] `POST /api/auth/resend-verification` — resend if expired/lost
-- **Commit:** `feat(auth): add email verification flow`
+### Phase 2 — Admin authorization + API endpoints
+- [ ] `requireSuperAdmin()` helper in authorization.ts
+- [ ] `src/server/admin/` service with metrics queries
+- [ ] GET /api/admin/overview (users, workspaces, registrations, storage, feature usage)
+- [ ] GET /api/admin/users (list all users with status, last login)
+- [ ] GET /api/admin/workspaces (list all workspaces with member counts)
+- [ ] GET /api/admin/audit (recent audit events)
+- [ ] GET /api/admin/health (system health check)
+- **Commit:** `feat(admin): add super admin API endpoints`
 
-### Phase 3 — Password reset flow
-- [ ] `src/server/auth/password-reset.service.ts` — generate + verify reset tokens
-- [ ] `POST /api/auth/forgot-password` — send reset email
-- [ ] `POST /api/auth/reset-password` — verify token + set new password
-- [ ] Tokens invalidated (usedAt set) after use
-- **Commit:** `feat(auth): add password reset flow`
+### Phase 3 — Admin dashboard page
+- [ ] `/admin` route with admin layout
+- [ ] Dashboard cards for each metric
+- [ ] Tables for users, workspaces, audit log
+- **Commit:** `feat(admin): add admin dashboard page`
 
 ---
 

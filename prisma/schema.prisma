@@ -43,6 +43,15 @@ enum UserStatus {
   DELETED
 }
 
+/** Platform-level role. SUPER_ADMIN can access the internal admin dashboard
+ *  (users, workspaces, audit, system health). This is completely distinct
+ *  from WorkspaceRole/ProjectRole — a SUPER_ADMIN may or may not be a
+ *  workspace OWNER. */
+enum PlatformRole {
+  USER
+  SUPER_ADMIN
+}
+
 /* ------------------------------- user --------------------------------- */
 
 model User {
@@ -55,6 +64,9 @@ model User {
   /** Display-only job title (e.g. "Project Manager"). NOT used for authz. */
   jobTitle      String?
   status        UserStatus      @default(ACTIVE)
+  /** Platform-level role. SUPER_ADMIN = internal Flowdeck team with access
+   *  to the admin dashboard. Completely distinct from workspace/project roles. */
+  platformRole  PlatformRole    @default(USER)
   deletedAt     DateTime?
   /** Timestamp set when the user finishes onboarding. Null = not onboarded.
    *  Source of truth for onboarding state (not localStorage). */
