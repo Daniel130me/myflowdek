@@ -12,6 +12,8 @@ export const createCommentSchema = z.object({
   taskId: z.string().min(1),
   /** Optional parent comment ID for threaded replies. */
   parentId: z.string().optional().nullable(),
+  /** Structured mention user IDs (from UI autocomplete, NOT text parsing). */
+  mentionedUserIds: z.array(z.string()).optional(),
 });
 
 export const updateCommentSchema = z.object({
@@ -147,34 +149,23 @@ export async function createComment(
       }
     }
 
-    // Notify @mentioned users (extract @word patterns, resolve to workspace members).
-    const mentions = extractMentions(input.text);
-    if (mentions.length > 0) {
-      // Resolve mentions to users by email within the workspace.
-      const mentionedUsers = await db.user.findMany({
-        where: {
-          email: { in: mentions.map(m => m.toLowerCase()) },
-          // Must be a member of the workspace that owns this project.
-          workspaces: {
-            some: {
-              workspace: {
-                projects: { some: { id: projectId } },
-              },
-            },
-          },
-        },
-        select: { id: true, name: true },
-      });
-
+    // Notify @mentioned users using structured user IDs (from UI autocomplete).
+    // This replaces the old text-based @word parsing which was unreliable.
+    if (input.mentionedUserIds && input.mentionedUserIds.length > 0) {
       const authorName = await db.user.findUnique({
         where: { id: authorId },
         select: { name: true },
       }).then(u => u?.name ?? 'Someone').catch(() => 'Someone');
 
-      for (const mentionedUser of mentionedUsers) {
-        if (mentionedUser.id !== authorId) {
+      for (const mentionedUserId of input.mentionedUserIds) {
+        if (mentionedUserId !== authorId) {
+          // Create the CommentMention record (structured, not text-parsed).
+          await db.commentMention.create({
+            data: { commentId: comment.id, userId: mentionedUserId },
+          }).catch(() => {}); // Ignore duplicate PK errors.
+
           await createNotification(
-            mentionedUser.id,
+            mentionedUserId,
             NOTIFICATION_TYPES.MENTIONED,
             `${authorName} mentioned you in a comment`,
             { actorId: authorId, projectId, taskId: input.taskId },

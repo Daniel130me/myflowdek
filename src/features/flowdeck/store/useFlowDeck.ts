@@ -381,18 +381,19 @@ export function useFlowDeckStore(): FlowDeckState {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       try {
+        // Only persist UI-only state to localStorage — NOT business data.
+        // Business data (projects, tasks, comments, etc.) is now the
+        // server's responsibility via the API. LocalStorage is used only
+        // for UI settings that don't need to survive across devices.
         const state = {
-          projects, tasksByProject, filesByProject, raidByProject,
-          customColsByProject, tagsByProject, commentsByProject, activityByProject,
-          timeLogsByProject, sectionsByProject, statusUpdatesByProject,
-          goals, keyResults, savedFilters, currentProjectId, activeView,
-          automations, forms, submissions, approvals, budgets, expenses, timesheets,
+          currentProjectId,
+          activeView,
         };
         savePersistedState(state);
       } catch { /* storage full or private mode */ }
     }, SAVE_DEBOUNCE);
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
-  }, [hydrated, projects, tasksByProject, filesByProject, raidByProject, customColsByProject, tagsByProject, commentsByProject, activityByProject, timeLogsByProject, sectionsByProject, statusUpdatesByProject, goals, keyResults, savedFilters, currentProjectId, activeView, automations, forms, submissions, approvals, budgets, expenses, timesheets]);
+  }, [hydrated, currentProjectId, activeView]);
 
   const project = currentProjectId ? projects[currentProjectId] : null;
   const tasks = currentProjectId ? (tasksByProject[currentProjectId] || []) : [];
