@@ -34,23 +34,39 @@ export interface EmailParams {
 }
 
 /**
- * Send an email. Returns true on success, false on failure (including when
- * SendGrid is not configured — in which case the email is logged instead).
+ * Send an email. Returns true on success, false on failure.
  *
- * Never throws — email delivery is a side-effect, not a critical path. If
- * the email fails, the main operation (registration, password reset) should
- * still succeed.
+ * Behavior:
+ *   - Production + no SendGrid API key: THROWS — transactional emails
+ *     (password reset, verification, invitations) must not be silently
+ *     logged in production, as that would leak security tokens into logs.
+ *   - Development + no SendGrid API key: logs the email to the console
+ *     (minus sensitive tokens — the full body is NOT logged; only To,
+ *     From, Subject, and a truncated preview).
+ *   - SendGrid configured: sends via the API.
+ *
+ * Never throws for SendGrid API errors (returns false) — but DOES throw
+ * if production email is not configured, as that's a deployment blocker.
  */
 export async function sendEmail(params: EmailParams): Promise<boolean> {
   const isConfigured = ensureInitialized();
 
   if (!isConfigured) {
-    // Development mode: log the email instead of sending it.
+    if (process.env.NODE_ENV === 'production') {
+      // CRITICAL: do not log security tokens in production.
+      throw new Error(
+        'Transactional email provider (SendGrid) is not configured. ' +
+        'Set SENDGRID_API_KEY in production environment.'
+      );
+    }
+    // Development mode: log a safe preview (no full token-bearing body).
     console.log('[email] (dev mode — SendGrid not configured)');
     console.log('  To:      ', params.to);
     console.log('  From:    ', `${EMAIL_FROM_NAME} <${EMAIL_FROM}>`);
     console.log('  Subject: ', params.subject);
-    console.log('  Body:    ', params.text.slice(0, 200));
+    // Log only the first 80 chars — enough to identify the email type
+    // without exposing the full token link.
+    console.log('  Preview: ', params.text.slice(0, 80));
     return true;
   }
 

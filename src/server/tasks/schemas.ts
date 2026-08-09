@@ -12,6 +12,8 @@ export const createTaskSchema = z.object({
   dueDate: optionalDate,
   duration: z.number().int().nonnegative().optional(),
   parentId: z.string().optional().nullable(),
+  assigneeId: z.string().optional().nullable(),
+  sectionId: z.string().optional().nullable(),
 });
 
 export const updateTaskSchema = z.object({
@@ -25,6 +27,7 @@ export const updateTaskSchema = z.object({
   progress: z.number().min(0).max(100).optional(),
   assigneeId: z.string().optional().nullable(),
   parentId: z.string().optional().nullable(),
+  sectionId: z.string().optional().nullable(),
 });
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;

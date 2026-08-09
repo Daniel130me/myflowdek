@@ -117,11 +117,15 @@ export async function resetPassword(token: string, newPassword: string): Promise
 
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
-  // Update password + mark token as used in a single transaction.
+  // Update password + increment sessionVersion (revokes existing sessions)
+  // + mark token as used, all in a single transaction.
   await db.$transaction([
     db.user.update({
       where: { id: record.userId },
-      data: { passwordHash },
+      data: {
+        passwordHash,
+        sessionVersion: { increment: 1 },
+      },
     }),
     db.verificationToken.update({
       where: { id: record.id },

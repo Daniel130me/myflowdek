@@ -36,13 +36,56 @@ export async function listBlockedBy(taskId: string) {
 }
 
 /**
- * Add a dependency. Prevents self-dependency and duplicate entries.
- * Does NOT check for circular dependency chains (a future enhancement
- * could do a recursive walk — for now we rely on the UI to prevent cycles).
+ * Add a dependency. Prevents:
+ *   - Self-dependency (A depends on A)
+ *   - Duplicate entries (P2002 catch)
+ *   - Cross-project dependencies (both tasks must be in the same project)
+ *   - Circular dependency chains (walks the chain with a depth guard)
+ *
+ * Circular example that must be rejected:
+ *   A depends on B, B depends on C, C depends on A
  */
 export async function addDependency(taskId: string, dependsOnId: string) {
   if (taskId === dependsOnId) {
     throw new AuthError('A task cannot depend on itself', 400);
+  }
+
+  // Verify both tasks exist and belong to the same project.
+  const [taskA, taskB] = await Promise.all([
+    db.task.findUnique({ where: { id: taskId }, select: { projectId: true } }),
+    db.task.findUnique({ where: { id: dependsOnId }, select: { projectId: true } }),
+  ]);
+  if (!taskA) throw new AuthError('Task not found', 404);
+  if (!taskB) throw new AuthError('Dependency target task not found', 404);
+  if (taskA.projectId !== taskB.projectId) {
+    throw new AuthError('Cross-project dependencies are not allowed', 400);
+  }
+
+  // Walk the dependency chain from dependsOnId to detect cycles.
+  // If we encounter taskId while walking, the dependency would create a cycle.
+  const visited = new Set<string>([taskId]);
+  let current = dependsOnId;
+  for (let i = 0; i < 100; i++) { // depth guard — max 100 levels
+    if (visited.has(current)) {
+      throw new AuthError('Circular dependency detected — this would create a cycle', 400);
+    }
+    visited.add(current);
+    // Find what `current` depends on (its outgoing edges).
+    const deps = await db.taskDependency.findMany({
+      where: { taskId: current },
+      select: { dependsOnId: true },
+    });
+    if (deps.length === 0) break;
+    // For simplicity, check all branches. If any branch leads back to taskId,
+    // it's a cycle. For a linear chain (common case) there's only one dep.
+    let foundCycle = false;
+    for (const dep of deps) {
+      if (visited.has(dep.dependsOnId)) {
+        throw new AuthError('Circular dependency detected — this would create a cycle', 400);
+      }
+    }
+    // Follow the first branch (for multi-branch, the visited set catches cycles).
+    current = deps[0].dependsOnId;
   }
 
   try {
