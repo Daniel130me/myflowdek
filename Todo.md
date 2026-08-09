@@ -48,6 +48,6 @@ Admin dashboard shows:
 
 | Phase | Commit | Status |
 |-------|--------|--------|
-| 1 | — | pending |
-| 2 | — | pending |
-| 3 | — | pending |
+| 1 | `4e5888f` | ✅ done |
+| 2 | `4e5888f` | ✅ done |
+| 3 | — | pending (admin UI deferred — APIs are complete) |
