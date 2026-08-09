@@ -54,6 +54,16 @@ export async function createGoal(workspaceId: string, input: CreateGoalInput) {
   });
 }
 
+/** Get a single goal with its key results. */
+export async function getGoal(goalId: string) {
+  const goal = await db.goal.findUnique({
+    where: { id: goalId },
+    select: { ...goalSelect, keyResults: true },
+  });
+  if (!goal) throw new AuthError('Goal not found', 404);
+  return goal;
+}
+
 export async function updateGoal(goalId: string, input: UpdateGoalInput) {
   try {
     return await db.goal.update({
