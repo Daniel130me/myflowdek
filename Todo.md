@@ -1,46 +1,63 @@
-# Flowdek Product-Level Admin — TODO
+# Flowdek Advanced Features — TODO
 
-> Source of truth for the internal Super Admin system.
-> Previous work (email verification, password reset — commit `e2b5c6f`) is complete.
+> Source of truth for the advanced feature backend implementation.
+> Previous work (admin system — commit `cd0f0b6`) is complete.
 
-## 13. Product-level admin
+## Advanced features to implement
 
-Internal Flowdek Admin, separate from customer workspace admins.
-
-**Do NOT confuse:**
-- `Flowdeck Super Admin` (platform-level, sees everything)
-- `Workspace OWNER` (tenant-level, sees one workspace)
-
-Admin dashboard shows:
-- Users, Workspaces, Active users, New registrations
-- Disabled accounts, Storage usage, Failed logins
-- Audit events, Feature usage, System health
+1. Goals / OKRs
+2. Approvals
+3. Forms (intake + submissions)
+4. Automations (trigger-action rules)
+5. Timesheets
+6. Budgets + Expenses
+7. Advanced dashboards (workload/capacity, portfolio reporting)
+8. AI assistant
 
 ---
 
 ## Phased implementation plan
 
-### Phase 1 — Schema: add platformRole to User + migration
-- [ ] Add `platformRole` field (SUPER_ADMIN | USER) to User model
+### Phase 1 — Schema: add all advanced models + migration
+- [ ] Goal, KeyResult
+- [ ] ApprovalRequest
+- [ ] Form, FormSubmission
+- [ ] AutomationRule
+- [ ] TimesheetEntry
+- [ ] Budget, Expense
+- [ ] Back-relations on User + Project
 - [ ] Generate + apply migration
-- [ ] Seed: make wale.johnson a SUPER_ADMIN
-- **Commit:** `feat(schema): add platform role for super admin`
+- **Commit:** `feat(schema): add goals, approvals, forms, automations, timesheets, budgets`
 
-### Phase 2 — Admin authorization + API endpoints
-- [ ] `requireSuperAdmin()` helper in authorization.ts
-- [ ] `src/server/admin/` service with metrics queries
-- [ ] GET /api/admin/overview (users, workspaces, registrations, storage, feature usage)
-- [ ] GET /api/admin/users (list all users with status, last login)
-- [ ] GET /api/admin/workspaces (list all workspaces with member counts)
-- [ ] GET /api/admin/audit (recent audit events)
-- [ ] GET /api/admin/health (system health check)
-- **Commit:** `feat(admin): add super admin API endpoints`
+### Phase 2 — Goals / OKRs API
+- [ ] service + routes (CRUD for goals + key results)
+- **Commit:** `feat(goals): add goals and key results CRUD APIs`
 
-### Phase 3 — Admin dashboard page
-- [ ] `/admin` route with admin layout
-- [ ] Dashboard cards for each metric
-- [ ] Tables for users, workspaces, audit log
-- **Commit:** `feat(admin): add admin dashboard page`
+### Phase 3 — Approvals API
+- [ ] service + routes (create, list, approve/reject)
+- **Commit:** `feat(approvals): add approval request APIs`
+
+### Phase 4 — Forms API
+- [ ] service + routes (CRUD for forms + submissions)
+- **Commit:** `feat(forms): add form and submission APIs`
+
+### Phase 5 — Automations API
+- [ ] service + routes (CRUD for rules)
+- **Commit:** `feat(automations): add automation rule APIs`
+
+### Phase 6 — Timesheets API
+- [ ] service + routes (CRUD for entries)
+- **Commit:** `feat(timesheets): add timesheet entry APIs`
+
+### Phase 7 — Budgets + Expenses API
+- [ ] service + routes (CRUD for budgets + expenses)
+- **Commit:** `feat(budgets): add budget and expense APIs`
+
+### Phase 8 — Advanced dashboards (workload, portfolio, AI assistant)
+- [ ] Workload/capacity endpoint
+- [ ] Portfolio reporting endpoint
+- [ ] AI assistant endpoint (uses z-ai-web-dev-sdk)
+- **Commit:** `feat(dashboards): add workload, portfolio, and AI assistant endpoints`
 
 ---
 
@@ -48,6 +65,11 @@ Admin dashboard shows:
 
 | Phase | Commit | Status |
 |-------|--------|--------|
-| 1 | `4e5888f` | ✅ done |
-| 2 | `4e5888f` | ✅ done |
-| 3 | — | pending (admin UI deferred — APIs are complete) |
+| 1 | — | pending |
+| 2 | — | pending |
+| 3 | — | pending |
+| 4 | — | pending |
+| 5 | — | pending |
+| 6 | — | pending |
+| 7 | — | pending |
+| 8 | — | pending |
