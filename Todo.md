@@ -128,10 +128,10 @@
 | 7 | `d8238c2` | ✅ done |
 | 8 | `d362139` | ✅ done |
 | 9 | `4b44d8d` | ✅ done |
-| 10 | — | pending |
-| 11 | — | pending |
-| 12 | — | pending |
-| 13 | — | pending |
-| 14 | — | pending |
-| 15 | `pending` | ✅ done |
+| 10 | `295ce68` | ✅ done |
+| 11 | `295ce68` | ✅ done |
+| 12 | `295ce68` | ✅ done |
+| 13 | `295ce68` | ✅ done |
+| 14 | — | pending (existing tests pass, new tests deferred) |
+| 15 | `pending` | ✅ done (file created, couldn't push — PAT lacks workflow scope) |
 | 16 | `273b2b4` | ✅ done |
