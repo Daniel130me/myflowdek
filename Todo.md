@@ -65,11 +65,4 @@
 
 | Phase | Commit | Status |
 |-------|--------|--------|
-| 1 | — | pending |
-| 2 | — | pending |
-| 3 | — | pending |
-| 4 | — | pending |
-| 5 | — | pending |
-| 6 | — | pending |
-| 7 | — | pending |
-| 8 | — | pending |
+| 1-8 | `3a4923c` | ✅ done (all in one commit) |
