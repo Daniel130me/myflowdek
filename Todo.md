@@ -125,13 +125,13 @@
 | 4 | `b3a9503` | ✅ done |
 | 5 | `dbd1cd3` | ✅ done |
 | 6 | `b3a9503` | ✅ done |
-| 7 | — | pending |
-| 8 | — | pending |
+| 7 | `d8238c2` | ✅ done |
+| 8 | `d362139` | ✅ done |
 | 9 | — | pending |
 | 10 | — | pending |
 | 11 | — | pending |
 | 12 | — | pending |
 | 13 | — | pending |
 | 14 | — | pending |
-| 15 | — | pending |
-| 16 | — | pending |
+| 15 | `pending` | ✅ done |
+| 16 | `pending` | ✅ done |
