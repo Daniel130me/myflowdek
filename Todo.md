@@ -122,9 +122,9 @@
 | 1 | `c6c1d19` | ✅ done |
 | 2 | `2903860` | ✅ done |
 | 3 | `dbd1cd3` | ✅ done |
-| 4 | — | in progress |
+| 4 | `b3a9503` | ✅ done |
 | 5 | `dbd1cd3` | ✅ done |
-| 6 | — | pending |
+| 6 | `b3a9503` | ✅ done |
 | 7 | — | pending |
 | 8 | — | pending |
 | 9 | — | pending |
