@@ -10,6 +10,7 @@ declare module 'next-auth' {
       jobTitle?: string;
       avatarColor?: string;
       onboardedAt?: string | null;
+      sessionVersion?: number;
     };
   }
 
@@ -20,6 +21,7 @@ declare module 'next-auth' {
     jobTitle?: string;
     avatarColor?: string;
     onboardedAt?: Date | null;
+    sessionVersion?: number;
   }
 }
 
@@ -29,5 +31,6 @@ declare module 'next-auth/jwt' {
     jobTitle?: string;
     avatarColor?: string;
     onboardedAt?: string | null;
+    sessionVersion?: number;
   }
 }

@@ -81,6 +81,7 @@ export const authOptions: NextAuthOptions = {
             jobTitle: user.jobTitle ?? undefined,
             avatarColor: user.avatarColor ?? undefined,
             onboardedAt: user.onboardedAt ?? undefined,
+            sessionVersion: user.sessionVersion,
           };
         } catch (err) {
           console.error('[auth] authorize error:', err);
@@ -93,7 +94,7 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: SESSION_STRATEGY },
   pages: { signIn: LOGIN_PATH },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       // `user` is only present on the first sign-in; copy its fields onto the
       // token so subsequent requests carry them without re-querying the DB.
       if (user) {
@@ -103,14 +104,38 @@ export const authOptions: NextAuthOptions = {
         token.onboardedAt = (user as AuthUser).onboardedAt
           ? String((user as AuthUser).onboardedAt)
           : null;
+        token.sessionVersion = (user as AuthUser).sessionVersion ?? 0;
       }
+
+      // Handle session update: when the client calls useSession().update(),
+      // refresh the user's state from the DB so changes (onboarding, profile
+      // edits, password reset) are reflected without a full logout/login.
+      if (trigger === 'update' && token.id) {
+        const dbUser = await db.user.findUnique({
+          where: { id: token.id as string },
+          select: {
+            onboardedAt: true,
+            jobTitle: true,
+            avatarColor: true,
+            status: true,
+            sessionVersion: true,
+          },
+        });
+        if (dbUser) {
+          token.onboardedAt = dbUser.onboardedAt
+            ? String(dbUser.onboardedAt)
+            : null;
+          token.jobTitle = dbUser.jobTitle ?? undefined;
+          token.avatarColor = dbUser.avatarColor ?? undefined;
+          token.sessionVersion = dbUser.sessionVersion;
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {
       // Expose the persisted token fields on the session object consumed by
       // the client. Falls back to the defaults if the token is incomplete.
-      // The session.user type is augmented in types/next-auth.d.ts so no
-      // cast is needed.
       if (session.user) {
         session.user.id = token.id as string;
         session.user.jobTitle =
@@ -118,6 +143,8 @@ export const authOptions: NextAuthOptions = {
         session.user.avatarColor =
           (token.avatarColor as string | undefined) ?? DEFAULT_AVATAR_COLOR;
         session.user.onboardedAt = (token.onboardedAt as string | null) ?? null;
+        (session.user as { sessionVersion?: number }).sessionVersion =
+          (token.sessionVersion as number | undefined) ?? 0;
       }
       return session;
     },
@@ -138,4 +165,5 @@ interface AuthUser {
   jobTitle?: string;
   avatarColor?: string;
   onboardedAt?: Date | null;
+  sessionVersion?: number;
 }

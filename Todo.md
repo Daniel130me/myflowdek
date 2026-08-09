@@ -119,9 +119,9 @@
 
 | Phase | Commit | Status |
 |-------|--------|--------|
-| 1 | — | pending |
-| 2 | — | pending |
-| 3 | — | pending |
+| 1 | `c6c1d19` | ✅ done |
+| 2 | `2903860` | ✅ done |
+| 3 | — | in progress |
 | 4 | — | pending |
 | 5 | — | pending |
 | 6 | — | pending |
