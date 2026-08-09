@@ -18,6 +18,13 @@ import type { ProjectStatusUpdate } from '@/features/flowdeck/model';
 import { useOptionalFlowdekData } from '@/providers/FlowdekDataProvider';
 import { loadPersistedState, savePersistedState, clearPersistedState, loadCustomTemplates, saveCustomTemplates, STORAGE_KEY } from '@/data/local-storage/storageAdapter';
 import { defaultIdGenerator } from '@/shared/utils/id';
+import {
+  apiUpdateTask, apiDeleteTask, apiCreateTask, apiBulkAction,
+  apiAddComment, apiEditComment, apiDeleteComment,
+  apiAddTaskTag, apiRemoveTaskTag,
+  apiFollowTask, apiUnfollowTask,
+  apiCreateSection, apiDeleteSection,
+} from '@/lib/api-client';
 
 /* ---- LocalStorage persistence ---- */
 const SAVE_DEBOUNCE = 500;
@@ -549,6 +556,7 @@ export function useFlowDeckStore(): FlowDeckState {
   const updateTask = useCallback((projectId: string, id: string, patch: Partial<Task>) => {
     const projectTasks = tasksByProject[projectId] || [];
     const task = projectTasks.find(t => t.id === id);
+    // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === id ? { ...t, ...patch } : t));
     if (task && patch.status && patch.status !== task.status) {
       const member = TEAM.find(m => m.id === userIdRef.current);
@@ -562,6 +570,10 @@ export function useFlowDeckStore(): FlowDeckState {
       const member = TEAM.find(m => m.id === userIdRef.current);
       logActivity(projectId, id, 'due_date_change', `${member?.name || 'Someone'} changed due date`);
     }
+    // Persist to PostgreSQL (non-blocking, error toast on failure).
+    apiUpdateTask(id, patch).then((res) => {
+      if (!res.ok) toast.error('Failed to save task change', { description: res.error });
+    });
   }, [tasksByProject, commit, logActivity]);
 
   const toggleComplete = useCallback((projectId: string, id: string) => {
@@ -650,9 +662,21 @@ export function useFlowDeckStore(): FlowDeckState {
       milestone: input.milestone,
       createdAt,
     };
+    // Optimistic local update.
     commit(projectId, [...projectTasks, newTask]);
     logActivity(projectId, id, 'created', `Task "${newTask.name}" was created`);
     toast.success('Task created', { description: newTask.name });
+    // Persist to PostgreSQL.
+    apiCreateTask(projectId, {
+      name: input.name,
+      status: input.status,
+      priority: input.priority,
+      assigneeId: input.assignee,
+      parentId: input.parentId,
+      sectionId: input.sectionId,
+    }).then((res) => {
+      if (!res.ok) toast.error('Failed to create task on server', { description: res.error });
+    });
   }, [tasksByProject, commit, logActivity]);
   const addTasksBulk = useCallback((projectId: string, newTasks: Task[]) => {
     if (projectId) {
@@ -681,18 +705,28 @@ export function useFlowDeckStore(): FlowDeckState {
     };
     descendantIds.add(id);
     collectDescendants(id);
+    // Optimistic local update.
     commit(projectId, projectTasks.filter(t => !descendantIds.has(t.id)));
     setSelectedIds(prev => { const n = new Set(prev); for (const did of descendantIds) n.delete(did); return n; });
     toast.success('Task deleted', { description: task?.name || 'Task' });
+    // Persist to PostgreSQL.
+    apiDeleteTask(id).then((res) => {
+      if (!res.ok) toast.error('Failed to delete task on server', { description: res.error });
+    });
   }, [tasksByProject, commit]);
 
   const removeTasksBulk = useCallback((projectId: string, ids: Set<string>) => {
     if (!projectId) return;
     const count = ids.size;
     const projectTasks = tasksByProject[projectId] || [];
+    // Optimistic local update.
     commit(projectId, projectTasks.filter(t => !ids.has(t.id)));
     setSelectedIds(new Set());
     toast.success(`${count} task${count > 1 ? 's' : ''} deleted`);
+    // Persist to PostgreSQL.
+    apiBulkAction(projectId, 'delete', [...ids]).then((res) => {
+      if (!res.ok) toast.error('Failed to delete tasks on server', { description: res.error });
+    });
   }, [tasksByProject, commit]);
 
   const bulkSetDueDate = useCallback((projectId: string, ids: Set<string>, date: string | null) => {
@@ -720,22 +754,34 @@ export function useFlowDeckStore(): FlowDeckState {
     const progress = s === 'done' ? 100 : s === 'backlog' ? 0 : undefined;
     updateTasksBulk(projectId, ids, progress !== undefined ? { status: s, progress } : { status: s });
     toast.success(`${ids.size} task${ids.size > 1 ? 's' : ''} set to ${STATUS_META[s]?.label || s}`);
+    apiBulkAction(projectId, 'status', [...ids], { status }).then((res) => {
+      if (!res.ok) toast.error('Failed to save status change', { description: res.error });
+    });
   }, [updateTasksBulk]);
 
   const bulkAssign = useCallback((projectId: string, ids: Set<string>, memberId: string) => {
     updateTasksBulk(projectId, ids, { assignee: memberId });
     const member = TEAM.find(m => m.id === memberId);
     toast.success(`Assigned ${ids.size} task${ids.size > 1 ? 's' : ''} to ${member?.name || 'someone'}`);
+    apiBulkAction(projectId, 'assignee', [...ids], { assigneeId: memberId }).then((res) => {
+      if (!res.ok) toast.error('Failed to save assignment', { description: res.error });
+    });
   }, [updateTasksBulk]);
 
   const bulkSetPriority = useCallback((projectId: string, ids: Set<string>, priority: TaskPriority) => {
     updateTasksBulk(projectId, ids, { priority });
     toast.success(`Priority set to ${PRIORITY_META[priority].label} for ${ids.size} task${ids.size > 1 ? 's' : ''}`);
+    apiBulkAction(projectId, 'priority', [...ids], { priority }).then((res) => {
+      if (!res.ok) toast.error('Failed to save priority change', { description: res.error });
+    });
   }, [updateTasksBulk]);
 
   const bulkComplete = useCallback((projectId: string, ids: Set<string>) => {
     updateTasksBulk(projectId, ids, { status: 'done', progress: 100 });
     toast.success(`Completed ${ids.size} task${ids.size > 1 ? 's' : ''}`);
+    apiBulkAction(projectId, 'complete', [...ids]).then((res) => {
+      if (!res.ok) toast.error('Failed to save completion', { description: res.error });
+    });
   }, [updateTasksBulk]);
 
   const indentSelected = useCallback((projectId: string) => updateTasksBulk(projectId, selectedIds, (t: Task) => ({ level: Math.min(4, (t.level || 0) + 1) })), [selectedIds, updateTasksBulk]);
@@ -882,13 +928,25 @@ export function useFlowDeckStore(): FlowDeckState {
     const task = projectTasks.find(t => t.id === taskId);
     if (!task) return;
     const currentTags = task.tags || [];
-    const newTags = currentTags.includes(tagId)
-      ? currentTags.filter(t => t !== tagId)
-      : [...currentTags, tagId];
+    const isAdding = !currentTags.includes(tagId);
+    const newTags = isAdding
+      ? [...currentTags, tagId]
+      : currentTags.filter(t => t !== tagId);
+    // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, tags: newTags } : t));
     const tagList = tagsByProject[projectId] || [];
     const tag = tagList.find(tg => tg.id === tagId);
-    if (tag) logActivity(projectId, taskId, currentTags.includes(tagId) ? 'tag_removed' : 'tag_added', `Tag "${tag.name}" ${currentTags.includes(tagId) ? 'removed from' : 'added to'} task`);
+    if (tag) logActivity(projectId, taskId, isAdding ? 'tag_added' : 'tag_removed', `Tag "${tag.name}" ${isAdding ? 'added to' : 'removed from'} task`);
+    // Persist to PostgreSQL.
+    if (isAdding) {
+      apiAddTaskTag(taskId, tagId).then((res) => {
+        if (!res.ok) toast.error('Failed to add tag', { description: res.error });
+      });
+    } else {
+      apiRemoveTaskTag(taskId, tagId).then((res) => {
+        if (!res.ok) toast.error('Failed to remove tag', { description: res.error });
+      });
+    }
   }, [tasksByProject, tagsByProject, commit, logActivity]);
 
   /* ---- Reorder ---- */
@@ -922,8 +980,17 @@ export function useFlowDeckStore(): FlowDeckState {
       createdAt: new Date().toISOString(),
     };
     const projectTasks = tasksByProject[projectId] || [];
+    // Optimistic local update.
     commit(projectId, [...projectTasks, newTask]);
     logActivity(projectId, id, 'created', `Task "${newTask.name}" was created`);
+    // Persist to PostgreSQL.
+    apiCreateTask(projectId, {
+      name: name.trim(),
+      status: opts?.status,
+      parentId: opts?.parentId,
+    }).then((res) => {
+      if (!res.ok) toast.error('Failed to create task on server', { description: res.error });
+    });
     return id;
   }, [tasksByProject, commit, logActivity]);
 
@@ -939,38 +1006,51 @@ export function useFlowDeckStore(): FlowDeckState {
       parentId: parentId || null,
       reactions: [],
     };
+    // Optimistic local update.
     setCommentsByProject(prev => ({
       ...prev,
       [projectId]: [...(prev[projectId] || []), comment],
     }));
     const member = TEAM.find(m => m.id === userIdRef.current);
     logActivity(projectId, taskId, 'comment', `${member?.name || 'Someone'} ${parentId ? 'replied' : 'commented'}`);
+    // Persist to PostgreSQL.
+    apiAddComment(projectId, taskId, text.trim(), parentId ?? undefined).then((res) => {
+      if (!res.ok) toast.error('Failed to save comment', { description: res.error });
+    });
   }, [logActivity]);
 
   const deleteComment = useCallback((projectId: string, commentId: string) => {
     if (!projectId) return;
-    /* Also delete replies to this comment */
+    // Optimistic local update.
     setCommentsByProject(prev => {
       const comments = prev[projectId] || [];
       const idsToDelete = new Set<string>();
       idsToDelete.add(commentId);
-      /* Collect all descendant reply IDs (only 1 level deep per spec) */
       comments.forEach(c => { if (c.parentId && idsToDelete.has(c.parentId)) idsToDelete.add(c.id); });
       return {
         ...prev,
         [projectId]: comments.filter(c => !idsToDelete.has(c.id)),
       };
     });
+    // Persist to PostgreSQL.
+    apiDeleteComment(commentId).then((res) => {
+      if (!res.ok) toast.error('Failed to delete comment', { description: res.error });
+    });
   }, []);
 
   const editComment = useCallback((projectId: string, commentId: string, newText: string) => {
     if (!projectId || !newText.trim()) return;
+    // Optimistic local update.
     setCommentsByProject(prev => ({
       ...prev,
       [projectId]: (prev[projectId] || []).map(c =>
         c.id === commentId ? { ...c, text: newText.trim(), edited: true } : c
       ),
     }));
+    // Persist to PostgreSQL.
+    apiEditComment(commentId, newText.trim()).then((res) => {
+      if (!res.ok) toast.error('Failed to edit comment', { description: res.error });
+    });
   }, []);
 
   const toggleReaction = useCallback((projectId: string, commentId: string, emoji: string) => {
@@ -1007,13 +1087,25 @@ export function useFlowDeckStore(): FlowDeckState {
     const task = projectTasks.find(t => t.id === taskId);
     if (!task) return;
     const current = task.followers || [];
-    const newFollowers = current.includes(userId)
+    const isFollowing = current.includes(userId);
+    const newFollowers = isFollowing
       ? current.filter(u => u !== userId)
       : [...current, userId];
+    // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, followers: newFollowers } : t));
     const member = TEAM.find(m => m.id === userId);
     const memberName = member?.name || 'Someone';
-    logActivity(projectId, taskId, 'comment', `${memberName} ${current.includes(userId) ? 'stopped following' : 'is now following'} this task`);
+    logActivity(projectId, taskId, 'comment', `${memberName} ${isFollowing ? 'stopped following' : 'is now following'} this task`);
+    // Persist to PostgreSQL.
+    if (isFollowing) {
+      apiUnfollowTask(taskId).then((res) => {
+        if (!res.ok) toast.error('Failed to unfollow task', { description: res.error });
+      });
+    } else {
+      apiFollowTask(taskId).then((res) => {
+        if (!res.ok) toast.error('Failed to follow task', { description: res.error });
+      });
+    }
   }, [tasksByProject, commit, logActivity]);
 
   /* ---- Time Logs ---- */
@@ -1362,8 +1454,13 @@ export function useFlowDeckStore(): FlowDeckState {
     const id = defaultIdGenerator.generate('sec');
     const currentSections = sectionsByProject[projectId] || [];
     const newSection: Section = { id, projectId, name, position: currentSections.length, collapsed: false };
+    // Optimistic local update.
     setSectionsByProject(prev => ({ ...prev, [projectId]: [...(prev[projectId] || []), newSection] }));
     toast.success('Section added', { description: name });
+    // Persist to PostgreSQL.
+    apiCreateSection(projectId, name).then((res) => {
+      if (!res.ok) toast.error('Failed to create section on server', { description: res.error });
+    });
   }, [sectionsByProject]);
 
   const renameSection = useCallback((projectId: string, sectionId: string, name: string) => {
@@ -1377,12 +1474,17 @@ export function useFlowDeckStore(): FlowDeckState {
   const deleteSection = useCallback((projectId: string, sectionId: string) => {
     if (!projectId) return;
     const projectTasks = tasksByProject[projectId] || [];
+    // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.sectionId === sectionId ? { ...t, sectionId: null } : t));
     setSectionsByProject(prev => ({
       ...prev,
       [projectId]: (prev[projectId] || []).filter(s => s.id !== sectionId),
     }));
     toast.success('Section removed');
+    // Persist to PostgreSQL.
+    apiDeleteSection(projectId, sectionId).then((res) => {
+      if (!res.ok) toast.error('Failed to delete section on server', { description: res.error });
+    });
   }, [tasksByProject, commit]);
 
   const toggleSectionCollapsed = useCallback((projectId: string, sectionId: string) => {
