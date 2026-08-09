@@ -86,9 +86,12 @@ export async function POST(request: Request) {
       select: { id: true, email: true, name: true },
     });
 
-    // TODO (future): generate an email-verification token and send the email.
-    // For now, the VerificationToken model exists in the schema as a
-    // foundation — the send-email step is not yet wired.
+    // Generate + send the email verification token (non-blocking — if the
+    // email fails, registration still succeeds).
+    const { generateAndSendVerification } = await import('@/server/auth/verification.service');
+    await generateAndSendVerification(user.id, email).catch((err) => {
+      console.error('[register] verification email failed:', err);
+    });
 
     await audit({ userId: user.id, action: 'register', ip: clientId, userAgent });
 
