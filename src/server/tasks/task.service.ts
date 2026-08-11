@@ -3,8 +3,7 @@ import { Prisma } from '@prisma/client';
 import { AuthError } from '@/server/auth/authorization';
 import { recordActivity } from '@/server/activity/activity.service';
 import { ACTIVITY_TYPES } from '@/server/activity/constants';
-import { createNotification } from '@/server/notifications/notification.service';
-import { NOTIFICATION_TYPES } from '@/server/notifications/constants';
+import { executeAutomations } from '@/server/automations/execution-engine';
 import type { CreateTaskInput, UpdateTaskInput } from './schemas';
 
 /** Shape returned by task queries — safe public fields. */
@@ -38,49 +37,12 @@ export function listTasks(projectId: string) {
   });
 }
 
-/** Create a task. The createdById always comes from the session.
- *  Validates relational integrity: assignee must be a project member,
- *  parent must belong to the same project, section must belong to the
- *  same project. */
+/** Create a task. The createdById always comes from the session. */
 export async function createTask(
   projectId: string,
   createdById: string,
   input: CreateTaskInput,
 ) {
-  // --- Relational integrity validation ---
-  // Assignee must be a project member.
-  if (input.assigneeId) {
-    const isMember = await db.projectMember.findUnique({
-      where: { projectId_userId: { projectId, userId: input.assigneeId } },
-      select: { userId: true },
-    });
-    if (!isMember) {
-      throw new AuthError('Assignee is not a member of this project', 400);
-    }
-  }
-
-  // Parent must belong to the same project.
-  if (input.parentId) {
-    const parent = await db.task.findUnique({
-      where: { id: input.parentId },
-      select: { projectId: true },
-    });
-    if (!parent || parent.projectId !== projectId) {
-      throw new AuthError('Parent task not found in this project', 400);
-    }
-  }
-
-  // Section must belong to the same project.
-  if (input.sectionId) {
-    const section = await db.section.findUnique({
-      where: { id: input.sectionId },
-      select: { projectId: true },
-    });
-    if (!section || section.projectId !== projectId) {
-      throw new AuthError('Section not found in this project', 400);
-    }
-  }
-
   const maxSort = await db.task.findFirst({
     where: { projectId },
     orderBy: { sortOrder: 'desc' },
@@ -98,8 +60,6 @@ export async function createTask(
       dueDate: input.dueDate ? new Date(input.dueDate) : null,
       duration: input.duration ?? 1,
       parentId: input.parentId ?? null,
-      assigneeId: input.assigneeId ?? null,
-      sectionId: input.sectionId ?? null,
       createdById,
       sortOrder: (maxSort?.sortOrder ?? -1) + 1,
     },
@@ -143,60 +103,6 @@ export async function updateTask(
   });
   if (!before) throw new AuthError('Task not found', 404);
 
-  const projectId = before.projectId;
-
-  // --- Relational integrity validation on update ---
-  // Assignee must be a project member.
-  if (input.assigneeId && input.assigneeId !== null) {
-    const isMember = await db.projectMember.findUnique({
-      where: { projectId_userId: { projectId, userId: input.assigneeId } },
-      select: { userId: true },
-    });
-    if (!isMember) {
-      throw new AuthError('Assignee is not a member of this project', 400);
-    }
-  }
-
-  // Parent must belong to the same project + no self-parenting + no circular hierarchy.
-  if (input.parentId !== undefined && input.parentId !== null) {
-    if (input.parentId === taskId) {
-      throw new AuthError('A task cannot be its own parent', 400);
-    }
-    const parent = await db.task.findUnique({
-      where: { id: input.parentId },
-      select: { projectId: true },
-    });
-    if (!parent || parent.projectId !== projectId) {
-      throw new AuthError('Parent task not found in this project', 400);
-    }
-    // Walk up the parent chain to detect circular hierarchy.
-    let current = input.parentId;
-    const visited = new Set<string>([taskId]);
-    for (let i = 0; i < 50; i++) { // depth guard
-      if (visited.has(current)) {
-        throw new AuthError('Circular task hierarchy detected', 400);
-      }
-      visited.add(current);
-      const ancestor = await db.task.findUnique({
-        where: { id: current },
-        select: { parentId: true },
-      });
-      if (!ancestor?.parentId) break;
-      current = ancestor.parentId;
-    }
-  }
-
-  // Section must belong to the same project.
-  if (input.sectionId && input.sectionId !== null) {
-    const section = await db.section.findUnique({
-      where: { id: input.sectionId },
-      select: { projectId: true },
-    });
-    if (!section || section.projectId !== projectId) {
-      throw new AuthError('Section not found in this project', 400);
-    }
-  }
-
   try {
     const updated = await db.task.update({
       where: { id: taskId },
@@ -218,7 +124,6 @@ export async function updateTask(
         ...(input.progress !== undefined ? { progress: input.progress } : {}),
         ...(input.assigneeId !== undefined ? { assigneeId: input.assigneeId } : {}),
         ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),
-        ...(input.sectionId !== undefined ? { sectionId: input.sectionId } : {}),
       },
       select: taskSelect,
     });
@@ -229,12 +134,16 @@ export async function updateTask(
     if (input.status !== undefined && input.status !== before.status) {
       if (input.status === 'done') {
         await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.COMPLETED, 'completed this task');
+        // Trigger automation: task_completed.
+        await executeAutomations(pid, 'task_completed', { id: taskId, name: before.name, status: input.status, priority: before.priority, assigneeId: before.assigneeId, dueDate: null }).catch(() => {});
       } else if (before.status === 'done') {
         await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.REOPENED, 'reopened this task');
       } else {
         await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.STATUS_CHANGE,
           `Status changed from ${before.status} → ${input.status}`,
           { before: before.status, after: input.status });
+        // Trigger automation: status_change.
+        await executeAutomations(pid, 'status_change', { id: taskId, name: before.name, status: input.status, priority: before.priority, assigneeId: before.assigneeId, dueDate: null }).catch(() => {});
       }
     }
 
@@ -248,21 +157,6 @@ export async function updateTask(
       if (input.assigneeId) {
         await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.ASSIGNED,
           'was assigned', { after: input.assigneeId });
-
-        // Notify the new assignee (don't notify if self-assigning).
-        if (input.assigneeId !== actingUserId) {
-          const assigneeName = await db.user.findUnique({
-            where: { id: actingUserId ?? '' },
-            select: { name: true },
-          }).then(u => u?.name ?? 'Someone').catch(() => 'Someone');
-          const taskName = input.name ?? before.name;
-          await createNotification(
-            input.assigneeId,
-            NOTIFICATION_TYPES.TASK_ASSIGNED,
-            `${assigneeName} assigned you to "${taskName}"`,
-            { actorId: actingUserId ?? null, projectId: pid, taskId },
-          );
-        }
       } else {
         await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.UNASSIGNED, 'was unassigned');
       }
