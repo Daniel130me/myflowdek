@@ -44,6 +44,16 @@ export async function POST(
 
     const { fileName, mimeType, size, r2Key, taskId } = parsed.data;
 
+    // Security: validate that the r2Key belongs to this project.
+    // This prevents a user from claiming an R2 object from another project.
+    const { validateR2KeyForProject } = await import('@/server/files/file.service');
+    if (!validateR2KeyForProject(r2Key, projectId)) {
+      return NextResponse.json(
+        { error: 'Invalid file key for this project' },
+        { status: 400 },
+      );
+    }
+
     // Store only the metadata — the binary is already in R2.
     const file = await createFile(projectId, user.id, {
       name: fileName,

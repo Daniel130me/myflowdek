@@ -1,5 +1,5 @@
 import { db } from '@/server/db/client';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { AuthError } from '@/server/auth/authorization';
 import { sendPasswordResetEmail } from '@/server/email/service';
@@ -12,6 +12,11 @@ import {
 import { BCRYPT_ROUNDS } from '@/lib/auth.constants';
 import { passwordSchema } from '@/lib/password-policy';
 import { audit } from '@/server/audit/log';
+
+/** Hash a token using SHA-256 for secure storage. */
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 /**
  * Password reset service.
@@ -62,18 +67,19 @@ export async function requestPasswordReset(email: string): Promise<void> {
     data: { usedAt: new Date() },
   });
 
-  const token = generateToken();
+  const rawToken = generateToken();
+  const tokenHash = hashToken(rawToken);
 
   await db.verificationToken.create({
     data: {
       userId: user.id,
-      token,
+      token: tokenHash,
       type: TOKEN_TYPES.PASSWORD_RESET,
       expiresAt: expiryDate(),
     },
   });
 
-  await sendPasswordResetEmail(user.email, token, APP_BASE_URL);
+  await sendPasswordResetEmail(user.email, rawToken, APP_BASE_URL);
 }
 
 /**
@@ -94,8 +100,10 @@ export async function resetPassword(token: string, newPassword: string): Promise
     throw new AuthError(parsed.error.issues[0]?.message ?? 'Invalid password', 400);
   }
 
+  const tokenHash = hashToken(token);
+
   const record = await db.verificationToken.findUnique({
-    where: { token },
+    where: { token: tokenHash },
     select: { id: true, userId: true, type: true, usedAt: true, expiresAt: true },
   });
 

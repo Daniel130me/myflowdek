@@ -1,5 +1,5 @@
 import { db } from '@/server/db/client';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { AuthError } from '@/server/auth/authorization';
 import {
   sendVerificationEmail,
@@ -12,23 +12,30 @@ import {
 } from '@/server/email/constants';
 
 /**
- * Email verification service.
- *
- * Generates tokens, sends verification emails, and verifies tokens to mark
- * the user's email as verified.
+ * Email verification service — with hashed token storage.
  *
  * Token lifecycle:
- *   1. Generated on registration (or on resend request)
- *   2. Emailed to the user as a link
- *   3. User clicks the link → POST /api/auth/verify-email
- *   4. Token verified → User.emailVerifiedAt set, token.usedAt set
- *   5. Token expires after VERIFICATION_TOKEN_TTL_HOURS (24h)
+ *   1. Raw token generated (crypto-random hex) → emailed to the user
+ *   2. SHA-256 hash of the token stored in the DB (never store the raw token)
+ *   3. User clicks the link → POST /api/auth/verify-email with the raw token
+ *   4. Server hashes the submitted token and looks up by hash
+ *   5. Token verified → User.emailVerifiedAt set, token.usedAt set
+ *   6. Token expires after VERIFICATION_TOKEN_TTL_HOURS (24h)
+ *
+ * This approach means a DB leak does NOT expose valid tokens — the
+ * attacker would need to reverse the SHA-256 hash.
  */
 
 /** Generate a cryptographically random URL-safe token. */
 function generateToken(): string {
   const bytes = Math.ceil(TOKEN_LENGTH / 2);
   return randomBytes(bytes).toString('hex').slice(0, TOKEN_LENGTH);
+}
+
+/** Hash a token using SHA-256. The hash is stored in the DB; the raw
+ *  token is only ever sent to the user via email. */
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
 }
 
 /** Compute the expiry timestamp (now + TTL). */
@@ -38,9 +45,7 @@ function expiryDate(): Date {
 
 /**
  * Generate a verification token for a user and send the verification email.
- *
- * Invalidates any existing unused PENDING tokens of the same type for this
- * user before creating the new one (prevents token pile-up).
+ * Stores the HASH of the token, not the raw token.
  */
 export async function generateAndSendVerification(
   userId: string,
@@ -56,33 +61,30 @@ export async function generateAndSendVerification(
     data: { usedAt: new Date() },
   });
 
-  const token = generateToken();
+  const rawToken = generateToken();
+  const tokenHash = hashToken(rawToken);
 
   await db.verificationToken.create({
     data: {
       userId,
-      token,
+      token: tokenHash,
       type: TOKEN_TYPES.EMAIL_VERIFICATION,
       expiresAt: expiryDate(),
     },
   });
 
-  await sendVerificationEmail(email, token, APP_BASE_URL);
+  await sendVerificationEmail(email, rawToken, APP_BASE_URL);
 }
 
 /**
- * Verify an email verification token. Sets User.emailVerifiedAt and marks
- * the token as used.
- *
- * Throws AuthError if:
- *   - Token not found (404)
- *   - Token already used (409)
- *   - Token expired (410)
- *   - Token type mismatch (400)
+ * Verify an email verification token. Hashes the submitted token and
+ * looks up by the hash.
  */
 export async function verifyEmail(token: string): Promise<{ ok: true }> {
+  const tokenHash = hashToken(token);
+
   const record = await db.verificationToken.findUnique({
-    where: { token },
+    where: { token: tokenHash },
     include: { user: { select: { id: true, emailVerifiedAt: true } } },
   });
 
