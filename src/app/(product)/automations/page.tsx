@@ -1,21 +1,71 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AutomationsView } from '@/features/flowdeck/components/views';
+import { useAutomations } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { toast } from 'sonner';
+import type { AutomationRule } from '@/features/flowdeck/model';
 
 export default function AutomationsRoutePage() {
   const state = useFlowDeck();
+  const projectId = state.currentProjectId;
+  const { data, loading, refetch } = useAutomations(projectId);
+  const [automations, setAutomations] = useState<AutomationRule[]>([]);
+
+  useEffect(() => {
+    if (data.automations) {
+      setAutomations(data.automations.map((a: any) => ({
+        id: a.id, name: a.name, enabled: a.enabled,
+        trigger: a.trigger, actions: a.actions, createdAt: a.createdAt,
+      })));
+    }
+  }, [data]);
+
+  const handleAdd = useCallback(async (rule: Partial<AutomationRule>) => {
+    if (!projectId) return;
+    try {
+      const res = await fetch(`/api/projects/${projectId}/automations`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: rule.name, trigger: rule.trigger, actions: rule.actions }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success('Automation created');
+      refetch();
+    } catch { toast.error('Failed to create automation'); }
+  }, [projectId, refetch]);
+
+  const handleUpdate = useCallback(async (id: string, patch: Partial<AutomationRule>) => {
+    if (!projectId) return;
+    try {
+      await fetch(`/api/projects/${projectId}/automations/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      refetch();
+    } catch { toast.error('Failed to update automation'); }
+  }, [projectId, refetch]);
+
+  const handleDelete = useCallback(async (id: string) => {
+    if (!projectId) return;
+    try {
+      await fetch(`/api/projects/${projectId}/automations/${id}`, { method: 'DELETE' });
+      toast.success('Automation deleted');
+      refetch();
+    } catch { toast.error('Failed to delete automation'); }
+  }, [projectId, refetch]);
+
+  if (loading) return <div style={{ padding: 40, color: '#9CA3AF' }}>Loading automations…</div>;
 
   return (
     <AutomationsView
-      automations={state.automations}
+      automations={automations}
       projects={state.projects}
       tagsByProject={state.tagsByProject}
-      currentProjectId={state.currentProjectId}
-      onAdd={state.addAutomation}
-      onUpdate={state.updateAutomation}
-      onDelete={state.deleteAutomation}
+      currentProjectId={projectId ?? ''}
+      onAdd={handleAdd as any}
+      onUpdate={handleUpdate}
+      onDelete={handleDelete}
     />
   );
 }
