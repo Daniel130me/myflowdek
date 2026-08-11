@@ -2,6 +2,7 @@
 
 import React, { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react';
 import { Menu, Search, Plus, ChevronDown, SlidersHorizontal, LogOut } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 import { FONT_FAMILY as FF, TEAM, COLORS, CURRENT_USER_ID, teamById, type SearchFilters } from '@/features/flowdeck/model';
 import { Avatar, SearchFilterPanel } from '../ui';
 import { useTheme } from '../../hooks/useTheme';
@@ -139,6 +140,9 @@ export const TopBar = forwardRef<TopBarHandle, {
         }}>
           <Plus size={15} strokeWidth={2} /> {!isMobile && (project ? 'New Task' : 'New Project')}
         </button>
+
+        {/* Notification bell */}
+        <NotificationBell />
 
         {/* User avatar + logout menu */}
         {onLogout && (

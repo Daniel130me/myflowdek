@@ -6,3 +6,4 @@ export { MobileSearchRow } from './MobileSearchRow';
 export { BottomNav } from './BottomNav';
 export { MoreMenu } from './MoreMenu';
 export { WorkspaceSelector } from './WorkspaceSelector';
+export { NotificationBell } from './NotificationBell';
