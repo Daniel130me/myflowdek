@@ -132,6 +132,6 @@
 | 11 | `295ce68` | ✅ done |
 | 12 | `295ce68` | ✅ done |
 | 13 | `295ce68` | ✅ done |
-| 14 | — | pending (existing tests pass, new tests deferred) |
-| 15 | `pending` | ✅ done (file created, couldn't push — PAT lacks workflow scope) |
+| 14 | `7c85988` | ✅ done (19 new integration tests: idempotency, capability matrix, cross-project integrity, persistence, session version) |
+| 15 | `7c85988` | ✅ done (CI workflow file pushed) |
 | 16 | `273b2b4` | ✅ done |
