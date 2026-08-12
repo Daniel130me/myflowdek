@@ -12,10 +12,27 @@ import { processRecurringTasks } from '@/server/tasks/recurrence.service';
  * Security: requires a CRON_SECRET header to prevent unauthorized calls.
  * Set CRON_SECRET in the environment and pass it as the
  * x-cron-secret header when calling this endpoint.
+ *
+ * Fail-closed: in production, if CRON_SECRET is unset, the endpoint refuses
+ * to run (503). A missing secret must NEVER open the door to anonymous
+ * callers — otherwise a misconfigured prod deployment would let anyone
+ * trigger recurrence processing. In non-production (dev/test), the secret
+ * is optional so the route can be exercised locally.
  */
 export async function POST(request: Request) {
-  // Verify the cron secret.
   const cronSecret = process.env.CRON_SECRET;
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // Fail closed: production deployments MUST configure CRON_SECRET.
+  if (isProduction && !cronSecret) {
+    console.error('[cron/recurrence] CRON_SECRET is not set in production — refusing to run');
+    return NextResponse.json(
+      { error: 'Cron secret not configured' },
+      { status: 503 },
+    );
+  }
+
+  // Verify the cron secret (when configured).
   if (cronSecret) {
     const headerSecret = request.headers.get('x-cron-secret');
     if (headerSecret !== cronSecret) {

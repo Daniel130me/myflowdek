@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuthenticatedUser, requireProjectMember, authErrorResponse } from '@/server/auth/authorization';
+import { requireAuthenticatedUser, requireProjectCapability, authErrorResponse } from '@/server/auth/authorization';
 import { db } from '@/server/db/client';
 
 /**
@@ -12,7 +12,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ project
   try {
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'VIEW_PROJECT');
 
     // Group tasks by assignee with counts + total duration.
     const tasks = await db.task.findMany({

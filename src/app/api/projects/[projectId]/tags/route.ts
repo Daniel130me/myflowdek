@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { listTags, createTag } from '@/server/tags/tag.service';
@@ -15,7 +15,7 @@ export async function GET(
   try {
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'VIEW_PROJECT');
     const tags = await listTags(projectId);
     return NextResponse.json({ tags });
   } catch (error) {
@@ -31,7 +31,7 @@ export async function POST(
   try {
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'MANAGE_TAGS');
 
     const body = await request.json().catch(() => null);
     const parsed = upsertTagSchema.safeParse(body);

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireWorkspaceMember,
-  requireWorkspaceRole,
+  requireWorkspaceCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import {
@@ -11,8 +10,6 @@ import {
   deleteWorkspace,
 } from '@/server/workspaces/service';
 import { updateWorkspaceSchema } from '@/server/workspaces/schemas';
-import { WORKSPACE_MANAGER_ROLES, WORKSPACE_OWNER_ROLE } from '@/server/workspaces/constants';
-import type { WorkspaceRole } from '@prisma/client';
 
 /**
  * GET /api/workspaces/:workspaceId
@@ -28,7 +25,7 @@ export async function GET(
     const { workspaceId } = await params;
 
     // Membership check — any role can view.
-    await requireWorkspaceMember(user.id, workspaceId);
+    await requireWorkspaceCapability(user.id, workspaceId, 'VIEW_WORKSPACE');
 
     const workspace = await getWorkspace(workspaceId);
     return NextResponse.json({ workspace });
@@ -51,11 +48,7 @@ export async function PATCH(
     const { workspaceId } = await params;
 
     // Only managers (OWNER, ADMIN) can update workspace settings.
-    await requireWorkspaceRole(
-      user.id,
-      workspaceId,
-      WORKSPACE_MANAGER_ROLES as unknown as WorkspaceRole[],
-    );
+    await requireWorkspaceCapability(user.id, workspaceId, 'MANAGE_WORKSPACE');
 
     const body = await request.json().catch(() => null);
     const parsed = updateWorkspaceSchema.safeParse(body);
@@ -89,9 +82,7 @@ export async function DELETE(
     const { workspaceId } = await params;
 
     // Only the OWNER can delete.
-    await requireWorkspaceRole(user.id, workspaceId, [
-      WORKSPACE_OWNER_ROLE as unknown as WorkspaceRole,
-    ]);
+    await requireWorkspaceCapability(user.id, workspaceId, 'DELETE_WORKSPACE');
 
     await deleteWorkspace(user.id, workspaceId);
     return NextResponse.json({ ok: true });

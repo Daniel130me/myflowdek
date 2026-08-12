@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { checkMutationLimit, RATE_LIMITS } from '@/lib/rate-limit';
@@ -16,7 +16,7 @@ export async function GET(
   try {
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'VIEW_PROJECT');
 
     const url = new URL(request.url);
     const taskId = url.searchParams.get('taskId') ?? undefined;
@@ -40,7 +40,7 @@ export async function POST(
 
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'CREATE_COMMENT');
 
     const body = await request.json().catch(() => null);
     const parsed = createCommentSchema.safeParse(body);

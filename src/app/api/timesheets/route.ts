@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuthenticatedUser, authErrorResponse } from '@/server/auth/authorization';
+import { requireAuthenticatedUser, requireProjectCapability, authErrorResponse } from '@/server/auth/authorization';
 import { listTimesheets, createTimesheet, createTimesheetSchema } from '@/server/timesheets/timesheet.service';
 
 export async function GET(req: Request) {
@@ -24,6 +24,10 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const parsed = createTimesheetSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid' }, { status: 400 });
+
+    // Verify the user is a member of the project they're logging time against.
+    await requireProjectCapability(user.id, parsed.data.projectId, 'VIEW_PROJECT');
+
     const entry = await createTimesheet(user.id, parsed.data);
     return NextResponse.json({ entry }, { status: 201 });
   } catch (e) { return authErrorResponse(e); }

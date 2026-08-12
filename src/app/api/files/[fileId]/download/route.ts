@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { db } from '@/server/db/client';
@@ -32,7 +32,7 @@ export async function GET(
     }
 
     // Verify the caller is a member of the file's project.
-    await requireProjectMember(user.id, file.projectId);
+    await requireProjectCapability(user.id, file.projectId, 'VIEW_PROJECT');
 
     if (!file.r2Key) {
       return NextResponse.json(

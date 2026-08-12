@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
-  requireProjectRole,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import {
@@ -10,8 +9,6 @@ import {
   addProjectMember,
 } from '@/server/projects/project-members.service';
 import { addProjectMemberSchema } from '@/server/projects/project-members.service';
-import { PROJECT_MANAGER_ROLES } from '@/server/projects/constants';
-import type { ProjectRole } from '@prisma/client';
 
 /**
  * GET /api/projects/:projectId/members
@@ -26,7 +23,7 @@ export async function GET(
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
 
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'VIEW_PROJECT');
     const members = await listProjectMembers(projectId);
     return NextResponse.json({ members });
   } catch (error) {
@@ -48,7 +45,7 @@ export async function POST(
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
 
-    await requireProjectRole(user.id, projectId, PROJECT_MANAGER_ROLES as unknown as ProjectRole[]);
+    await requireProjectCapability(user.id, projectId, 'MANAGE_MEMBERS');
 
     const body = await request.json().catch(() => null);
     const parsed = addProjectMemberSchema.safeParse(body);

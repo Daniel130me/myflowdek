@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { getTask } from '@/server/tasks/task.service';
@@ -25,7 +25,7 @@ export async function GET(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'VIEW_PROJECT');
     const dependencies = await listDependencies(taskId);
     return NextResponse.json({ dependencies });
   } catch (error) {
@@ -33,7 +33,11 @@ export async function GET(
   }
 }
 
-/** POST /api/tasks/:taskId/dependencies — add a dependency. */
+/** POST /api/tasks/:taskId/dependencies — add a dependency.
+ *
+ *  The service enforces same-project ownership for dependsOnId (cross-project
+ *  dependencies are rejected) and walks the dependency graph with a DFS to
+ *  reject cycles. */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ taskId: string }> },
@@ -42,7 +46,7 @@ export async function POST(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'MANAGE_DEPENDENCIES');
 
     const body = await request.json().catch(() => null);
     const parsed = addDependencySchema.safeParse(body);
@@ -69,7 +73,7 @@ export async function DELETE(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'MANAGE_DEPENDENCIES');
 
     const url = new URL(request.url);
     const dependsOnId = url.searchParams.get('dependsOnId');

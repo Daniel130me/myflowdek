@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { getTask, updateTask, deleteTask } from '@/server/tasks/task.service';
@@ -16,7 +16,7 @@ export async function GET(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'VIEW_PROJECT');
     return NextResponse.json({ task });
   } catch (error) {
     return authErrorResponse(error);
@@ -32,7 +32,7 @@ export async function PATCH(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'EDIT_TASK');
 
     const body = await request.json().catch(() => null);
     const parsed = updateTaskSchema.safeParse(body);
@@ -59,7 +59,7 @@ export async function DELETE(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'DELETE_TASK');
     await deleteTask(taskId);
     return NextResponse.json({ ok: true });
   } catch (error) {

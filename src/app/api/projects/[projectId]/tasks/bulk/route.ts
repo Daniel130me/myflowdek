@@ -1,14 +1,31 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
-  requireProjectRole,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { checkMutationLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { executeBulkAction, bulkActionSchema } from '@/server/tasks/bulk.service';
-import { PROJECT_MANAGER_ROLES } from '@/server/projects/constants';
-import type { ProjectRole } from '@prisma/client';
+import type { ProjectCapability } from '@/server/auth/capabilities';
+
+/**
+ * Map each bulk action type to the project capability it requires.
+ *
+ * Destructive actions (delete) require DELETE_TASK. Move requires both
+ * EDIT_TASK on the source and CREATE_TASK on the target. Tag operations
+ * require MANAGE_TAGS. Field updates use EDIT_TASK.
+ */
+const BULK_ACTION_CAPABILITY: Record<string, ProjectCapability> = {
+  status: 'EDIT_TASK',
+  priority: 'EDIT_TASK',
+  assignee: 'EDIT_TASK',
+  dueDate: 'EDIT_TASK',
+  complete: 'EDIT_TASK',
+  delete: 'DELETE_TASK',
+  move: 'EDIT_TASK',
+  addTag: 'MANAGE_TAGS',
+  removeTag: 'MANAGE_TAGS',
+};
 
 /**
  * POST /api/projects/:projectId/tasks/bulk
@@ -16,14 +33,8 @@ import type { ProjectRole } from '@prisma/client';
  * Execute a bulk action on multiple tasks at once. All operations run inside
  * a single database transaction (all-or-nothing).
  *
- * Actions that require manager role (OWNER/ADMIN):
- *   - delete, move
- *
- * Actions any member can perform:
- *   - status, priority, assignee, dueDate, complete, addTag, removeTag
- *
- * The route validates the action shape with a discriminated-union Zod schema
- * so each action type is type-safe.
+ * Authorization is enforced through the centralized capability matrix:
+ * each action type maps to a specific project capability.
  */
 export async function POST(
   request: Request,
@@ -47,22 +58,16 @@ export async function POST(
     }
 
     const action = parsed.data;
-
-    // Destructive actions require manager role.
-    if (action.action === 'delete' || action.action === 'move') {
-      await requireProjectRole(
-        user.id,
-        projectId,
-        PROJECT_MANAGER_ROLES as unknown as ProjectRole[],
-      );
-    } else {
-      // Non-destructive actions just require membership.
-      await requireProjectMember(user.id, projectId);
+    const capability = BULK_ACTION_CAPABILITY[action.action];
+    if (!capability) {
+      return NextResponse.json({ error: 'Unknown bulk action' }, { status: 400 });
     }
+    await requireProjectCapability(user.id, projectId, capability);
 
-    // For move, the caller must also be a member of the target project.
+    // For move, the caller must also be allowed to create tasks in the
+    // target project (membership + CREATE_TASK capability).
     if (action.action === 'move') {
-      await requireProjectMember(user.id, action.targetProjectId);
+      await requireProjectCapability(user.id, action.targetProjectId, 'CREATE_TASK');
     }
 
     const result = await executeBulkAction(projectId, action);

@@ -47,6 +47,14 @@ export const PROJECT_PERMISSIONS = {
   DELETE_FILES: ['OWNER', 'ADMIN'] as ProjectRole[],
   /** Bulk operations on tasks. */
   BULK_OPERATIONS: ['OWNER', 'ADMIN', 'MEMBER'] as ProjectRole[],
+  /** Manage custom fields on a project (create/update/delete field definitions). */
+  MANAGE_CUSTOM_FIELDS: ['OWNER', 'ADMIN'] as ProjectRole[],
+  /** Post/delete project status updates (standup-style posts). */
+  MANAGE_STATUS_UPDATES: ['OWNER', 'ADMIN', 'MEMBER'] as ProjectRole[],
+  /** Add/remove task dependencies (blocking relationships). */
+  MANAGE_DEPENDENCIES: ['OWNER', 'ADMIN', 'MEMBER'] as ProjectRole[],
+  /** Approve submitted timesheet entries. */
+  APPROVE_TIMESHEETS: ['OWNER', 'ADMIN'] as ProjectRole[],
 } as const;
 
 export type ProjectCapability = keyof typeof PROJECT_PERMISSIONS;

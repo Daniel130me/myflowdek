@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { Project } from '@/features/flowdeck/model';
+import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 
 /** Shape returned by GET /api/workspaces/:id/projects. */
 interface ApiProject {
@@ -20,7 +21,7 @@ interface ApiProject {
 }
 
 /** Map the API project shape to the frontend Project type. */
-function mapProject(api: ApiProject): Project {
+export function mapProject(api: ApiProject): Project {
   return {
     id: api.id,
     name: api.name,
@@ -34,16 +35,19 @@ function mapProject(api: ApiProject): Project {
 }
 
 /**
- * Hook that fetches projects for a workspace from the API.
+ * Hook that fetches projects for a workspace from the API and syncs the
+ * results into the shared Zustand store (`syncProjects`).
  *
- * Returns `{ projects, loading, error, refetch, createProject }`.
- * The `projects` value is a Record keyed by project ID (matching the shape
- * the PortfolioView expects).
+ * Phase 8 (item 26): every consumer reads projects from the store, so the
+ * sidebar/portfolio/task-detail panels all stay in sync. Returns a local
+ * `projects` copy too, for callers that still read directly (e.g. the
+ * portfolio page).
  */
 export function useProjects(workspaceId: string | null) {
   const [projects, setProjects] = useState<Record<string, Project>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { syncProjects, upsertProject } = useFlowDeck();
 
   const refetch = useCallback(async () => {
     if (!workspaceId) return;
@@ -58,18 +62,21 @@ export function useProjects(workspaceId: string | null) {
         mapped[p.id] = mapProject(p);
       }
       setProjects(mapped);
+      // Sync the API results into the shared store so every consumer (sidebar,
+      // portfolio, project layout) sees real data instead of the mock seed.
+      syncProjects(workspaceId, mapped);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, [workspaceId]);
+  }, [workspaceId, syncProjects]);
 
   useEffect(() => {
     refetch();
   }, [refetch]);
 
-  /** Create a new project via the API and add it to the local state. */
+  /** Create a new project via the API and add it to the local + shared store. */
   const createProject = useCallback(
     async (input: { name: string; description?: string; color?: string }) => {
       if (!workspaceId) return null;
@@ -85,9 +92,10 @@ export function useProjects(workspaceId: string | null) {
       const data = await res.json();
       const mapped = mapProject(data.project as ApiProject);
       setProjects((prev) => ({ ...prev, [mapped.id]: mapped }));
+      upsertProject(mapped);
       return mapped;
     },
-    [workspaceId],
+    [workspaceId, upsertProject],
   );
 
   return { projects, loading, error, refetch, createProject };

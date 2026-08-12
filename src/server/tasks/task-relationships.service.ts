@@ -44,6 +44,15 @@ export async function listBlockedBy(taskId: string) {
  *
  * Circular example that must be rejected:
  *   A depends on B, B depends on C, C depends on A
+ *
+ * Cycle detection uses an explicit-stack DFS that explores ALL branches of
+ * the dependency graph (not just the first outgoing edge). A visited set
+ * guards against re-visiting nodes. If the proposed dependency would
+ * introduce a path from `dependsOnId` back to `taskId`, it's rejected.
+ *
+ * Branching regression case (must be rejected):
+ *   B→C, B→D, D→A. Attempting A→B would close the cycle
+ *   A→B→D→A even though the first branch (B→C) is acyclic.
  */
 export async function addDependency(taskId: string, dependsOnId: string) {
   if (taskId === dependsOnId) {
@@ -61,31 +70,49 @@ export async function addDependency(taskId: string, dependsOnId: string) {
     throw new AuthError('Cross-project dependencies are not allowed', 400);
   }
 
-  // Walk the dependency chain from dependsOnId to detect cycles.
-  // If we encounter taskId while walking, the dependency would create a cycle.
+  // Detect cycles by walking the dependency graph from `dependsOnId` using a
+  // DFS with an explicit stack. We explore ALL outgoing edges — the previous
+  // implementation only followed deps[0] and could miss cycles that close
+  // through a non-first branch (see the branching regression test).
+  //
+  // The visited set is seeded with `taskId`: if we ever encounter `taskId`
+  // again while walking, the proposed dependency would close a cycle.
   const visited = new Set<string>([taskId]);
-  let current = dependsOnId;
-  for (let i = 0; i < 100; i++) { // depth guard — max 100 levels
-    if (visited.has(current)) {
+  const stack: string[] = [dependsOnId];
+  // Depth guard: bound the traversal to avoid pathological cases. Each edge
+  // is visited at most once (because of `visited`), so this is a safety net
+  // against a maliciously-large or corrupted graph.
+  const MAX_VISITS = 10_000;
+  let visits = 0;
+
+  while (stack.length > 0) {
+    if (visits++ > MAX_VISITS) {
+      throw new AuthError('Dependency graph too large to validate', 400);
+    }
+    const current = stack.pop()!;
+
+    // If we've reached `taskId`, the proposed edge closes a cycle.
+    if (current === taskId) {
       throw new AuthError('Circular dependency detected — this would create a cycle', 400);
     }
+    // Skip already-explored nodes — their outgoing edges are already on the
+    // stack (or have been processed).
+    if (visited.has(current)) continue;
     visited.add(current);
-    // Find what `current` depends on (its outgoing edges).
+
+    // Push every outgoing edge onto the stack so all branches are explored.
     const deps = await db.taskDependency.findMany({
       where: { taskId: current },
       select: { dependsOnId: true },
     });
-    if (deps.length === 0) break;
-    // For simplicity, check all branches. If any branch leads back to taskId,
-    // it's a cycle. For a linear chain (common case) there's only one dep.
-    let foundCycle = false;
     for (const dep of deps) {
-      if (visited.has(dep.dependsOnId)) {
+      if (!visited.has(dep.dependsOnId)) {
+        stack.push(dep.dependsOnId);
+      } else if (dep.dependsOnId === taskId) {
+        // Direct edge back to taskId — cycle closed.
         throw new AuthError('Circular dependency detected — this would create a cycle', 400);
       }
     }
-    // Follow the first branch (for multi-branch, the visited set catches cycles).
-    current = deps[0].dependsOnId;
   }
 
   try {

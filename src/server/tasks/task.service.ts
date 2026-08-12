@@ -5,7 +5,32 @@ import { recordActivity } from '@/server/activity/activity.service';
 import { ACTIVITY_TYPES } from '@/server/activity/constants';
 import { createNotification } from '@/server/notifications/notification.service';
 import { NOTIFICATION_TYPES } from '@/server/notifications/constants';
+import { executeAutomations } from '@/server/automations/execution-engine';
 import type { CreateTaskInput, UpdateTaskInput } from './schemas';
+
+/**
+ * Fire-and-forget automation execution helper.
+ *
+ * Automations run AFTER the mutation has been committed. They must NEVER roll
+ * back the mutation, so we swallow any rejection into a console log. The
+ * `void` keyword marks the returned Promise as intentionally un-awaited.
+ */
+function fireAutomations(
+  projectId: string,
+  trigger: string,
+  task: {
+    id: string;
+    name: string;
+    status: string;
+    priority: string;
+    assigneeId: string | null;
+    dueDate: Date | null;
+  },
+): void {
+  void executeAutomations(projectId, trigger, task).catch((err) => {
+    console.error(`[automations] ${trigger} trigger failed for task ${task.id}:`, err);
+  });
+}
 
 /** Shape returned by task queries — safe public fields. */
 const taskSelect = {
@@ -114,6 +139,16 @@ export async function createTask(
     ACTIVITY_TYPES.CREATED,
     'created this task',
   );
+
+  // Fire task_created automations (non-blocking, never rolls back the create).
+  fireAutomations(projectId, 'task_created', {
+    id: task.id,
+    name: task.name,
+    status: task.status,
+    priority: task.priority,
+    assigneeId: task.assigneeId,
+    dueDate: task.dueDate,
+  });
 
   return task;
 }
@@ -282,6 +317,57 @@ export async function updateTask(
       await recordActivity(taskId, pid, actingUserId ?? null, ACTIVITY_TYPES.NAME_CHANGE,
         `Renamed from "${before.name}" to "${input.name}"`,
         { before: before.name, after: input.name });
+    }
+
+    // Fire automation triggers for the changes that have dedicated rules.
+    // Each trigger only fires when the corresponding field actually changed,
+    // and only AFTER the mutation + activity log have committed. Automations
+    // are non-blocking and never roll back the mutation.
+    if (input.status !== undefined && input.status !== before.status) {
+      // The engine's status_change rules compare trigger.value against the
+      // task's NEW status, so we pass the post-update state.
+      fireAutomations(pid, 'status_change', {
+        id: updated.id,
+        name: updated.name,
+        status: updated.status,
+        priority: updated.priority,
+        assigneeId: updated.assigneeId,
+        dueDate: updated.dueDate,
+      });
+      // task_completed is a dedicated trigger fired only when transitioning
+      // INTO the 'done' status (not when re-opening).
+      if (input.status === 'done') {
+        fireAutomations(pid, 'task_completed', {
+          id: updated.id,
+          name: updated.name,
+          status: updated.status,
+          priority: updated.priority,
+          assigneeId: updated.assigneeId,
+          dueDate: updated.dueDate,
+        });
+      }
+    }
+
+    if (input.priority !== undefined && input.priority !== before.priority) {
+      fireAutomations(pid, 'priority_change', {
+        id: updated.id,
+        name: updated.name,
+        status: updated.status,
+        priority: updated.priority,
+        assigneeId: updated.assigneeId,
+        dueDate: updated.dueDate,
+      });
+    }
+
+    if (input.assigneeId !== undefined && input.assigneeId !== before.assigneeId) {
+      fireAutomations(pid, 'assignee_change', {
+        id: updated.id,
+        name: updated.name,
+        status: updated.status,
+        priority: updated.priority,
+        assigneeId: updated.assigneeId,
+        dueDate: updated.dueDate,
+      });
     }
 
     return updated;

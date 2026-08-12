@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectRole,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { restoreProject } from '@/server/projects/project.service';
-import { PROJECT_MANAGER_ROLES } from '@/server/projects/constants';
-import type { ProjectRole } from '@prisma/client';
 
 /**
  * POST /api/projects/:projectId/restore
@@ -21,7 +19,7 @@ export async function POST(
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
 
-    await requireProjectRole(user.id, projectId, PROJECT_MANAGER_ROLES as unknown as ProjectRole[]);
+    await requireProjectCapability(user.id, projectId, 'MANAGE_PROJECT');
     const project = await restoreProject(projectId);
     return NextResponse.json({ project });
   } catch (error) {

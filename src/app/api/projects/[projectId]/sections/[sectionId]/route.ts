@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import {
@@ -9,6 +9,23 @@ import {
   deleteSection,
 } from '@/server/sections/section.service';
 import { updateSectionSchema } from '@/server/sections/section.service';
+import { db } from '@/server/db/client';
+
+/**
+ * Verify the section belongs to the project in the URL — prevents IDOR where
+ * a member of project A could mutate a section in project B by guessing the
+ * sectionId. Returns 404 if the section is missing or mismatched.
+ */
+async function verifySectionInProject(
+  sectionId: string,
+  projectId: string,
+): Promise<boolean> {
+  const section = await db.section.findUnique({
+    where: { id: sectionId },
+    select: { projectId: true },
+  });
+  return !!section && section.projectId === projectId;
+}
 
 /** PATCH /api/projects/:projectId/sections/:sectionId — update a section. */
 export async function PATCH(
@@ -18,7 +35,11 @@ export async function PATCH(
   try {
     const user = await requireAuthenticatedUser();
     const { projectId, sectionId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'MANAGE_SECTIONS');
+
+    if (!(await verifySectionInProject(sectionId, projectId))) {
+      return NextResponse.json({ error: 'Section not found' }, { status: 404 });
+    }
 
     const body = await request.json().catch(() => null);
     const parsed = updateSectionSchema.safeParse(body);
@@ -44,7 +65,11 @@ export async function DELETE(
   try {
     const user = await requireAuthenticatedUser();
     const { projectId, sectionId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'MANAGE_SECTIONS');
+
+    if (!(await verifySectionInProject(sectionId, projectId))) {
+      return NextResponse.json({ error: 'Section not found' }, { status: 404 });
+    }
 
     await deleteSection(sectionId);
     return NextResponse.json({ ok: true });

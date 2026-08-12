@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { checkMutationLimit, RATE_LIMITS } from '@/lib/rate-limit';
@@ -16,7 +16,7 @@ export async function GET(
   try {
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'VIEW_PROJECT');
     const tasks = await listTasks(projectId);
     return NextResponse.json({ tasks });
   } catch (error) {
@@ -36,7 +36,7 @@ export async function POST(
 
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'CREATE_TASK');
 
     const body = await request.json().catch(() => null);
     const parsed = createTaskSchema.safeParse(body);

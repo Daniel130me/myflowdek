@@ -16,7 +16,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
   try {
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectCapability(user.id, projectId, 'CREATE_COMMENT');
+    await requireProjectCapability(user.id, projectId, 'MANAGE_STATUS_UPDATES');
     const body = await req.json().catch(() => null);
     const parsed = createStatusUpdateSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid' }, { status: 400 });

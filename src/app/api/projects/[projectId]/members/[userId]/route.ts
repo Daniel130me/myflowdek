@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
-  requireProjectRole,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import {
@@ -10,8 +9,6 @@ import {
   removeProjectMember,
   updateProjectMemberRoleSchema,
 } from '@/server/projects/project-members.service';
-import { PROJECT_MANAGER_ROLES } from '@/server/projects/constants';
-import type { ProjectRole } from '@prisma/client';
 
 /**
  * PATCH /api/projects/:projectId/members/:userId
@@ -27,7 +24,7 @@ export async function PATCH(
     const user = await requireAuthenticatedUser();
     const { projectId, userId: targetUserId } = await params;
 
-    await requireProjectRole(user.id, projectId, PROJECT_MANAGER_ROLES as unknown as ProjectRole[]);
+    await requireProjectCapability(user.id, projectId, 'MANAGE_MEMBERS');
 
     const body = await request.json().catch(() => null);
     const parsed = updateProjectMemberRoleSchema.safeParse(body);
@@ -64,10 +61,10 @@ export async function DELETE(
 
     if (isSelf) {
       // Leaving — any member can remove themselves.
-      await requireProjectMember(user.id, projectId);
+      await requireProjectCapability(user.id, projectId, 'VIEW_PROJECT');
     } else {
       // Removing someone else requires manager role.
-      await requireProjectRole(user.id, projectId, PROJECT_MANAGER_ROLES as unknown as ProjectRole[]);
+      await requireProjectCapability(user.id, projectId, 'MANAGE_MEMBERS');
     }
 
     await removeProjectMember(projectId, targetUserId);

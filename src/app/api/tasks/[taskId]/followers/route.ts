@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { getTask } from '@/server/tasks/task.service';
@@ -20,7 +20,7 @@ export async function GET(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'VIEW_PROJECT');
     const followers = await listFollowers(taskId);
     return NextResponse.json({ followers });
   } catch (error) {
@@ -28,7 +28,9 @@ export async function GET(
   }
 }
 
-/** POST /api/tasks/:taskId/followers — follow a task (self). */
+/** POST /api/tasks/:taskId/followers — follow a task (self).
+ *  Following is a self-action — any project member (VIEW_PROJECT) can follow
+ *  a task they can see. */
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ taskId: string }> },
@@ -37,7 +39,7 @@ export async function POST(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'VIEW_PROJECT');
 
     const follower = await addFollower(taskId, user.id);
     // Idempotent: if already following, follower is null → return success.
@@ -59,7 +61,7 @@ export async function DELETE(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'VIEW_PROJECT');
 
     await removeFollower(taskId, user.id);
     return NextResponse.json({ ok: true });

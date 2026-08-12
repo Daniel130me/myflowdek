@@ -40,3 +40,5 @@ next-env.d.ts
 /download/
 
 /legacy/data/*.db
+skills/
+myflowdek/

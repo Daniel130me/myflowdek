@@ -61,10 +61,11 @@ export default function TaskDetailRoutePage() {
 
   const taskComments = projectComments.filter(comment => comment.taskId === taskId);
 
-  // Use API activity if available, fall back to mock store.
-  const taskActivity = apiActivity.length > 0
-    ? apiActivity
-    : (state.activityByProject[projectId] ?? []).filter(a => a.taskId === taskId);
+  // Activity comes exclusively from the API. The previous mock-store fallback
+  // (state.activityByProject) is intentionally removed — when the API returns
+  // no activity we want to show "No activity recorded yet" instead of fake
+  // demo entries that drift out of sync with the server's audit trail.
+  const taskActivity = apiActivity;
 
   const taskTimeLogs = projectTimeLogs.filter(log => log.taskId === taskId);
 

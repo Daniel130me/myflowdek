@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { getTask } from '@/server/tasks/task.service';
@@ -21,7 +21,7 @@ export async function GET(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'VIEW_PROJECT');
 
     const activity = await listActivityForTask(taskId);
     return NextResponse.json({ activity });

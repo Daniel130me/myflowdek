@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { createFile } from '@/server/files/file.service';
@@ -31,7 +31,7 @@ export async function POST(
   try {
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'UPLOAD_FILES');
 
     const body = await request.json().catch(() => null);
     const parsed = confirmSchema.safeParse(body);

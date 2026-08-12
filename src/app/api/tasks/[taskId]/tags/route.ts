@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { getTask } from '@/server/tasks/task.service';
@@ -25,7 +25,7 @@ export async function GET(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'VIEW_PROJECT');
     const tags = await listTaskTags(taskId);
     return NextResponse.json({ tags });
   } catch (error) {
@@ -42,7 +42,7 @@ export async function POST(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'MANAGE_TAGS');
 
     const body = await request.json().catch(() => null);
     const parsed = addTagSchema.safeParse(body);
@@ -69,7 +69,7 @@ export async function DELETE(
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
     const task = await getTask(taskId);
-    await requireProjectMember(user.id, task.projectId);
+    await requireProjectCapability(user.id, task.projectId, 'MANAGE_TAGS');
 
     const url = new URL(request.url);
     const tagId = url.searchParams.get('tagId');

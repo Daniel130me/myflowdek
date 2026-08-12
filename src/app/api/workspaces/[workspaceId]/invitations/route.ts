@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireWorkspaceRole,
+  requireWorkspaceCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import {
@@ -9,8 +9,6 @@ import {
   listInvitations,
 } from '@/server/invitations/service';
 import { createInvitationSchema } from '@/server/invitations/schemas';
-import { INVITATION_ISSUER_ROLES } from '@/server/invitations/constants';
-import type { WorkspaceRole } from '@prisma/client';
 
 /**
  * GET /api/workspaces/:workspaceId/invitations
@@ -25,11 +23,7 @@ export async function GET(
     const user = await requireAuthenticatedUser();
     const { workspaceId } = await params;
 
-    await requireWorkspaceRole(
-      user.id,
-      workspaceId,
-      INVITATION_ISSUER_ROLES as unknown as WorkspaceRole[],
-    );
+    await requireWorkspaceCapability(user.id, workspaceId, 'INVITE_MEMBERS');
 
     const invitations = await listInvitations(workspaceId);
     return NextResponse.json({ invitations });
@@ -53,11 +47,7 @@ export async function POST(
     const user = await requireAuthenticatedUser();
     const { workspaceId } = await params;
 
-    await requireWorkspaceRole(
-      user.id,
-      workspaceId,
-      INVITATION_ISSUER_ROLES as unknown as WorkspaceRole[],
-    );
+    await requireWorkspaceCapability(user.id, workspaceId, 'INVITE_MEMBERS');
 
     const body = await request.json().catch(() => null);
     const parsed = createInvitationSchema.safeParse(body);

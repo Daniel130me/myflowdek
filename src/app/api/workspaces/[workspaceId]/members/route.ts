@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireWorkspaceMember,
+  requireWorkspaceCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { listWorkspaceMembers } from '@/server/workspaces/member-service';
@@ -20,7 +20,7 @@ export async function GET(
     const { workspaceId } = await params;
 
     // Any member can view the list.
-    await requireWorkspaceMember(user.id, workspaceId);
+    await requireWorkspaceCapability(user.id, workspaceId, 'VIEW_WORKSPACE');
 
     const members = await listWorkspaceMembers(workspaceId);
     return NextResponse.json({ members });

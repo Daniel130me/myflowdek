@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { listFiles, createFile } from '@/server/files/file.service';
@@ -15,7 +15,7 @@ export async function GET(
   try {
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'VIEW_PROJECT');
     const files = await listFiles(projectId);
     return NextResponse.json({ files });
   } catch (error) {
@@ -31,7 +31,7 @@ export async function POST(
   try {
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'UPLOAD_FILES');
 
     const body = await request.json().catch(() => null);
     const parsed = createFileSchema.safeParse(body);

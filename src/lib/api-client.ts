@@ -6,7 +6,9 @@
  * calls these functions to persist to PostgreSQL. On failure, the store
  * can rollback + show an error toast.
  *
- * All functions return a Promise<{ ok: boolean; error?: string }>.
+ * Functions that create server-owned records return the parsed JSON body so
+ * the store can reconcile the optimistic temp id with the canonical server
+ * id. Read-only mutations return `{ ok, error }`.
  */
 
 /** Generic fetch wrapper that returns { ok, error } instead of throwing. */
@@ -21,6 +23,27 @@ async function apiCall(
       return { ok: false, error: data.error ?? `HTTP ${res.status}` };
     }
     return { ok: true };
+  } catch {
+    return { ok: false, error: 'Network error' };
+  }
+}
+
+/**
+ * Like `apiCall`, but parses + returns the JSON body on success. Used by
+ * endpoints that return a newly-created record (e.g. POST /api/projects/:id/tasks)
+ * so the store can reconcile optimistic temp ids with server ids.
+ */
+async function apiCallWithData<T = unknown>(
+  url: string,
+  options?: RequestInit,
+): Promise<{ ok: boolean; error?: string; data?: T }> {
+  try {
+    const res = await fetch(url, options);
+    const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+    if (!res.ok) {
+      return { ok: false, error: (data as { error?: string }).error ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, data };
   } catch {
     return { ok: false, error: 'Network error' };
   }
@@ -46,9 +69,31 @@ export function apiDeleteTask(taskId: string) {
   return apiCall(`/api/tasks/${taskId}`, { method: 'DELETE' });
 }
 
-/** POST /api/projects/:projectId/tasks — create a task. */
-export function apiCreateTask(projectId: string, input: { name: string; status?: string; priority?: string; assigneeId?: string; parentId?: string | null; sectionId?: string | null }) {
-  return apiCall(`/api/projects/${projectId}/tasks`, json('POST', input));
+/**
+ * POST /api/projects/:projectId/tasks — create a task.
+ *
+ * Returns the server-created task so the store can replace the optimistic
+ * temp id with the canonical server id.
+ */
+export function apiCreateTask(
+  projectId: string,
+  input: {
+    name: string;
+    description?: string;
+    status?: string;
+    priority?: string;
+    assigneeId?: string;
+    parentId?: string | null;
+    sectionId?: string | null;
+    dueDate?: string | null;
+    startDate?: string | null;
+    duration?: number;
+  },
+) {
+  return apiCallWithData<{ task: { id: string; [key: string]: unknown } }>(
+    `/api/projects/${projectId}/tasks`,
+    json('POST', input),
+  );
 }
 
 /** POST /api/projects/:projectId/tasks/bulk — bulk operation. */
@@ -56,11 +101,40 @@ export function apiBulkAction(projectId: string, action: string, taskIds: string
   return apiCall(`/api/projects/${projectId}/tasks/bulk`, json('POST', { action, taskIds, ...extra }));
 }
 
+/* -------------------------- Dependency mutations ------------------------- */
+
+/** POST /api/tasks/:taskId/dependencies — add a blocking dependency. */
+export function apiAddDependency(taskId: string, dependsOnId: string) {
+  return apiCall(`/api/tasks/${taskId}/dependencies`, json('POST', { dependsOnId }));
+}
+
+/** DELETE /api/tasks/:taskId/dependencies?dependsOnId=xxx — remove a dep. */
+export function apiRemoveDependency(taskId: string, dependsOnId: string) {
+  return apiCall(
+    `/api/tasks/${taskId}/dependencies?dependsOnId=${encodeURIComponent(dependsOnId)}`,
+    { method: 'DELETE' },
+  );
+}
+
 /* --------------------------- Comment mutations --------------------------- */
 
-/** POST /api/projects/:projectId/comments — add a comment. */
-export function apiAddComment(projectId: string, taskId: string, text: string, parentId?: string) {
-  return apiCall(`/api/projects/${projectId}/comments`, json('POST', { taskId, text, parentId }));
+/**
+ * POST /api/projects/:projectId/comments — add a comment.
+ *
+ * Returns the server-created comment so the store can reconcile the temp id
+ * with the canonical server id (item 55: preserve parentId, editedAt,
+ * reactions when mapping the response).
+ */
+export function apiAddComment(
+  projectId: string,
+  taskId: string,
+  text: string,
+  parentId?: string,
+) {
+  return apiCallWithData<{ comment: { id: string; [key: string]: unknown } }>(
+    `/api/projects/${projectId}/comments`,
+    json('POST', { taskId, text, parentId }),
+  );
 }
 
 /** PATCH /api/comments/:commentId — edit a comment. */
@@ -117,4 +191,26 @@ export function apiCreateSection(projectId: string, name: string) {
 /** DELETE /api/projects/:projectId/sections/:sectionId — delete a section. */
 export function apiDeleteSection(projectId: string, sectionId: string) {
   return apiCall(`/api/projects/${projectId}/sections/${sectionId}`, { method: 'DELETE' });
+}
+
+/* --------------------------- Time-log mutations ------------------------- */
+
+/**
+ * POST /api/tasks/:taskId/time-logs — log time on a task.
+ *
+ * Returns the server-created time-log so the store can reconcile the temp id.
+ */
+export function apiAddTimeLog(
+  taskId: string,
+  input: { minutes: number; note?: string; loggedAt?: string },
+) {
+  return apiCallWithData<{ timeLog: { id: string; [key: string]: unknown } }>(
+    `/api/tasks/${taskId}/time-logs`,
+    json('POST', input),
+  );
+}
+
+/** DELETE /api/tasks/:taskId/time-logs/:logId — delete a time-log entry. */
+export function apiDeleteTimeLog(taskId: string, logId: string) {
+  return apiCall(`/api/tasks/${taskId}/time-logs/${logId}`, { method: 'DELETE' });
 }

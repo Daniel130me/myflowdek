@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireWorkspaceMember,
+  requireWorkspaceCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import {
@@ -9,8 +9,6 @@ import {
   listProjectsForUser,
 } from '@/server/projects/project.service';
 import { createProjectSchema } from '@/server/projects/schemas';
-import { PROJECT_CREATOR_WORKSPACE_ROLES } from '@/server/projects/constants';
-import type { WorkspaceRole } from '@prisma/client';
 
 /**
  * GET /api/workspaces/:workspaceId/projects
@@ -28,7 +26,7 @@ export async function GET(
     const { workspaceId } = await params;
 
     // Any workspace member can view projects.
-    await requireWorkspaceMember(user.id, workspaceId);
+    await requireWorkspaceCapability(user.id, workspaceId, 'VIEW_WORKSPACE');
 
     const url = new URL(request.url);
     const includeArchived = url.searchParams.get('includeArchived') === 'true';
@@ -56,7 +54,7 @@ export async function POST(
     const { workspaceId } = await params;
 
     // Only workspace OWNER/ADMIN/MEMBER can create projects.
-    await requireWorkspaceMember(user.id, workspaceId);
+    await requireWorkspaceCapability(user.id, workspaceId, 'CREATE_PROJECT');
 
     const body = await request.json().catch(() => null);
     const parsed = createProjectSchema.safeParse(body);

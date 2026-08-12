@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import {
@@ -18,7 +18,7 @@ export async function GET(
   try {
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'VIEW_PROJECT');
     const sections = await listSections(projectId);
     return NextResponse.json({ sections });
   } catch (error) {
@@ -34,7 +34,7 @@ export async function POST(
   try {
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'MANAGE_SECTIONS');
 
     const body = await request.json().catch(() => null);
     const parsed = createSectionSchema.safeParse(body);

@@ -31,6 +31,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ projec
     const user = await requireAuthenticatedUser();
     const { projectId, formId } = await params;
     await requireProjectCapability(user.id, projectId, 'MANAGE_FORMS');
+
+    // IDOR guard: verify the form belongs to this project before mutating.
+    const existing = await db.form.findUnique({ where: { id: formId }, select: { projectId: true } });
+    if (!existing || existing.projectId !== projectId) {
+      return NextResponse.json({ error: 'Form not found' }, { status: 404 });
+    }
+
     const body = await req.json().catch(() => null);
     const parsed = updateFormSchema.safeParse(body);
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid' }, { status: 400 });
@@ -44,6 +51,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ proj
     const user = await requireAuthenticatedUser();
     const { projectId, formId } = await params;
     await requireProjectCapability(user.id, projectId, 'MANAGE_FORMS');
+
+    // IDOR guard: verify the form belongs to this project before deleting.
+    const existing = await db.form.findUnique({ where: { id: formId }, select: { projectId: true } });
+    if (!existing || existing.projectId !== projectId) {
+      return NextResponse.json({ error: 'Form not found' }, { status: 404 });
+    }
+
     await deleteForm(formId);
     return NextResponse.json({ ok: true });
   } catch (e) { return authErrorResponse(e); }

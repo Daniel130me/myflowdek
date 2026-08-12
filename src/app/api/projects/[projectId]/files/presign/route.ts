@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { generatePresignedUploadUrl, buildR2Key } from '@/server/files/r2.service';
@@ -22,7 +22,8 @@ const presignSchema = z.object({
  * Request a presigned R2 upload URL. The browser will upload the file
  * directly to R2 using this URL, then call /confirm to store the metadata.
  *
- * Flowdek verifies project membership before issuing the URL.
+ * Flowdek verifies project membership + upload capability before issuing
+ * the URL.
  */
 export async function POST(
   request: Request,
@@ -31,7 +32,7 @@ export async function POST(
   try {
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'UPLOAD_FILES');
 
     const body = await request.json().catch(() => null);
     const parsed = presignSchema.safeParse(body);

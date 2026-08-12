@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireWorkspaceMember,
-  requireWorkspaceRole,
+  requireWorkspaceCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import {
@@ -10,8 +9,6 @@ import {
   removeWorkspaceMember,
 } from '@/server/workspaces/member-service';
 import { updateMemberRoleSchema } from '@/server/workspaces/member-schemas';
-import { WORKSPACE_MANAGER_ROLES } from '@/server/workspaces/constants';
-import type { WorkspaceRole } from '@prisma/client';
 
 /**
  * PATCH /api/workspaces/:workspaceId/members/:userId
@@ -29,11 +26,7 @@ export async function PATCH(
     const { workspaceId, userId: targetUserId } = await params;
 
     // Only managers (OWNER, ADMIN) can change roles.
-    await requireWorkspaceRole(
-      user.id,
-      workspaceId,
-      WORKSPACE_MANAGER_ROLES as unknown as WorkspaceRole[],
-    );
+    await requireWorkspaceCapability(user.id, workspaceId, 'MANAGE_MEMBERS');
 
     const body = await request.json().catch(() => null);
     const parsed = updateMemberRoleSchema.safeParse(body);
@@ -71,14 +64,10 @@ export async function DELETE(
     if (isSelf) {
       // Leaving — any member can remove themselves (verified below to
       // confirm they're actually a member).
-      await requireWorkspaceMember(user.id, workspaceId);
+      await requireWorkspaceCapability(user.id, workspaceId, 'VIEW_WORKSPACE');
     } else {
       // Removing someone else requires manager role.
-      await requireWorkspaceRole(
-        user.id,
-        workspaceId,
-        WORKSPACE_MANAGER_ROLES as unknown as WorkspaceRole[],
-      );
+      await requireWorkspaceCapability(user.id, workspaceId, 'MANAGE_MEMBERS');
     }
 
     await removeWorkspaceMember(workspaceId, targetUserId);

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
-  requireProjectRole,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import {
@@ -12,8 +11,6 @@ import {
   toggleProjectFavorite,
 } from '@/server/projects/project.service';
 import { updateProjectSchema } from '@/server/projects/schemas';
-import { PROJECT_MANAGER_ROLES } from '@/server/projects/constants';
-import type { ProjectRole } from '@prisma/client';
 
 /**
  * GET /api/projects/:projectId
@@ -28,7 +25,7 @@ export async function GET(
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
 
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'VIEW_PROJECT');
     const project = await getProject(projectId);
     return NextResponse.json({ project });
   } catch (error) {
@@ -56,13 +53,13 @@ export async function PATCH(
 
     // Favourite toggle — any member can do this for themselves.
     if (body && typeof body.favorite === 'boolean') {
-      await requireProjectMember(user.id, projectId);
+      await requireProjectCapability(user.id, projectId, 'VIEW_PROJECT');
       const result = await toggleProjectFavorite(projectId, user.id);
       return NextResponse.json(result);
     }
 
     // Regular update — requires manager role.
-    await requireProjectRole(user.id, projectId, PROJECT_MANAGER_ROLES as unknown as ProjectRole[]);
+    await requireProjectCapability(user.id, projectId, 'MANAGE_PROJECT');
 
     const parsed = updateProjectSchema.safeParse(body);
     if (!parsed.success) {
@@ -93,7 +90,7 @@ export async function DELETE(
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
 
-    await requireProjectRole(user.id, projectId, PROJECT_MANAGER_ROLES as unknown as ProjectRole[]);
+    await requireProjectCapability(user.id, projectId, 'MANAGE_PROJECT');
     await deleteProject(projectId);
     return NextResponse.json({ ok: true });
   } catch (error) {

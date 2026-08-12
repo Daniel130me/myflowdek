@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireWorkspaceRole,
+  requireWorkspaceCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { transferOwnership } from '@/server/workspaces/member-service';
 import { transferOwnershipSchema } from '@/server/workspaces/schemas';
-import { WORKSPACE_OWNER_ROLE } from '@/server/workspaces/constants';
-import type { WorkspaceRole } from '@prisma/client';
 
 /**
  * POST /api/workspaces/:workspaceId/transfer
@@ -27,9 +25,7 @@ export async function POST(
     const { workspaceId } = await params;
 
     // Only the OWNER can transfer ownership.
-    await requireWorkspaceRole(user.id, workspaceId, [
-      WORKSPACE_OWNER_ROLE as unknown as WorkspaceRole,
-    ]);
+    await requireWorkspaceCapability(user.id, workspaceId, 'TRANSFER_OWNERSHIP');
 
     const body = await request.json().catch(() => null);
     const parsed = transferOwnershipSchema.safeParse(body);

@@ -106,11 +106,29 @@ async function executeAction(
     }
     case 'set_assignee': {
       if (!action.value) return;
+      // Domain validation: the new assignee must be a member of the project.
+      // An automation rule could specify any user ID — without this check,
+      // it could assign a task to someone who can't even see the project.
+      const isMember = await db.projectMember.findUnique({
+        where: {
+          projectId_userId: { projectId, userId: action.value },
+        },
+        select: { userId: true },
+      });
+      if (!isMember) {
+        console.warn(
+          `[automations] set_assignee skipped — user ${action.value} is not a member of project ${projectId}`,
+        );
+        return;
+      }
       await db.task.update({ where: { id: task.id }, data: { assigneeId: action.value } });
       break;
     }
     case 'add_tag': {
       if (!action.value) return;
+      // Domain validation: only tags that belong to this project can be
+      // applied. The findFirst filter enforces this — a tag from another
+      // project will simply not be found and the action is a no-op.
       const tag = await db.tag.findFirst({ where: { projectId, name: action.value } });
       if (tag) {
         await db.taskTag.create({ data: { taskId: task.id, tagId: tag.id } }).catch(() => {});

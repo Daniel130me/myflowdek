@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
 import {
@@ -38,7 +38,7 @@ export async function POST(
     if (!projectId) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'CREATE_COMMENT');
 
     const body = await request.json().catch(() => null);
     const parsed = createReactionSchema.safeParse(body);
@@ -73,7 +73,7 @@ export async function DELETE(
     if (!projectId) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'CREATE_COMMENT');
 
     const url = new URL(request.url);
     const emoji = url.searchParams.get('emoji');

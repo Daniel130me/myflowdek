@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
-  requireProjectMember,
+  requireProjectCapability,
   requireProjectRole,
   authErrorResponse,
 } from '@/server/auth/authorization';
@@ -40,7 +40,7 @@ export async function PATCH(
     if (!projectId) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
-    await requireProjectMember(user.id, projectId);
+    await requireProjectCapability(user.id, projectId, 'CREATE_COMMENT');
 
     const body = await request.json().catch(() => null);
     const parsed = updateCommentSchema.safeParse(body);
@@ -90,8 +90,8 @@ export async function DELETE(
       isManager = false;
     }
 
-    // Either way, the user must be a project member.
-    await requireProjectMember(user.id, projectId);
+    // Either way, the user must be a project member with comment capability.
+    await requireProjectCapability(user.id, projectId, 'CREATE_COMMENT');
 
     await deleteComment(commentId, user.id, isManager);
     return NextResponse.json({ ok: true });
