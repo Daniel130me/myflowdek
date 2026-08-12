@@ -5,6 +5,7 @@ import {
   requireProjectRole,
   authErrorResponse,
 } from '@/server/auth/authorization';
+import { checkMutationLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { executeBulkAction, bulkActionSchema } from '@/server/tasks/bulk.service';
 import { PROJECT_MANAGER_ROLES } from '@/server/projects/constants';
 import type { ProjectRole } from '@prisma/client';
@@ -29,6 +30,10 @@ export async function POST(
   { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
+    // Rate limit: 10 bulk actions per minute per IP.
+    const rl = checkMutationLimit(request, RATE_LIMITS.bulkAction, 'bulk-action');
+    if (rl) return rl;
+
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
 

@@ -4,6 +4,7 @@ import {
   requireProjectMember,
   authErrorResponse,
 } from '@/server/auth/authorization';
+import { checkMutationLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { listTasks, createTask } from '@/server/tasks/task.service';
 import { createTaskSchema } from '@/server/tasks/schemas';
 
@@ -29,6 +30,10 @@ export async function POST(
   { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
+    // Rate limit: 30 task creations per minute per IP.
+    const rl = checkMutationLimit(request, RATE_LIMITS.taskCreate, 'task-create');
+    if (rl) return rl;
+
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
     await requireProjectMember(user.id, projectId);

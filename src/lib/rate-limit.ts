@@ -21,10 +21,16 @@ interface RateLimitConfig {
   windowMs: number;
 }
 
-/** Default limits for auth endpoints. */
+/** Default limits for auth + mutation endpoints. */
 export const RATE_LIMITS = {
   register: { maxRequests: 5, windowMs: 60_000 }, // 5 per minute
   login: { maxRequests: 10, windowMs: 60_000 }, // 10 per minute
+  forgotPassword: { maxRequests: 3, windowMs: 60_000 }, // 3 per minute
+  taskCreate: { maxRequests: 30, windowMs: 60_000 }, // 30 per minute
+  commentCreate: { maxRequests: 20, windowMs: 60_000 }, // 20 per minute
+  fileUpload: { maxRequests: 10, windowMs: 60_000 }, // 10 per minute
+  bulkAction: { maxRequests: 10, windowMs: 60_000 }, // 10 per minute
+  generalMutation: { maxRequests: 60, windowMs: 60_000 }, // 60 per minute (fallback)
 } as const;
 
 const buckets = new Map<string, Bucket>();
@@ -67,4 +73,34 @@ export function getClientId(request: Request): string {
 /** Convert a retryAfterMs value to seconds for the Retry-After header. */
 export function retryAfterSeconds(ms: number): number {
   return Math.ceil(ms / 1000);
+}
+
+/**
+ * Convenience: apply rate limiting to a mutation request. Returns null
+ * if the request is allowed, or a Response (429) if rate-limited.
+ *
+ * Usage in a route:
+ *   const rl = checkMutationLimit(request, RATE_LIMITS.taskCreate, 'task-create');
+ *   if (rl) return rl;
+ */
+export function checkMutationLimit(
+  request: Request,
+  config: RateLimitConfig,
+  keyPrefix: string,
+): Response | null {
+  const clientId = getClientId(request);
+  const result = rateLimit(`${keyPrefix}:${clientId}`, config);
+  if (!result.allowed) {
+    return new Response(
+      JSON.stringify({ error: 'Too many requests. Please slow down.' }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(retryAfterSeconds(result.retryAfterMs ?? 0)),
+        },
+      },
+    );
+  }
+  return null;
 }
