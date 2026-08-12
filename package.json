@@ -1,15 +1,22 @@
 {
-  "name": "nextjs_tailwind_shadcn_ts",
-  "version": "0.2.1",
+  "name": "flowdeck",
+  "version": "0.3.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
-    "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
-    "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0",
     "lint": "eslint .",
-    "db:push": "prisma db push --accept-data-loss",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/shared/navigation/routes.test.ts src/providers/FlowdekDataProvider.test.ts src/data/local-storage/storageAdapter.test.ts src/features/tasks/selectors/getTaskForProject.test.ts src/features/files/selectors/getFileForProject.test.ts src/features/flowdeck/corrections.test.ts src/server/auth/tests/auth.test.ts src/server/auth/tests/integration.test.ts src/server/auth/tests/integration-frontend.test.ts",
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "verify": "npm run db:generate && npm run check && npm run build",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset",
     "seed:demo": "tsx prisma/seed.ts"
   },
@@ -92,10 +99,12 @@
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "bun-types": "^1.3.4",
     "eslint": "^9",
     "eslint-config-next": "^16.1.1",
+    "prisma": "^6.11.1",
     "tailwindcss": "^4",
+    "tailwindcss-animate": "^1.0.7",
+    "tsx": "^4.23.7",
     "tw-animate-css": "^1.3.5",
     "typescript": "^5"
   }
