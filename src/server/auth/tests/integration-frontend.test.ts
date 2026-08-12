@@ -201,7 +201,7 @@ describe('permission boundaries', () => {
 
     await assert.rejects(
       createTask(projectId, owner.id, { name: 'Task', assigneeId: outsider.id }),
-      (err: AuthError) => err.message.includes('assignee'),
+      (err: AuthError) => err.message.toLowerCase().includes('assignee'),
     );
   });
 });
