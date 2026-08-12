@@ -1,137 +1,132 @@
-# Flowdek Production Integration & Security Correction Pass — TODO
+# Flowdek Remaining Work — TODO
 
-> 34-item production stabilization pass. No new features — make existing
-> implementation internally consistent, production-safe, and fully connected.
-> Current head: `dc65870`
+> Source of truth for all remaining implementation work. Updated after
+> the production correction pass and frontend wiring phases.
+> Current head: `5e3c4c8`
 
-## Phased implementation plan
+## Remaining Frontend Pages & UI
 
-### Phase 1 — Package/deployment (#1)
-- [ ] Fix package.json scripts (add typecheck, test, check, verify, db:deploy)
-- [ ] Regenerate package-lock.json
-- [ ] Verify npm ci works
-- **Commit:** `fix(deploy): synchronize package.json and lockfile`
+### 1. Workspace Settings Page
+- [ ] `/settings` route within the product layout
+- [ ] Rename workspace (PATCH /api/workspaces/:id)
+- [ ] Manage workspace members (list, change role, remove)
+- [ ] Manage invitations (list pending, revoke, resend)
+- [ ] Workspace preferences (defaultView, theme, enableNotifications)
+- [ ] Danger zone: delete workspace, transfer ownership
+- **Commit:** `feat(ui): add workspace settings page`
 
-### Phase 2 — Schema additions (#2.3, #20, #22, #24, #29)
-- [ ] WorkspacePreference model
-- [ ] CommentMention model
-- [ ] User.sessionVersion field
-- [ ] ProjectStatusUpdate, SavedFilter, CustomField, TaskCustomFieldValue, TaskRecurrence models
-- [ ] Fix advanced model relations (Goal→Workspace, TimesheetEntry→Task, etc.)
-- [ ] Migration
-- **Commit:** `feat(schema): add preferences, mentions, session version, missing domains`
+### 2. Project Member Management Panel
+- [ ] Member list with roles (GET /api/projects/:id/members)
+- [ ] Add member (POST — select from workspace members)
+- [ ] Change role (PATCH /api/projects/:id/members/:userId)
+- [ ] Remove member / leave project (DELETE)
+- [ ] Only OWNER/ADMIN can manage
+- **Commit:** `feat(ui): add project member management panel`
 
-### Phase 3 — Authorization system (#4, #5)
-- [ ] Centralized capability matrix (PROJECT_PERMISSIONS, WORKSPACE_PERMISSIONS)
-- [ ] requireProjectCapability / requireWorkspaceCapability helpers
-- [ ] Enforce on all write routes
-- **Commit:** `feat(auth): add centralized capability-based authorization`
+### 3. Activity Feed in Task Detail Panel
+- [ ] Replace mock store activity with `useTaskActivity` hook
+- [ ] Show timeline: "X created this task", "Y changed status to…"
+- [ ] Auto-refresh after mutations (append new entries)
+- **Commit:** `feat(ui): wire activity feed to real API in task detail`
 
-### Phase 4 — Onboarding fixes (#2.1, #2.2, #2.3, #2.4)
-- [ ] Idempotency check inside transaction
-- [ ] JWT session update callback (trigger === "update")
-- [ ] Persist preferences (WorkspacePreference)
-- [ ] Persist invitedMembers as Invitation records
-- **Commit:** `fix(onboarding): idempotency, session refresh, preferences, invitations`
+### 4. Files View — R2 Upload Flow
+- [ ] Wire the file upload UI to POST /api/projects/:id/files/presign
+- [ ] Upload directly to R2 using the presigned URL
+- [ ] Call POST /api/projects/:id/files/confirm after upload
+- [ ] Wire file deletion to DELETE (removes DB + R2 object)
+- [ ] Wire file link/unlink to tasks (PATCH task sectionId)
+- [ ] Remove fake metadata creation from the store
+- **Commit:** `feat(ui): wire files view to R2 upload flow`
 
-### Phase 5 — Token & session security (#23, #24, #25, #26)
-- [ ] Hashed token storage (verification, reset, invitation)
-- [ ] Session version check in requireAuthenticatedUser
-- [ ] Production email safety (throw if no SendGrid in production)
-- [ ] Disabled/deleted user session rejection
-- **Commit:** `fix(security): hash tokens, enforce session version, safe production email`
+### 5. Search Bar Integration in TopBar
+- [ ] Wire the existing TopBar search input to open the GlobalSearch overlay
+- [ ] Support Ctrl+K / Cmd+K keyboard shortcut
+- [ ] Connect search results to navigation
+- **Commit:** `feat(ui): integrate global search into TopBar`
 
-### Phase 6 — Invitation flow (#3)
-- [ ] Send invitation emails via SendGrid
-- [ ] Token hashing for invitations
-- [ ] Remove raw token from API responses
-- **Commit:** `feat(invitations): send emails and hash tokens`
+### 6. Notification Navigation
+- [ ] Click a notification → navigate to the related project/task
+- [ ] Show notification type icon (bell, mention, assignment)
+- [ ] Unread count in document title (e.g. "(3) FlowDeck")
+- **Commit:** `feat(ui): add notification click-to-navigate`
 
-### Phase 7 — Data integrity (#6, #7, #8, #9, #10)
-- [ ] Task assignee/parent/section validation
-- [ ] Circular dependency prevention
-- [ ] Approval validation (task belongs to project, approver is member)
-- [ ] Timesheet validation (task belongs to project)
-- [ ] Budget/expense validation (budget belongs to project)
-- **Commit:** `fix(integrity): enforce relational and tenant validation on all writes`
+## Remaining Backend Hardening
 
-### Phase 8 — API completeness (#11, #12, #13)
-- [ ] Goals CRUD routes (get/update/delete, KR CRUD)
-- [ ] Forms CRUD routes (get/patch/delete, submissions)
-- [ ] Automation CRUD routes (update/toggle/delete)
-- [ ] Automation execution engine (server-side, with loop guards)
-- [ ] Approval resolve route
-- [ ] Timesheet submit/approve routes
-- [ ] Budget/expense full CRUD routes
-- **Commit:** `feat(api): complete missing CRUD and automation execution`
+### 7. Invitation Token Hashing
+- [ ] Hash invitation tokens with SHA-256 (same as verification/reset)
+- [ ] Store hash in DB, email raw token
+- [ ] Update accept/decline to hash submitted token before lookup
+- [ ] Remove raw token from API responses (return only invitation details)
+- **Commit:** `fix(security): hash invitation tokens`
 
-### Phase 9 — Frontend→Backend wiring (#14, #15, #16, #17, #18, #19)
-- [ ] Task mutations via API (moveStatus, toggleComplete, update, delete, quickAdd, bulk)
-- [ ] Comment mutations via API (add, reply, edit, delete, reactions)
-- [ ] File upload via R2 presign flow
-- [ ] R2 upload intent security
-- [ ] Activity feed from API
-- [ ] Notifications UI (list, badge, mark read)
-- **Commit:** `feat(ui): wire all mutations to backend APIs`
+### 8. Rate Limiting on All Mutation Endpoints
+- [ ] Add rate limiting to: task create, comment create, file presign
+- [ ] Reuse the existing rate-limit utility
+- [ ] Document limits in a constants file
+- **Commit:** `fix(security): add rate limiting to mutation endpoints`
 
-### Phase 10 — Advanced frontend hooks (#21)
-- [ ] useGoals, useApprovals, useForms, useAutomations, useBudgets, useTimesheets
-- [ ] Replace mock store data with API hooks
-- **Commit:** `feat(ui): wire advanced features to real backend`
+### 9. Task Recurrence Execution
+- [ ] Background job that checks for completed recurring tasks
+- [ ] Creates the next occurrence based on recurrence pattern (daily/weekly/monthly)
+- [ ] Uses the existing computeNextDate helper
+- **Commit:** `feat(tasks): implement recurrence execution`
 
-### Phase 11 — Missing domains (#22)
-- [ ] Project status updates (model + API + hook)
-- [ ] Saved filters (model + API + hook)
-- [ ] Custom fields (model + API + hook)
-- [ ] Task recurrence (field on Task)
-- **Commit:** `feat(domains): persist status updates, saved filters, custom fields`
+### 10. Realtime Updates (WebSocket)
+- [ ] Set up socket.io mini-service on a separate port
+- [ ] Emit events on task mutations (status_change, assign, comment)
+- [ ] Frontend listens and updates local state
+- [ ] Notification delivery in real-time
+- **Commit:** `feat(realtime): add WebSocket for live updates`
 
-### Phase 12 — Mention handling (#20)
-- [ ] CommentMention model (structured mentions)
-- [ ] API accepts mentionedUserIds array
-- [ ] Notification creation from actual user IDs
-- **Commit:** `fix(mentions): structured mention model and notification`
+## Remaining Testing
 
-### Phase 13 — LocalStorage removal (#30)
-- [ ] Remove business data from LocalStorage persistence
-- [ ] Server is authoritative on reload
-- **Commit:** `refactor(store): remove LocalStorage as authoritative persistence`
+### 11. Frontend Integration Tests
+- [ ] Test: create task → DB contains task → edit → DB updated → refresh → persists
+- [ ] Test: add comment → DB contains comment → refresh → persists
+- [ ] Test: file upload metadata confirmation
+- [ ] Test: task status update flow
+- **Commit:** `test: add frontend integration tests`
 
-### Phase 14 — Testing (#31)
-- [ ] Auth tests (disabled/deleted user, session version, token expiry/single-use)
-- [ ] Onboarding tests (idempotency, preferences, invitations)
-- [ ] Authorization tests (VIEWER/MEMBER/ADMIN/OWNER capabilities)
-- [ ] Integrity tests (cross-project, circular)
-- [ ] Persistence/refresh test
-- **Commit:** `test: add production integration and security tests`
+### 12. Permission Boundary Tests
+- [ ] VIEWER cannot create/edit/delete tasks
+- [ ] VIEWER cannot manage project settings
+- [ ] MEMBER can create tasks but cannot delete project
+- [ ] ADMIN can manage settings but cannot transfer ownership
+- [ ] Cross-workspace access blocked
+- **Commit:** `test: add permission boundary tests`
 
-### Phase 15 — CI (#32)
-- [ ] GitHub Actions workflow (lint, typecheck, test, build)
-- **Commit:** `ci: add GitHub Actions workflow`
+## Remaining Documentation
 
-### Phase 16 — Documentation (#33)
-- [ ] Honest status in Todo.md and BACKEND_DOMAIN_ROADMAP.md
-- **Commit:** `docs: honest implementation status update`
+### 13. Update IMPLEMENTATION_STATUS.md
+- [ ] Mark all completed items as ✅
+- [ ] Add the new frontend pages (auth, admin, search, notifications)
+- [ ] Update test count (60 tests)
+- [ ] Update CI status (workflow pushed)
+- **Commit:** `docs: update implementation status to reflect current state`
+
+### 14. API Documentation
+- [ ] Document all endpoints in docs/API_REFERENCE.md
+- [ ] Include request/response shapes
+- [ ] Document authorization requirements per endpoint
+- **Commit:** `docs: add API reference documentation`
 
 ---
 
 ## Progress log
 
-| Phase | Commit | Status |
-|-------|--------|--------|
-| 1 | `c6c1d19` | ✅ done |
-| 2 | `2903860` | ✅ done |
-| 3 | `dbd1cd3` | ✅ done |
-| 4 | `b3a9503` | ✅ done |
-| 5 | `dbd1cd3` | ✅ done |
-| 6 | `b3a9503` | ✅ done |
-| 7 | `d8238c2` | ✅ done |
-| 8 | `d362139` | ✅ done |
-| 9 | `4b44d8d` | ✅ done |
-| 10 | `295ce68` | ✅ done |
-| 11 | `295ce68` | ✅ done |
-| 12 | `295ce68` | ✅ done |
-| 13 | `295ce68` | ✅ done |
-| 14 | `7c85988` | ✅ done (19 new integration tests: idempotency, capability matrix, cross-project integrity, persistence, session version) |
-| 15 | `7c85988` | ✅ done (CI workflow file pushed) |
-| 16 | `273b2b4` | ✅ done |
+| # | Item | Commit | Status |
+|---|------|--------|--------|
+| 1 | Workspace settings page | — | pending |
+| 2 | Project member management | — | pending |
+| 3 | Activity feed in task detail | — | pending |
+| 4 | Files view R2 upload flow | — | pending |
+| 5 | Search bar integration | — | pending |
+| 6 | Notification navigation | — | pending |
+| 7 | Invitation token hashing | — | pending |
+| 8 | Rate limiting on mutations | — | pending |
+| 9 | Task recurrence execution | — | pending |
+| 10 | Realtime (WebSocket) | — | pending |
+| 11 | Frontend integration tests | — | pending |
+| 12 | Permission boundary tests | — | pending |
+| 13 | Update IMPLEMENTATION_STATUS | — | pending |
+| 14 | API documentation | — | pending |
