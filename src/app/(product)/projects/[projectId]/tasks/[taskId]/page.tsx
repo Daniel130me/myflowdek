@@ -1,13 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
 import ProjectTasksPage from '../page';
 import { TaskDetailPanel } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useProjectComments } from '@/features/flowdeck/hooks/useProjectComments';
+import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { getTaskForProject } from '@/features/tasks/selectors/getTaskForProject';
 import { routes } from '@/shared/navigation/routes';
+import type { ActivityEntry } from '@/features/flowdeck/model';
 
 export default function TaskDetailRoutePage() {
   const params = useParams();
@@ -16,8 +18,34 @@ export default function TaskDetailRoutePage() {
   const taskId = typeof params.taskId === 'string' ? params.taskId : '';
   const state = useFlowDeck();
 
-  // Fetch real comments from the API and sync into the store.
+  // Fetch real tasks + comments from the API and sync into the store.
+  useProjectTasks(projectId);
   useProjectComments(projectId);
+
+  // Fetch real activity from the API (replaces mock store activity).
+  const [apiActivity, setApiActivity] = useState<ActivityEntry[]>([]);
+
+  useEffect(() => {
+    if (!taskId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/tasks/${taskId}/activity`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setApiActivity((data.activity ?? []).map((a: any) => ({
+          id: a.id,
+          taskId: a.taskId,
+          type: a.type,
+          description: a.description,
+          authorId: a.authorId ?? '',
+          timestamp: a.createdAt,
+        })));
+      } catch { /* network error */ }
+    })();
+    return () => { cancelled = true; };
+  }, [taskId]);
 
   const task = getTaskForProject(state.tasksByProject, projectId, taskId);
   if (!task) {
@@ -28,19 +56,17 @@ export default function TaskDetailRoutePage() {
   const projectFiles = state.filesByProject[projectId] ?? [];
   const projectTags = state.tagsByProject[projectId] ?? [];
   const projectComments = state.commentsByProject[projectId] ?? [];
-  const projectActivity = state.activityByProject[projectId] ?? [];
   const projectTimeLogs = state.timeLogsByProject[projectId] ?? [];
   const projectCustomFields = state.customColsByProject[projectId] ?? [];
 
-  const taskComments = projectComments.filter(
-    comment => comment.taskId === taskId
-  );
-  const taskActivity = projectActivity.filter(
-    activity => activity.taskId === taskId
-  );
-  const taskTimeLogs = projectTimeLogs.filter(
-    log => log.taskId === taskId
-  );
+  const taskComments = projectComments.filter(comment => comment.taskId === taskId);
+
+  // Use API activity if available, fall back to mock store.
+  const taskActivity = apiActivity.length > 0
+    ? apiActivity
+    : (state.activityByProject[projectId] ?? []).filter(a => a.taskId === taskId);
+
+  const taskTimeLogs = projectTimeLogs.filter(log => log.taskId === taskId);
 
   const parentTask = task.parentId ? projectTasks.find(t => t.id === task.parentId) : undefined;
 
