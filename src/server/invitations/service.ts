@@ -1,10 +1,16 @@
 import { db } from '@/server/db/client';
 import { Prisma } from '@prisma/client';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { AuthError } from '@/server/auth/authorization';
 import { audit } from '@/server/audit/log';
 import { INVITATION_TTL_HOURS, INVITATION_TOKEN_LENGTH } from './constants';
 import type { CreateInvitationInput } from './schemas';
+
+/** Hash a token using SHA-256 for secure storage.
+ *  The raw token is emailed to the user; only the hash is stored in the DB. */
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 /**
  * Invitation service — all invitation business logic lives here.
@@ -84,18 +90,19 @@ export async function createInvitation(
     );
   }
 
-  const token = generateToken();
+  const rawToken = generateToken();
+  const tokenHash = hashToken(rawToken);
   const invitation = await db.invitation.create({
     data: {
       workspaceId,
       email: input.email,
       role: input.role,
-      token,
+      token: tokenHash,
       status: 'PENDING',
       invitedById,
       expiresAt: expiryDate(),
     },
-    select: { ...invitationSelect, token: true },
+    select: { ...invitationSelect, token: false },
   });
 
   await audit({
@@ -104,11 +111,19 @@ export async function createInvitation(
     meta: { invitationId: invitation.id, workspaceId, email: input.email, role: input.role },
   });
 
-  // TODO (future): send the invitation email containing the token URL.
-  // For now the token is returned in the response so the caller can display
-  // or share it. In production, strip the token from the response and only
-  // send it via email.
+  // Send the invitation email with the raw token (the hash is stored in DB,
+  // the raw token is only in the email — never in the API response).
+  const { sendInvitationEmail } = await import('@/server/email/service');
+  const { APP_BASE_URL } = await import('@/server/email/constants');
+  const workspace = await db.workspace.findUniqueOrThrow({
+    where: { id: workspaceId },
+    select: { name: true },
+  });
+  await sendInvitationEmail(input.email, rawToken, workspace.name, APP_BASE_URL).catch((err) => {
+    console.error('[invitations] email failed for', input.email, err);
+  });
 
+  // Return the invitation WITHOUT the raw token — the caller never sees it.
   return invitation;
 }
 
@@ -155,8 +170,9 @@ export async function revokeInvitation(workspaceId: string, invitationId: string
  * Marks expired invitations as EXPIRED (lazy expiry).
  */
 export async function getInvitationByToken(token: string) {
+  const tokenHash = hashToken(token);
   const invitation = await db.invitation.findUnique({
-    where: { token },
+    where: { token: tokenHash },
     select: { ...invitationSelect, token: true, expiresAt: true },
   });
   if (!invitation) {
@@ -188,9 +204,10 @@ export async function getInvitationByToken(token: string) {
  * invitation is still marked ACCEPTED but no duplicate membership is created.
  */
 export async function acceptInvitation(token: string, userId: string, userEmail: string) {
+  const tokenHash = hashToken(token);
   return db.$transaction(async (tx) => {
     const invitation = await tx.invitation.findUnique({
-      where: { token },
+      where: { token: tokenHash },
     });
     if (!invitation) {
       throw new AuthError('Invitation not found', 404);
@@ -255,9 +272,10 @@ export async function acceptInvitation(token: string, userId: string, userEmail:
  * Transaction: verify + mark DECLINED.
  */
 export async function declineInvitation(token: string, userEmail: string) {
+  const tokenHash = hashToken(token);
   return db.$transaction(async (tx) => {
     const invitation = await tx.invitation.findUnique({
-      where: { token },
+      where: { token: tokenHash },
     });
     if (!invitation) {
       throw new AuthError('Invitation not found', 404);
