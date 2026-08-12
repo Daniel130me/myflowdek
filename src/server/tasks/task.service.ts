@@ -46,6 +46,7 @@ const taskSelect = {
   progress: true,
   sortOrder: true,
   isMilestone: true,
+  recurrence: true,
   assigneeId: true,
   createdById: true,
   parentId: true,
@@ -254,6 +255,7 @@ export async function updateTask(
         ...(input.assigneeId !== undefined ? { assigneeId: input.assigneeId } : {}),
         ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),
         ...(input.sectionId !== undefined ? { sectionId: input.sectionId } : {}),
+        ...(input.recurrence !== undefined ? { recurrence: input.recurrence } : {}),
       },
       select: taskSelect,
     });

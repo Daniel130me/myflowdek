@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Eye, EyeOff, Plus, Check } from 'lucide-react';
-import { COLORS, TEAM, type TeamMember } from '@/features/flowdeck/model';
+import { COLORS, type MemberInfo } from '@/features/flowdeck/model';
 import { FF } from './styles';
 import { Avatar } from './Avatar';
 import { Field } from './Field';
@@ -11,14 +11,17 @@ interface FollowersSectionProps {
   followerIds: string[];
   onToggle: (userId: string) => void;
   currentUserId: string;
+  /** Real project members (sourced from `useProjectMembers`). When
+   *  omitted the picker is empty — we never fall back to the mock TEAM. */
+  members?: MemberInfo[];
 }
 
-export function FollowersSection({ followerIds, onToggle, currentUserId }: FollowersSectionProps) {
+export function FollowersSection({ followerIds, onToggle, currentUserId, members = [] }: FollowersSectionProps) {
   const [showPicker, setShowPicker] = useState(false);
   const isFollowing = followerIds.includes(currentUserId);
 
-  const available = TEAM.filter(m => !followerIds.includes(m.id));
-  const followers = TEAM.filter(m => followerIds.includes(m.id));
+  const available = members.filter(m => !followerIds.includes(m.id));
+  const followers = members.filter(m => followerIds.includes(m.id));
 
   return (
     <Field label={

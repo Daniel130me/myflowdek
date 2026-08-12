@@ -2,10 +2,11 @@
 
 import React from 'react';
 import { X, ArrowLeft, Download as DownloadIcon, Paperclip, ChevronLeft, ChevronRight } from 'lucide-react';
-import { COLORS, teamById, fmtSize, fmtDate, extOf, type FileItem, type Task } from '@/features/flowdeck/model';
+import { COLORS, fmtSize, fmtDate, extOf, type FileItem, type Task } from '@/features/flowdeck/model';
 import { FF } from '../ui/styles';
 import { Avatar } from '../ui/Avatar';
 import { FileThumbnail } from '../ui/FileThumbnail';
+import { useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 
 /* Extension -> colour tint for the type badge */
@@ -40,10 +41,12 @@ interface FileViewerModalProps {
 
 export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateFile }: FileViewerModalProps) {
   const { isMobile } = useViewport();
+  const { lookup } = useMemberDirectory();
   const ext = extOf(file.name);
   const tint = getExtColor(file.name);
   const linkedTask = file.linkedTaskId ? allTasks.find(t => t.id === file.linkedTaskId) : null;
-  const uploader = teamById[file.uploadedBy];
+  const uploader = lookup(file.uploadedBy);
+  const uploaderName = uploader?.name ?? '';
   const currentIndex = allFiles.findIndex(f => f.id === file.id);
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < allFiles.length - 1;
@@ -132,7 +135,7 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
             <Avatar id={file.uploadedBy} size={20} />
-            <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF, whiteSpace: 'nowrap' }}>{uploader?.name.split(' ')[0]}</span>
+            <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF, whiteSpace: 'nowrap' }}>{uploaderName.split(' ')[0]}</span>
           </div>
         </div>
       </div>
@@ -204,7 +207,7 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
             <Avatar id={file.uploadedBy} size={20} />
-            <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF, whiteSpace: 'nowrap' }}>{uploader?.name.split(' ')[0]}</span>
+            <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF, whiteSpace: 'nowrap' }}>{uploaderName.split(' ')[0]}</span>
           </div>
         </div>
       </div>

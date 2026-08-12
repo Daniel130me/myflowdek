@@ -18,7 +18,10 @@ export function FlowdekDataProvider({ children }: { children: React.ReactNode })
     if (session?.user?.id) {
       value.setCurrentUserId(session.user.id);
     }
-  }, [session?.user?.id, value]);
+    if (session?.user?.name) {
+      value.setCurrentUserName(session.user.name);
+    }
+  }, [session?.user?.id, session?.user?.name, value]);
 
   return (
     <FlowdekDataContext.Provider value={value}>

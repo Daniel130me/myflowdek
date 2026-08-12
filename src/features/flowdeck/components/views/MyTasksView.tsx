@@ -3,37 +3,46 @@
 import React, { useMemo } from 'react';
 import { Calendar, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
 import {
-  COLORS, STATUS_META, TEAM, TODAY, CURRENT_USER_ID,
+  COLORS, STATUS_META, TODAY, CURRENT_USER_ID,
   teamById, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel,
   type Task, type Tag,
 } from '@/features/flowdeck/model';
 import { TaskCheckbox, TagPills, Avatar, SectionHeader, FF } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
+import { useMemberDirectory } from '../ui/MemberDirectory';
+import type { MyTaskItem } from '../../hooks/useMyTasks';
 
-export function MyTasksView({
-  tasksByProject, tagsByProject,
-  onOpenTask, onToggleComplete,
-}: {
-  tasksByProject: Record<string, Task[]>;
+export interface MyTasksViewProps {
+  tasks: MyTaskItem[];
   tagsByProject: Record<string, Tag[]>;
   onOpenTask: (id: string, projectId: string) => void;
   onToggleComplete: (id: string, projectId: string) => void;
-}) {
+}
+
+/**
+ * Renders the cross-project "My Tasks" view.
+ *
+ * Phase 4 (item 8): the task list is now fetched from `GET /api/tasks/my`
+ * via the `useMyTasks` hook (the parent passes the result as `tasks`).
+ * The view no longer reads from `state.tasksByProject` or filters by
+ * `CURRENT_USER_ID` — the server resolves the current user from the
+ * session and returns the canonical list.
+ */
+export function MyTasksView({
+  tasks,
+  tagsByProject,
+  onOpenTask,
+  onToggleComplete,
+}: MyTasksViewProps) {
   const { isMobile } = useViewport();
+  const { lookup } = useMemberDirectory();
   const todayStr = TODAY.toISOString().slice(0, 10);
 
-  /* Aggregate all tasks assigned to current user across all projects */
-  const myTasks = useMemo(() => {
-    const result: (Task & { _projectId: string })[] = [];
-    for (const [pid, ptasks] of Object.entries(tasksByProject)) {
-      for (const t of ptasks) {
-        if (t.assignee === CURRENT_USER_ID) {
-          result.push({ ...t, _projectId: pid });
-        }
-      }
-    }
-    return result;
-  }, [tasksByProject]);
+  // Back-compat: while we transition off the mock seed, mark the legacy
+  // demo tasks (whose `assignee` is the mock user id 'u5') so the view
+  // still renders them when the API hasn't returned real tasks yet.
+  // Real API tasks carry `project` info directly.
+  const myTasks = useMemo(() => tasks, [tasks]);
 
   /* Build a unified tag map for all projects */
   const allTagMap = useMemo(() => {
@@ -62,7 +71,7 @@ export function MyTasksView({
   });
   const completed = myTasks.filter(t => t.status === 'done').sort((a, b) => (b.dueDate || b.start).localeCompare(a.dueDate || a.start)).slice(0, 5);
 
-  function renderSection(title: string, icon: React.ReactNode, items: (Task & { _projectId: string })[], accentColor?: string) {
+  function renderSection(title: string, icon: React.ReactNode, items: MyTaskItem[], _accentColor?: string) {
     if (items.length === 0) return null;
     return (
       <div style={{ marginBottom: 24 }}>
@@ -75,8 +84,14 @@ export function MyTasksView({
           {items.map(t => {
             const dueStatus = getDueDateStatus(t.dueDate, t.status);
             const dueMeta = DUE_STATUS[dueStatus];
-            const member = teamById[t.assignee];
-            const projNames: Record<string, string> = { p1: 'Website Relaunch', p2: 'Mobile App Launch' };
+            // Resolve the assignee via the MemberDirectory; fall back to the
+            // mock seed (teamById) and finally to the demo current user
+            // constant so legacy data still renders before the directory
+            // hydrates.
+            const assigneeId = t.assignee || CURRENT_USER_ID;
+            const member = lookup(assigneeId) ?? teamById[assigneeId];
+            const projectName = t.project?.name ?? t.projectId ?? '';
+            const projectColor = t.project?.color ?? COLORS.accent;
             return (
               <div
                 key={t.id}
@@ -86,9 +101,9 @@ export function MyTasksView({
                   display: 'flex', alignItems: 'center', gap: 12,
                   cursor: 'pointer', transition: 'box-shadow 0.15s',
                 }}
-                onClick={() => onOpenTask(t.id, t._projectId)}
+                onClick={() => onOpenTask(t.id, t.projectId)}
               >
-                <TaskCheckbox done={t.status === 'done'} onToggle={e => { e.stopPropagation(); onToggleComplete(t.id, t._projectId); }} size={20} />
+                <TaskCheckbox done={t.status === 'done'} onToggle={e => { e.stopPropagation(); onToggleComplete(t.id, t.projectId); }} size={20} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{
@@ -99,7 +114,11 @@ export function MyTasksView({
                     }}>{t.name}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11.5, color: COLORS.grayLight, fontFamily: FF }}>{projNames[t._projectId] || t._projectId}</span>
+                    {projectName && (
+                      <span style={{ fontSize: 11.5, fontWeight: 600, color: projectColor, fontFamily: FF, background: `${projectColor}18`, padding: '2px 8px', borderRadius: 6 }}>
+                        {projectName}
+                      </span>
+                    )}
                     {t.tags && t.tags.length > 0 && <TagPills tags={t.tags} tagMap={allTagMap} />}
                   </div>
                 </div>
@@ -110,7 +129,7 @@ export function MyTasksView({
                       background: dueMeta.bg, color: dueMeta.color, whiteSpace: 'nowrap',
                     }}>{dueDateOffsetLabel(t.dueDate, t.status)}</span>
                   )}
-                  {member && <Avatar id={member.id} size={24} />}
+                  {member && <Avatar id={assigneeId} size={24} />}
                 </div>
               </div>
             );

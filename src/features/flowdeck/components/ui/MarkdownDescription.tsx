@@ -3,8 +3,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Bold, Italic, Heading2, List, ListOrdered, Code, Link2, CheckSquare, Eye, Edit3 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { COLORS, TEAM, CURRENT_USER_ID, FF } from '@/features/flowdeck/model';
+import { COLORS, FF } from '@/features/flowdeck/model';
 import { Field } from './Field';
+import { useMemberDirectory } from './MemberDirectory';
 
 /* ---- Markdown toolbar button ---- */
 function ToolBtn({ icon: Icon, label, onClick }: { icon: React.ElementType; label: string; onClick: () => void }) {
@@ -28,14 +29,14 @@ function ToolBtn({ icon: Icon, label, onClick }: { icon: React.ElementType; labe
 }
 
 /* ---- Mention renderer for markdown ---- */
-function renderMentionText(text: string): React.ReactNode {
+function renderMentionText(text: string, members: ReturnType<typeof useMemberDirectory>['list']): React.ReactNode {
   const parts = text.split(/(@\w+)/g);
   return parts.map((part, i) => {
     if (part.startsWith('@')) {
       const username = part.slice(1);
-      const member = TEAM.find(m => m.name.toLowerCase().split(' ').some(n => n.toLowerCase().startsWith(username.toLowerCase())));
+      const member = members.find(m => m.name.toLowerCase().split(' ').some(n => n.toLowerCase().startsWith(username.toLowerCase())));
       return (
-        <span key={i} style={{ fontWeight: 600, color: member?.color || COLORS.teal, backgroundColor: member ? `${member.color}15` : 'transparent', padding: '1px 4px', borderRadius: 4 }}>{part}</span>
+        <span key={i} style={{ fontWeight: 600, color: member?.color || COLORS.teal, backgroundColor: member?.color ? `${member.color}15` : 'transparent', padding: '1px 4px', borderRadius: 4 }}>{part}</span>
       );
     }
     return part;
@@ -43,13 +44,13 @@ function renderMentionText(text: string): React.ReactNode {
 }
 
 /* ---- Markdown preview renderer ---- */
-function MarkdownPreview({ content }: { content: string }) {
+function MarkdownPreview({ content, members }: { content: string; members: ReturnType<typeof useMemberDirectory>['list'] }) {
   return (
     <div style={{ fontSize: 13.5, fontFamily: FF, lineHeight: 1.6, color: COLORS.ink }}>
       <ReactMarkdown
         components={{
           /* @mention rendering inside markdown */
-          p: ({ children }) => <p style={{ margin: '0 0 8px 0' }}>{typeof children === 'string' ? renderMentionText(children) : children}</p>,
+          p: ({ children }) => <p style={{ margin: '0 0 8px 0' }}>{typeof children === 'string' ? renderMentionText(children, members) : children}</p>,
           h2: ({ children }) => <h2 style={{ fontSize: 17, fontWeight: 700, margin: '12px 0 6px 0', color: COLORS.ink }}>{children}</h2>,
           h3: ({ children }) => <h3 style={{ fontSize: 15, fontWeight: 700, margin: '10px 0 4px 0', color: COLORS.ink }}>{children}</h3>,
           strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
@@ -81,6 +82,7 @@ export function MarkdownDescription({ value, onUpdate }: { value: string | undef
   const [mode, setMode] = useState<'view' | 'edit' | 'preview'>('view');
   const [draft, setDraft] = useState(value || '');
   const ref = useRef<HTMLTextAreaElement>(null);
+  const { list: memberList } = useMemberDirectory();
 
   /* @mention autocomplete state */
   const [showMentions, setShowMentions] = useState(false);
@@ -89,8 +91,8 @@ export function MarkdownDescription({ value, onUpdate }: { value: string | undef
   const [cursorPos, setCursorPos] = useState(0);
 
   const mentionMatches = mentionQuery
-    ? TEAM.filter(m => m.name.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 5)
-    : TEAM.slice(0, 5);
+    ? memberList.filter(m => m.name.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 5)
+    : memberList.slice(0, 5);
 
   /* Focus textarea when entering edit mode (draft is set in click handlers) */
   useEffect(() => {
@@ -234,7 +236,7 @@ export function MarkdownDescription({ value, onUpdate }: { value: string | undef
         {value ? (
           <div style={{ position: 'relative' }}>
             <div onClick={() => { setDraft(value || ''); setMode('preview'); }} style={{ minHeight: 60, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${COLORS.line}`, cursor: 'pointer', transition: 'border-color 0.15s' }}>
-              <MarkdownPreview content={value} />
+              <MarkdownPreview content={value} members={memberList} />
             </div>
             <button
               onClick={() => { setDraft(value || ''); setMode('edit'); }}
@@ -345,7 +347,7 @@ export function MarkdownDescription({ value, onUpdate }: { value: string | undef
     <Field label="Description">
       <div style={{ position: 'relative' }}>
         <div style={{ minHeight: 60, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${COLORS.accent}`, boxShadow: '0 0 0 3px rgba(254,128,41,0.12)', background: '#FFFCF8' }}>
-          <MarkdownPreview content={draft} />
+          <MarkdownPreview content={draft} members={memberList} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 8 }}>
           <button

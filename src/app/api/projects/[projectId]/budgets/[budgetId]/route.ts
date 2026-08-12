@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser, requireProjectCapability, authErrorResponse } from '@/server/auth/authorization';
-import { deleteBudget, createExpense, createExpenseSchema, listExpenses } from '@/server/budgets/budget.service';
+import { deleteBudget, createExpense, createExpenseSchema, listExpenses, updateBudget, updateBudgetSchema } from '@/server/budgets/budget.service';
 import { db } from '@/server/db/client';
 
 /**
@@ -53,6 +53,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
     // the request body — prevents cross-project expense injection.
     const expense = await createExpense(projectId, user.id, { ...parsed.data, budgetId });
     return NextResponse.json({ expense }, { status: 201 });
+  } catch (e) { return authErrorResponse(e); }
+}
+
+/** PATCH /api/projects/:projectId/budgets/:budgetId — update budget fields. */
+export async function PATCH(req: Request, { params }: { params: Promise<{ projectId: string; budgetId: string }> }) {
+  try {
+    const user = await requireAuthenticatedUser();
+    const { projectId, budgetId } = await params;
+    await requireProjectCapability(user.id, projectId, 'MANAGE_BUDGETS');
+
+    if (!(await verifyBudgetInProject(budgetId, projectId))) {
+      return NextResponse.json({ error: 'Budget not found' }, { status: 404 });
+    }
+
+    const body = await req.json().catch(() => null);
+    const parsed = updateBudgetSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid' }, { status: 400 });
+
+    const budget = await updateBudget(budgetId, parsed.data);
+    return NextResponse.json({ budget });
   } catch (e) { return authErrorResponse(e); }
 }
 

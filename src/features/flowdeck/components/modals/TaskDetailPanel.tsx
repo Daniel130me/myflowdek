@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { X, ArrowLeft, Calendar, Link2, Diamond, Repeat, Tag as TagIcon, Plus, Trash2, Eye, Download, Upload, Copy, FolderInput, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
-import { COLORS, STATUS_META, PRIORITY_META, TEAM, TAG_COLORS, fmtRange, fmtDueDate, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, CURRENT_USER_ID, TODAY, type Task, type FileItem, type Tag, type Comment, type ActivityEntry, type TimeLog, type CustomColumn, type TaskStatus, type TaskPriority } from '@/features/flowdeck/model';
+import { COLORS, STATUS_META, PRIORITY_META, TAG_COLORS, fmtRange, fmtDueDate, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, TODAY, type Task, type FileItem, type Tag, type Comment, type ActivityEntry, type TimeLog, type CustomColumn, type TaskStatus, type TaskPriority, type MemberInfo } from '@/features/flowdeck/model';
 import { useViewport } from '../../hooks/useViewport';
 import { StatusPill } from '../ui/StatusPill';
 import { FileThumbnail } from '../ui/FileThumbnail';
@@ -51,6 +51,10 @@ interface TaskDetailPanelProps {
   /* #35: Section assignment */
   onSetTaskSection?: (taskId: string, sectionId: string | null) => void;
   sections?: { id: string; name: string }[];
+  /** Real project members for the assignee <select>. Sourced from
+   *  `useProjectMembers` by the parent. When omitted the select shows an
+   *  empty option so the field still renders. */
+  members?: MemberInfo[];
 }
 
 /* Description field is now in MarkdownDescription.tsx — supports Markdown editing + preview + @mentions */
@@ -142,7 +146,7 @@ function TagPicker({ tags, taskTags, onToggle, onAddTag, onRemoveTag }: { tags: 
   );
 }
 
-export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comments = [], activity = [], parentTask, onClose, onUpdate, onAddSubtask, onNavigateToTask, onToggleTaskTag, onAddTag, onRemoveTag, onAddComment, onDeleteComment, onEditComment, onToggleReaction, onToggleFollower, timeLogs = [], onAddTimeLog, onDeleteTimeLog, currentUserId, customCols, onViewFile, onRemoveFile, onAddFiles, onDuplicateTaskWithOptions, onMoveToProject, projects, currentProjectId, onPromoteSubtask, onDemoteToSubtask, onSetTaskSection, sections = [] }: TaskDetailPanelProps) {
+export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comments = [], activity = [], parentTask, onClose, onUpdate, onAddSubtask, onNavigateToTask, onToggleTaskTag, onAddTag, onRemoveTag, onAddComment, onDeleteComment, onEditComment, onToggleReaction, onToggleFollower, timeLogs = [], onAddTimeLog, onDeleteTimeLog, currentUserId, customCols, onViewFile, onRemoveFile, onAddFiles, onDuplicateTaskWithOptions, onMoveToProject, projects, currentProjectId, onPromoteSubtask, onDemoteToSubtask, onSetTaskSection, sections = [], members = [] }: TaskDetailPanelProps) {
   const { isMobile } = useViewport();
   const deps = task.deps.map(id => allTasks.find(t => t.id === id)).filter(Boolean) as Task[];
   const taskFiles = files.filter(f => f.linkedTaskId === task.id);
@@ -164,7 +168,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
     const now = TODAY.toISOString().slice(0, 10);
     const newFiles: FileItem[] = picked.map(f => ({
       id: 'f' + Math.random().toString(36).slice(2, 8),
-      name: f.name, size: f.size, uploadedBy: CURRENT_USER_ID, uploadedAt: now,
+      name: f.name, size: f.size, uploadedBy: currentUserId, uploadedAt: now,
       linkedTaskId: task.id, url: URL.createObjectURL(f),
     }));
     onAddFiles(newFiles);
@@ -242,12 +246,12 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
 
   /* Shared: comments section */
   const commentsSection = onAddComment ? (
-    <CommentsSection taskId={task.id} comments={comments} activity={activity} onAddComment={onAddComment || (() => {})} onDeleteComment={onDeleteComment || (() => {})} onEditComment={onEditComment} onToggleReaction={onToggleReaction} />
+    <CommentsSection taskId={task.id} comments={comments} activity={activity} onAddComment={onAddComment || (() => {})} onDeleteComment={onDeleteComment || (() => {})} onEditComment={onEditComment} onToggleReaction={onToggleReaction} currentUserId={currentUserId} />
   ) : null;
 
   /* Shared: followers section */
   const followersSection = onToggleFollower ? (
-    <FollowersSection followerIds={task.followers || []} onToggle={(uid) => onToggleFollower(task.id, uid)} currentUserId={currentUserId} />
+    <FollowersSection followerIds={task.followers || []} onToggle={(uid) => onToggleFollower(task.id, uid)} currentUserId={currentUserId} members={members} />
   ) : null;
 
   /* Shared: time tracking section */
@@ -412,7 +416,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
           {parentTaskField}
           {subtasksSection}
           <Field label="Status"><select value={task.status} onChange={e => onUpdate({ status: e.target.value as TaskStatus, progress: e.target.value === 'done' ? 100 : task.progress })} style={selectStyle}>{['backlog', 'in_progress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select></Field>
-          <Field label="Assignee"><select value={task.assignee} onChange={e => onUpdate({ assignee: e.target.value })} style={selectStyle}>{TEAM.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
+          <Field label="Assignee"><select value={task.assignee} onChange={e => onUpdate({ assignee: e.target.value })} style={selectStyle}>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
           <Field label="Priority"><select value={task.priority} onChange={e => onUpdate({ priority: e.target.value as TaskPriority })} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
           {dueDateField}
           {recurrenceField}
@@ -505,7 +509,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
         {parentTaskField}
         {subtasksSection}
         <Field label="Status"><select value={task.status} onChange={e => onUpdate({ status: e.target.value as TaskStatus, progress: e.target.value === 'done' ? 100 : task.progress })} style={selectStyle}>{['backlog', 'in_progress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select></Field>
-        <Field label="Assignee"><select value={task.assignee} onChange={e => onUpdate({ assignee: e.target.value })} style={selectStyle}>{TEAM.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
+        <Field label="Assignee"><select value={task.assignee} onChange={e => onUpdate({ assignee: e.target.value })} style={selectStyle}>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
         <Field label="Priority"><select value={task.priority} onChange={e => onUpdate({ priority: e.target.value as TaskPriority })} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
         {dueDateField}
         {recurrenceField}

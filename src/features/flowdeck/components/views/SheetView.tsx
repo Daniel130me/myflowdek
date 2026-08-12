@@ -2,8 +2,8 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { Search, Diamond, GripVertical } from 'lucide-react';
-import { COLORS, STATUS_META, PRIORITY_META, SHEET_COLUMNS, TEAM, teamById, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task, type TaskStatus, type TaskPriority } from '@/features/flowdeck/model';
-import { SectionHeader, TaskCheckbox, FF } from '../ui';
+import { COLORS, STATUS_META, PRIORITY_META, SHEET_COLUMNS, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task, type TaskStatus, type TaskPriority } from '@/features/flowdeck/model';
+import { SectionHeader, TaskCheckbox, FF, useProjectMembers } from '../ui';
 import { GridToolbar, type GridActions } from '../toolbar';
 import { useViewport } from '../../hooks/useViewport';
 
@@ -21,6 +21,9 @@ interface SheetViewProps {
 
 export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, onReorder, onQuickAdd, onToggleComplete }: SheetViewProps) {
   const { isMobile } = useViewport();
+  // Real project members for the assignee <select>. Registered into the
+  // global MemberDirectory so Avatar + lookups resolve real users.
+  const { members } = useProjectMembers(projectId);
   const allColumns = [...SHEET_COLUMNS, ...grid.customCols.map(c => ({ ...c, width: 140 } as const))];
   const [widths, setWidths] = useState<Record<string, number>>(() => Object.fromEntries(allColumns.map(c => [c.key, c.width])));
   const [hidden, setHidden] = useState<Set<string>>(new Set());
@@ -39,7 +42,7 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
   const inputCell: React.CSSProperties = { width: '100%', border: 'none', outline: 'none', padding: cellPad, fontSize: 12.5, background: 'transparent', fontFamily: 'inherit', minHeight: 36, boxSizing: 'border-box' };
 
   const visibleCols = allColumns.filter(c => !hidden.has(c.key));
-  const filtered = query.trim() ? tasks.filter(t => t.name.toLowerCase().includes(query.toLowerCase()) || teamById[t.assignee]?.name.toLowerCase().includes(query.toLowerCase())) : tasks;
+  const filtered = query.trim() ? tasks.filter(t => t.name.toLowerCase().includes(query.toLowerCase()) || (members.find(m => m.id === t.assignee)?.name || '').toLowerCase().includes(query.toLowerCase())) : tasks;
   const isSearching = query.trim().length > 0;
 
   const dragState = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
@@ -127,7 +130,7 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
       case 'description':
         return <input style={{ ...inputCell, color: t.description ? COLORS.ink : COLORS.grayLight }} value={t.description || ''} placeholder="Add description…" onChange={e => onUpdate(t.id, { description: e.target.value || undefined })} />;
       case 'select-assignee':
-        return <select style={inputCell} value={t.assignee} onChange={e => onUpdate(t.id, { assignee: e.target.value })}>{TEAM.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>;
+        return <select style={inputCell} value={t.assignee} onChange={e => onUpdate(t.id, { assignee: e.target.value })}>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select>;
       case 'date':
         if (col.key === 'dueDate') {
           const dueStatus = getDueDateStatus(t.dueDate, t.status);
@@ -164,7 +167,7 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
         .fd-row:hover .fd-grip-handle { opacity: 1; }
         .fd-row:hover .fd-grip-handle:active { cursor: grabbing; }
       `}</style>
-      <GridToolbar projectId={projectId} tasks={tasks} grid={grid} />
+      <GridToolbar projectId={projectId} tasks={tasks} grid={grid} members={members} />
       <SectionHeader title="Sheet" subtitle="Every cell is editable — drag column edges to resize, just like a spreadsheet" />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: COLORS.paper, border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: '6px 10px', width: isMobile ? '100%' : 220 }}>

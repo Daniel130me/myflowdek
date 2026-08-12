@@ -23,3 +23,4 @@ export { TaskContextMenu } from './TaskContextMenu';
 export { InlineTaskName } from './InlineTaskName';
 export { DuplicateTaskDialog } from './DuplicateTaskDialog';
 export { MarkdownDescription } from './MarkdownDescription';
+export { MemberDirectoryProvider, useMemberDirectory, useProjectMembers } from './MemberDirectory';

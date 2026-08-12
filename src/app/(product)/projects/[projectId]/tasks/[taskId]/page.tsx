@@ -7,6 +7,7 @@ import { TaskDetailPanel } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useProjectComments } from '@/features/flowdeck/hooks/useProjectComments';
 import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
+import { useProjectMembers } from '@/features/flowdeck/components/ui';
 import { getTaskForProject } from '@/features/tasks/selectors/getTaskForProject';
 import { routes } from '@/shared/navigation/routes';
 import type { ActivityEntry } from '@/features/flowdeck/model';
@@ -21,6 +22,8 @@ export default function TaskDetailRoutePage() {
   // Fetch real tasks + comments from the API and sync into the store.
   useProjectTasks(projectId);
   useProjectComments(projectId);
+  // Real project members for the assignee <select> in the detail panel.
+  const { members } = useProjectMembers(projectId);
 
   // Fetch real activity from the API (replaces mock store activity).
   const [apiActivity, setApiActivity] = useState<ActivityEntry[]>([]);
@@ -104,6 +107,7 @@ export default function TaskDetailRoutePage() {
         onAddFiles={(files) => state.addFiles(projectId, files)}
         onDuplicateTaskWithOptions={(taskId, opts) => state.duplicateTaskWithOptions(projectId, taskId, opts)}
         onMoveToProject={(taskId, targetProjectId) => state.moveTaskToProject(projectId, taskId, targetProjectId)}
+        members={members}
       />
     </>
   );

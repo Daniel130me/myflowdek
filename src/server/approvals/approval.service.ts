@@ -35,7 +35,41 @@ export function listApprovals(projectId: string) {
   });
 }
 
+/**
+ * Create an approval request.
+ *
+ * Integrity checks (defense in depth — the route layer already authorizes the
+ * requester via `requireProjectCapability('MANAGE_APPROVALS')`, but we re-check
+ * the cross-project + approver-membership invariants here so a buggy caller or
+ * a direct service invocation cannot create a malformed approval):
+ *
+ *  1. The referenced task must exist AND belong to the same project.
+ *     (Prevents leaking approvals across projects by tampering with taskId.)
+ *  2. The approver must be a ProjectMember of the same project.
+ *     (Prevents assigning approvals to users who cannot see the project at all.)
+ *
+ * The requester's `MANAGE_APPROVALS` capability is enforced by the route
+ * handler via `requireProjectCapability` before this function is called.
+ */
 export async function createApproval(projectId: string, requesterId: string, input: CreateApprovalInput) {
+  // (1) Task must exist and belong to the same project.
+  const task = await db.task.findUnique({
+    where: { id: input.taskId },
+    select: { id: true, projectId: true },
+  });
+  if (!task || task.projectId !== projectId) {
+    throw new AuthError('Task does not belong to this project', 400);
+  }
+
+  // (2) Approver must be a member of the same project.
+  const approverMembership = await db.projectMember.findUnique({
+    where: { projectId_userId: { projectId, userId: input.approverId } },
+    select: { userId: true },
+  });
+  if (!approverMembership) {
+    throw new AuthError('Approver is not a member of this project', 400);
+  }
+
   return db.approvalRequest.create({
     data: { taskId: input.taskId, projectId, requesterId, approverId: input.approverId, comment: input.comment },
     select: approvalSelect,

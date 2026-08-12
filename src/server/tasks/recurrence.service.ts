@@ -15,13 +15,18 @@ import { db } from '@/server/db/client';
  *   - recurrence IS NOT NULL
  *   - status = 'done'
  *   - completedAt is within the last 24 hours (avoids re-processing old tasks)
- *   - No subsequent task has been created from this one (checked by name + parent)
+ *   - No subsequent task has been created from this one (checked by
+ *     recurrenceSourceId — see below)
  *
  * For each matching task, it creates a new task with:
  *   - Same name, description, assignee, priority, tags
  *   - Status = 'backlog'
  *   - New due date calculated from the recurrence pattern
- *   - parentId = original task (so the chain is traceable)
+ *   - recurrenceSourceId = original task (lineage — distinct from `parentId`,
+ *     which is the subtask hierarchy only)
+ *   - parentId inherited from the original task (so a recurring subtask's
+ *     next occurrence stays under the same parent — but it is NOT made a
+ *     child of the original task)
  */
 
 /** Maximum recurrence depth — prevents infinite chains if something goes wrong. */
@@ -83,18 +88,21 @@ export async function processRecurringTasks(): Promise<number> {
   });
 
   let created = 0;
+  let depth = 0;
 
   for (const task of completedRecurring) {
+    if (depth >= MAX_RECURRENCE_DEPTH) break;
     if (!task.recurrence || !task.dueDate) continue;
 
-    // Check if a next occurrence already exists (same name, same project,
-    // created after this task was completed). This prevents duplicate
-    // creation if the cron runs multiple times.
+    // Check if a next occurrence already exists. We match on
+    // `recurrenceSourceId` (pointing back to this task) rather than `parentId`
+    // — `parentId` is the subtask hierarchy and would yield false positives
+    // if the user has manually nested tasks under this one. Only the
+    // recurrence service ever sets `recurrenceSourceId`, so a match here is
+    // authoritative.
     const existing = await db.task.findFirst({
       where: {
-        projectId: task.projectId,
-        name: task.name,
-        parentId: task.id, // The next occurrence has this task as its parent
+        recurrenceSourceId: task.id,
       },
       select: { id: true },
     });
@@ -105,6 +113,11 @@ export async function processRecurringTasks(): Promise<number> {
     const nextDueDate = computeNextDate(task.dueDate, task.recurrence);
 
     // Create the next occurrence.
+    //
+    // `recurrenceSourceId` records the lineage (which task produced this one).
+    // `parentId` is inherited from the source so a recurring subtask's next
+    // occurrence stays under the same parent — but we do NOT set
+    // `parentId = task.id` (that would conflate recurrence with subtasking).
     const newTask = await db.task.create({
       data: {
         projectId: task.projectId,
@@ -116,7 +129,8 @@ export async function processRecurringTasks(): Promise<number> {
         duration: task.duration,
         assigneeId: task.assigneeId,
         createdById: task.createdById,
-        parentId: task.id, // Link to the original for traceability
+        parentId: task.parentId, // Preserve subtask position (may be null)
+        recurrenceSourceId: task.id, // Lineage pointer to the source task
         recurrence: task.recurrence, // Carry the recurrence forward
       },
     });
@@ -130,6 +144,7 @@ export async function processRecurringTasks(): Promise<number> {
     }
 
     created++;
+    depth++;
   }
 
   if (created > 0) {

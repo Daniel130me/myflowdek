@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import ProjectTasksPage from '../page';
 import { NewTaskModal } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { useProjectMembers } from '@/features/flowdeck/components/ui';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
 
@@ -18,6 +19,7 @@ export default function NewTaskRoutePage() {
   const project = state.projects[projectId];
   const tasks = state.tasksByProject[projectId] || [];
   const tags = state.tagsByProject[projectId] || [];
+  const { members } = useProjectMembers(projectId);
 
   return (
     <>
@@ -26,6 +28,7 @@ export default function NewTaskRoutePage() {
         projectStart={project?.start || ''}
         tasks={tasks}
         tags={tags}
+        members={members}
         onClose={close}
         onCreate={input => {
           state.addTask(projectId, input);

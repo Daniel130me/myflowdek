@@ -12,6 +12,7 @@ import {
   type Task, type Project, type FileItem, type RaidItem, type CustomColumn, type TaskStatus, type TaskPriority,
   type Tag, type Comment, type ActivityEntry, type TimeLog, type SearchFilters, type Section, type Reaction, type Goal, type KeyResult, type SavedFilter, EMPTY_FILTERS,
   type AutomationRule, type Form, type FormSubmission, type ApprovalRequest, type Budget, type Expense, type TimesheetEntry, type CreateTaskInput,
+  type MemberInfo,
 } from '@/features/flowdeck/model';
 import type { GridActions } from '../components/toolbar/types';
 import type { ProjectStatusUpdate } from '@/features/flowdeck/model';
@@ -24,9 +25,12 @@ import {
   apiAddReaction, apiRemoveReaction,
   apiAddTaskTag, apiRemoveTaskTag,
   apiFollowTask, apiUnfollowTask,
-  apiCreateSection, apiDeleteSection,
+  apiCreateSection, apiDeleteSection, apiUpdateSection,
   apiAddDependency, apiRemoveDependency,
   apiAddTimeLog, apiDeleteTimeLog,
+  apiUpdateProject, apiToggleProjectFavorite, apiArchiveProject, apiRestoreProject,
+  apiAddProjectMember, apiRemoveProjectMember,
+  apiCreateProjectStatusUpdate, apiDeleteProjectStatusUpdate,
 } from '@/lib/api-client';
 
 /* ---- LocalStorage persistence ---- */
@@ -53,6 +57,23 @@ export interface FlowDeckState {
   sectionsByProject: Record<string, Section[]>;
   currentUserId: string;
   setCurrentUserId: (id: string) => void;
+  /**
+   * Display name of the authenticated user (set from session.user.name by
+   * FlowdekDataProvider). Used for activity-log messages + CSV export when
+   * the actor is the current user. Falls back to 'Someone' if unset.
+   */
+  currentUserName: string;
+  setCurrentUserName: (name: string) => void;
+  /**
+   * Global `userId → MemberInfo` map aggregated from every project the user
+   * has opened. Populated by `registerMembers` (called by
+   * `useProjectMembers` whenever the members API responds) and used by the
+   * store for activity-log names, CSV name→id mapping, and assignee-name
+   * search. Components read this via the `MemberDirectory` context's
+   * `lookup()` helper.
+   */
+  membersById: Record<string, MemberInfo>;
+  registerMembers: (members: MemberInfo[]) => void;
 
   /* UI state */
   currentProjectId: string | null;
@@ -116,6 +137,18 @@ export interface FlowDeckState {
   syncProjectComments: (projectId: string, comments: Comment[]) => void;
   /** Replace a project's files with API data. */
   syncProjectFiles: (projectId: string, files: FileItem[]) => void;
+  /**
+   * Replace a project's member id list with API data. One-way sync — does
+   * NOT call the API (used by `useProjectMembers` to populate the local
+   * cache from the server's response). For user-initiated member changes,
+   * use `setProjectMembers` (which diffs + calls POST/DELETE per member).
+   */
+  syncProjectMembers: (projectId: string, memberUserIds: string[]) => void;
+  /**
+   * Replace a project's status updates with API data. One-way sync from the
+   * server — does NOT call the API.
+   */
+  syncProjectStatusUpdates: (projectId: string, updates: ProjectStatusUpdate[]) => void;
   /**
    * Replace the entire projects map with the API results for the given
    * workspace. Called by `useProjects` whenever the API responds. The
@@ -308,6 +341,64 @@ export function useFlowDeckStore(): FlowDeckState {
     setCurrentUserIdState(id);
   }, []);
 
+  /**
+   * Display name of the authenticated user (set from session.user.name by
+   * FlowdekDataProvider). Used for activity-log messages so they read
+   * naturally even before the MemberDirectory hydrates with real members.
+   */
+  const [currentUserName, setCurrentUserName] = useState<string>('');
+  const userNameRef = useRef(currentUserName);
+  userNameRef.current = currentUserName;
+
+  /**
+   * Global `userId → MemberInfo` map aggregated from every project the user
+   * has opened. Used by:
+   *   - the store (CSV name→id mapping, activity-log actor names, filtered
+   *     task search by assignee name)
+   *   - the MemberDirectory context (`lookup()` helper for Avatar + activity
+   *     labels)
+   *
+   * Seeded with the mock TEAM so the legacy demo data still renders before
+   * the members API responds (the seeded entries get overwritten by real
+   * data the first time `useProjectMembers` runs for any project).
+   */
+  const [membersById, setMembersById] = useState<Record<string, MemberInfo>>(
+    () => Object.fromEntries(TEAM.map(m => [m.id, { id: m.id, name: m.name, role: m.role, color: m.color }])),
+  );
+  const membersRef = useRef(membersById);
+  membersRef.current = membersById;
+  const registerMembers = useCallback((members: MemberInfo[]) => {
+    setMembersById(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const m of members) {
+        const existing = next[m.id];
+        if (!existing || existing.name !== m.name || existing.color !== m.color || existing.role !== m.role) {
+          next[m.id] = m;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
+  /**
+   * Resolve a user id to a display name for activity-log messages + toasts.
+   * Order of precedence:
+   *   1. The store's `membersById` map (populated by `useProjectMembers`)
+   *   2. The current user's session name (when the id is the current user)
+   *   3. The generic 'Someone' fallback
+   *
+   * This replaces the old `TEAM.find(m => m.id === X)?.name || 'Someone'`
+   * pattern so activity logs + toasts use real member data once it's loaded.
+   */
+  const resolveMemberName = useCallback((id: string): string => {
+    const known = membersRef.current[id];
+    if (known?.name) return known.name;
+    if (id === userIdRef.current && userNameRef.current) return userNameRef.current;
+    return 'Someone';
+  }, []);
+
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState('projects');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -452,6 +543,20 @@ export function useFlowDeckStore(): FlowDeckState {
     setFilesByProject(prev => ({ ...prev, [projectId]: files }));
   }, []);
 
+  /** One-way sync: replace a project's local member id list with API data. */
+  const syncProjectMembers = useCallback((projectId: string, memberUserIds: string[]) => {
+    setProjects(prev => {
+      const p = prev[projectId];
+      if (!p) return prev;
+      return { ...prev, [projectId]: { ...p, members: memberUserIds } };
+    });
+  }, []);
+
+  /** One-way sync: replace a project's local status updates with API data. */
+  const syncProjectStatusUpdates = useCallback((projectId: string, updates: ProjectStatusUpdate[]) => {
+    setStatusUpdatesByProject(prev => ({ ...prev, [projectId]: updates }));
+  }, []);
+
   /**
    * Replace the projects map with the API response for the selected
    * workspace. Empty results reset the map (so switching to a workspace with
@@ -579,16 +684,16 @@ export function useFlowDeckStore(): FlowDeckState {
     // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === id ? { ...t, ...patch } : t));
     if (task && patch.status && patch.status !== task.status) {
-      const member = TEAM.find(m => m.id === userIdRef.current);
-      logActivity(projectId, id, 'status_change', `${member?.name || 'Someone'} changed status to ${STATUS_META[patch.status]?.label || patch.status}`);
+      const actorName = resolveMemberName(userIdRef.current);
+      logActivity(projectId, id, 'status_change', `${actorName} changed status to ${STATUS_META[patch.status]?.label || patch.status}`);
     }
     if (task && patch.priority && patch.priority !== task.priority) {
-      const member = TEAM.find(m => m.id === userIdRef.current);
-      logActivity(projectId, id, 'priority_change', `${member?.name || 'Someone'} changed priority to ${PRIORITY_META[patch.priority]?.label || patch.priority}`);
+      const actorName = resolveMemberName(userIdRef.current);
+      logActivity(projectId, id, 'priority_change', `${actorName} changed priority to ${PRIORITY_META[patch.priority]?.label || patch.priority}`);
     }
     if (task && patch.dueDate && patch.dueDate !== task.dueDate) {
-      const member = TEAM.find(m => m.id === userIdRef.current);
-      logActivity(projectId, id, 'due_date_change', `${member?.name || 'Someone'} changed due date`);
+      const actorName = resolveMemberName(userIdRef.current);
+      logActivity(projectId, id, 'due_date_change', `${actorName} changed due date`);
     }
     // Persist to PostgreSQL. On failure, restore the snapshot (full project
     // task list at the moment before the optimistic update) so the UI doesn't
@@ -598,20 +703,20 @@ export function useFlowDeckStore(): FlowDeckState {
       setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
       toast.error('Failed to save task change', { description: res.error });
     });
-  }, [tasksByProject, commit, logActivity]);
+  }, [tasksByProject, commit, logActivity, resolveMemberName]);
 
   const toggleComplete = useCallback((projectId: string, id: string) => {
     const projectTasks = tasksByProject[projectId] || [];
     const task = projectTasks.find(t => t.id === id);
     if (!task) return;
-    const member = TEAM.find(m => m.id === userIdRef.current);
+    const actorName = resolveMemberName(userIdRef.current);
     // Snapshot for rollback.
     const snapshot = projectTasks;
     if (task.status === 'done') {
       // Reopen the task.
       const patch: Partial<Task> = { status: 'in_progress', progress: 0 };
       commit(projectId, projectTasks.map(t => t.id === id ? { ...t, ...patch } : t));
-      logActivity(projectId, id, 'reopened', `${member?.name || 'Someone'} reopened this task`);
+      logActivity(projectId, id, 'reopened', `${actorName} reopened this task`);
       toast.info('Task reopened', { description: task.name });
       apiUpdateTask(id, patch).then((res) => {
         if (res.ok) return;
@@ -624,7 +729,7 @@ export function useFlowDeckStore(): FlowDeckState {
       // (item: remove browser-side recurrence copy creation).
       const patch: Partial<Task> = { status: 'done', progress: 100 };
       commit(projectId, projectTasks.map(t => t.id === id ? { ...t, ...patch } : t));
-      logActivity(projectId, id, 'completed', `${member?.name || 'Someone'} marked as done`);
+      logActivity(projectId, id, 'completed', `${actorName} marked as done`);
       toast.success('Task completed', { description: task.name });
       apiUpdateTask(id, patch).then((res) => {
         if (res.ok) return;
@@ -632,7 +737,7 @@ export function useFlowDeckStore(): FlowDeckState {
         toast.error('Failed to complete task', { description: res.error });
       });
     }
-  }, [tasksByProject, commit, logActivity]);
+  }, [tasksByProject, commit, logActivity, resolveMemberName]);
 
   const updateTasksBulk = useCallback((projectId: string, ids: Set<string>, patch: Partial<Task> | ((t: Task) => Partial<Task>)) => {
     if (projectId) {
@@ -770,70 +875,143 @@ export function useFlowDeckStore(): FlowDeckState {
     if (!projectId) return;
     const count = ids.size;
     const projectTasks = tasksByProject[projectId] || [];
+    // Snapshot for rollback — restore the pre-delete task list (and the
+    // selection set) if the server rejects the bulk delete.
+    const snapshot = projectTasks;
+    const snapshotSelection = new Set(selectedIds);
     // Optimistic local update.
     commit(projectId, projectTasks.filter(t => !ids.has(t.id)));
     setSelectedIds(new Set());
     toast.success(`${count} task${count > 1 ? 's' : ''} deleted`);
-    // Persist to PostgreSQL.
+    // Persist to PostgreSQL via the bulk delete action. On failure, restore
+    // the pre-delete task list + selection so the UI reflects the server's
+    // canonical state.
     apiBulkAction(projectId, 'delete', [...ids]).then((res) => {
-      if (!res.ok) toast.error('Failed to delete tasks on server', { description: res.error });
+      if (res.ok) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      setSelectedIds(snapshotSelection);
+      toast.error('Failed to delete tasks on server', { description: res.error });
     });
-  }, [tasksByProject, commit]);
+  }, [tasksByProject, commit, selectedIds]);
 
   const bulkSetDueDate = useCallback((projectId: string, ids: Set<string>, date: string | null) => {
+    if (!projectId || ids.size === 0) return;
+    const projectTasks = tasksByProject[projectId] || [];
+    // Snapshot for rollback.
+    const snapshot = projectTasks;
+    // Optimistic local update.
     updateTasksBulk(projectId, ids, { dueDate: date || undefined });
     toast.success(date ? `Due date set for ${ids.size} task${ids.size > 1 ? 's' : ''}` : `Due date cleared for ${ids.size} task${ids.size > 1 ? 's' : ''}`);
-  }, [updateTasksBulk]);
+    // Persist to PostgreSQL via the bulk dueDate action. The schema expects
+    // an ISO datetime or null; we normalise the YYYY-MM-DD form by appending
+    // T00:00:00 so z.iso.datetime() accepts it.
+    const dueDatePayload = date ? new Date(date).toISOString() : null;
+    apiBulkAction(projectId, 'dueDate', [...ids], { dueDate: dueDatePayload }).then((res) => {
+      if (res.ok) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save due date', { description: res.error });
+    });
+  }, [tasksByProject, updateTasksBulk]);
 
   const bulkAddTag = useCallback((projectId: string, ids: Set<string>, tagId: string) => {
+    if (!projectId || ids.size === 0) return;
+    const projectTasks = tasksByProject[projectId] || [];
+    // Snapshot for rollback.
+    const snapshot = projectTasks;
+    // Optimistic local update.
     updateTasksBulk(projectId, ids, (t) => {
       const current = t.tags || [];
       return { tags: current.includes(tagId) ? current : [...current, tagId] };
     });
     toast.success(`Tag added to ${ids.size} task${ids.size > 1 ? 's' : ''}`);
-  }, [updateTasksBulk]);
+    // Persist to PostgreSQL via the bulk addTag action.
+    apiBulkAction(projectId, 'addTag', [...ids], { tagId }).then((res) => {
+      if (res.ok) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to add tag', { description: res.error });
+    });
+  }, [tasksByProject, updateTasksBulk]);
 
   const bulkRemoveTag = useCallback((projectId: string, ids: Set<string>, tagId: string) => {
+    if (!projectId || ids.size === 0) return;
+    const projectTasks = tasksByProject[projectId] || [];
+    // Snapshot for rollback.
+    const snapshot = projectTasks;
+    // Optimistic local update.
     updateTasksBulk(projectId, ids, (t) => ({
       tags: (t.tags || []).filter(tid => tid !== tagId),
     }));
     toast.success(`Tag removed from ${ids.size} task${ids.size > 1 ? 's' : ''}`);
-  }, [updateTasksBulk]);
+    // Persist to PostgreSQL via the bulk removeTag action.
+    apiBulkAction(projectId, 'removeTag', [...ids], { tagId }).then((res) => {
+      if (res.ok) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to remove tag', { description: res.error });
+    });
+  }, [tasksByProject, updateTasksBulk]);
 
   const bulkSetStatus = useCallback((projectId: string, ids: Set<string>, status: string) => {
+    if (!projectId || ids.size === 0) return;
     const s = status as TaskStatus;
     const progress = s === 'done' ? 100 : s === 'backlog' ? 0 : undefined;
+    const projectTasks = tasksByProject[projectId] || [];
+    // Snapshot for rollback.
+    const snapshot = projectTasks;
+    // Optimistic local update.
     updateTasksBulk(projectId, ids, progress !== undefined ? { status: s, progress } : { status: s });
     toast.success(`${ids.size} task${ids.size > 1 ? 's' : ''} set to ${STATUS_META[s]?.label || s}`);
     apiBulkAction(projectId, 'status', [...ids], { status }).then((res) => {
-      if (!res.ok) toast.error('Failed to save status change', { description: res.error });
+      if (res.ok) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save status change', { description: res.error });
     });
-  }, [updateTasksBulk]);
+  }, [tasksByProject, updateTasksBulk]);
 
   const bulkAssign = useCallback((projectId: string, ids: Set<string>, memberId: string) => {
+    if (!projectId || ids.size === 0) return;
+    const projectTasks = tasksByProject[projectId] || [];
+    // Snapshot for rollback.
+    const snapshot = projectTasks;
+    // Optimistic local update.
     updateTasksBulk(projectId, ids, { assignee: memberId });
-    const member = TEAM.find(m => m.id === memberId);
-    toast.success(`Assigned ${ids.size} task${ids.size > 1 ? 's' : ''} to ${member?.name || 'someone'}`);
+    const memberName = resolveMemberName(memberId);
+    toast.success(`Assigned ${ids.size} task${ids.size > 1 ? 's' : ''} to ${memberName}`);
     apiBulkAction(projectId, 'assignee', [...ids], { assigneeId: memberId }).then((res) => {
-      if (!res.ok) toast.error('Failed to save assignment', { description: res.error });
+      if (res.ok) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save assignment', { description: res.error });
     });
-  }, [updateTasksBulk]);
+  }, [tasksByProject, updateTasksBulk, resolveMemberName]);
 
   const bulkSetPriority = useCallback((projectId: string, ids: Set<string>, priority: TaskPriority) => {
+    if (!projectId || ids.size === 0) return;
+    const projectTasks = tasksByProject[projectId] || [];
+    // Snapshot for rollback.
+    const snapshot = projectTasks;
+    // Optimistic local update.
     updateTasksBulk(projectId, ids, { priority });
     toast.success(`Priority set to ${PRIORITY_META[priority].label} for ${ids.size} task${ids.size > 1 ? 's' : ''}`);
     apiBulkAction(projectId, 'priority', [...ids], { priority }).then((res) => {
-      if (!res.ok) toast.error('Failed to save priority change', { description: res.error });
+      if (res.ok) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save priority change', { description: res.error });
     });
-  }, [updateTasksBulk]);
+  }, [tasksByProject, updateTasksBulk]);
 
   const bulkComplete = useCallback((projectId: string, ids: Set<string>) => {
+    if (!projectId || ids.size === 0) return;
+    const projectTasks = tasksByProject[projectId] || [];
+    // Snapshot for rollback.
+    const snapshot = projectTasks;
+    // Optimistic local update.
     updateTasksBulk(projectId, ids, { status: 'done', progress: 100 });
     toast.success(`Completed ${ids.size} task${ids.size > 1 ? 's' : ''}`);
     apiBulkAction(projectId, 'complete', [...ids]).then((res) => {
-      if (!res.ok) toast.error('Failed to save completion', { description: res.error });
+      if (res.ok) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save completion', { description: res.error });
     });
-  }, [updateTasksBulk]);
+  }, [tasksByProject, updateTasksBulk]);
 
   const indentSelected = useCallback((projectId: string) => updateTasksBulk(projectId, selectedIds, (t: Task) => ({ level: Math.min(4, (t.level || 0) + 1) })), [selectedIds, updateTasksBulk]);
   const outdentSelected = useCallback((projectId: string) => updateTasksBulk(projectId, selectedIds, (t: Task) => ({ level: Math.max(0, (t.level || 0) - 1) })), [selectedIds, updateTasksBulk]);
@@ -889,7 +1067,31 @@ export function useFlowDeckStore(): FlowDeckState {
       toast.error('Failed to unlink tasks', { description: firstFailure.error });
     });
   }, [selectedIds, tasksByProject, commit]);
-  const setRecurrenceSelected = useCallback((projectId: string, freq: string | null) => updateTasksBulk(projectId, selectedIds, { recurrence: freq }), [selectedIds, updateTasksBulk]);
+  /**
+   * Set the recurrence pattern on every selected task. Persists each task
+   * individually via `PATCH /api/tasks/:id` with `{ recurrence }` — the
+   * bulk API doesn't have a recurrence action, so we fan out per-task.
+   *
+   * Snapshot + rollback: capture the pre-update task list, apply the
+   * optimistic update, then issue the PATCHes in parallel. On any failure
+   * we restore the snapshot so the UI matches the server's canonical state.
+   */
+  const setRecurrenceSelected = useCallback((projectId: string, freq: string | null) => {
+    if (!projectId || selectedIds.size === 0) return;
+    const projectTasks = tasksByProject[projectId] || [];
+    const snapshot = projectTasks;
+    // Optimistic local update.
+    updateTasksBulk(projectId, selectedIds, { recurrence: freq });
+    // Persist each task's recurrence via individual PATCHes. The recurrence
+    // schema field accepts 'daily' | 'weekly' | 'monthly' | null.
+    const ids = [...selectedIds];
+    Promise.all(ids.map(id => apiUpdateTask(id, { recurrence: freq }))).then(results => {
+      const firstFailure = results.find(r => !r.ok);
+      if (!firstFailure) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save recurrence', { description: firstFailure.error });
+    });
+  }, [selectedIds, tasksByProject, updateTasksBulk]);
   const toggleBoldSelected = useCallback((projectId: string) => {
     const projectTasks = tasksByProject[projectId] || [];
     const anyBold = projectTasks.some(t => selectedIds.has(t.id) && t.bold);
@@ -910,38 +1112,186 @@ export function useFlowDeckStore(): FlowDeckState {
     setClipboard({ items: projectTasks.filter(t => selectedIds.has(t.id)).map(t => ({ ...t })), mode: 'cut' });
     removeTasksBulk(projectId, selectedIds);
   }, [selectedIds, tasksByProject, removeTasksBulk]);
+  /**
+   * Paste the clipboard tasks into the current project.
+   *
+   * Phase 4 (item 3): each pasted task is now created via the API
+   * (`POST /api/projects/:id/tasks`) instead of just being cloned locally.
+   * We optimistically insert temp-id clones, then issue parallel POSTs and
+   * reconcile each clone's id with the server's canonical id. On any
+   * failure we remove the corresponding optimistic clone + surface a toast.
+   */
   const paste = useCallback((projectId: string) => {
     if (!clipboard.items.length || !projectId) return;
-    const clones = clipboard.items.map(t => ({ ...t, id: defaultIdGenerator.generate('t'), projectId, name: t.name + ' (copy)' }));
-    addTasksBulk(projectId, clones);
-  }, [clipboard.items, addTasksBulk]);
+    const projectTasks = tasksByProject[projectId] || [];
+    // Snapshot for rollback — remove all pasted clones if the first
+    // creation fails (subsequent failures are reported per-task but the
+    // clones are left in place; the next project load reconciles).
+    const snapshot = projectTasks;
+    const clones = clipboard.items.map(t => ({
+      ...t,
+      id: defaultIdGenerator.generate('t'),
+      projectId,
+      name: t.name + ' (copy)',
+      // Pasted tasks start fresh — no point carrying over the source's
+      // completion state.
+      status: 'backlog' as TaskStatus,
+      progress: 0,
+      deps: [],
+      createdAt: new Date().toISOString(),
+    }));
+    // Optimistic local insert.
+    commit(projectId, [...projectTasks, ...clones]);
+    toast.success(`Pasted ${clones.length} task${clones.length > 1 ? 's' : ''}`);
+    // Persist each clone via POST. Reconcile the temp id with the server id
+    // on success; remove the clone on failure.
+    Promise.all(clones.map(clone => apiCreateTask(projectId, {
+      name: clone.name,
+      description: clone.description,
+      status: clone.status,
+      priority: clone.priority,
+      assigneeId: clone.assignee || undefined,
+      parentId: clone.parentId,
+      sectionId: clone.sectionId,
+      dueDate: clone.dueDate,
+      startDate: clone.start,
+      duration: clone.duration,
+    }).then(res => ({ cloneId: clone.id, res })))).then(results => {
+      let anyFailure = false;
+      for (const { cloneId, res } of results) {
+        if (!res.ok) {
+          anyFailure = true;
+          // Remove the failed clone from the local list.
+          setTasksByProject(prev => ({
+            ...prev,
+            [projectId]: (prev[projectId] || []).filter(t => t.id !== cloneId),
+          }));
+          continue;
+        }
+        const serverId = res.data?.task?.id;
+        if (!serverId || serverId === cloneId) continue;
+        // Swap the temp id for the canonical server id.
+        setTasksByProject(prev => ({
+          ...prev,
+          [projectId]: (prev[projectId] || []).map(t => t.id === cloneId ? { ...t, id: serverId } : t),
+        }));
+      }
+      if (anyFailure) {
+        toast.error('Failed to paste some tasks on server');
+        // If every paste failed, restore the snapshot.
+        const allFailed = results.every(r => !r.res.ok);
+        if (allFailed) setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      }
+    });
+  }, [clipboard.items, tasksByProject, commit]);
 
+  /**
+   * Import tasks from a CSV file.
+   *
+   * Phase 4 (item 3): each row is now created via the API
+   * (`POST /api/projects/:id/tasks`) instead of just being added locally.
+   * The CSV `assignee` column is matched against the store's `membersById`
+   * map (real project members); unmatched rows are assigned to the current
+   * user. Failed rows are skipped + reported via a single toast.
+   */
   const importCSV = useCallback((projectId: string, file: File) => {
     if (!projectId) return;
     Papa.parse(file, {
       header: true, skipEmptyLines: true,
       complete: (res) => {
         const rows = (res.data as Record<string, string>[]).map(r => {
-          const member = TEAM.find(m => m.name.toLowerCase() === (r.assignee || '').toLowerCase());
-          return { id: defaultIdGenerator.generate('t'), projectId, name: r.name || 'Untitled task', description: r.description || undefined, assignee: member ? member.id : TEAM[0].id, start: r.start || TODAY.toISOString().slice(0, 10), duration: Number(r.duration) || 3, progress: Number(r.progress) || 0, priority: (PRIORITY_META[r.priority] ? r.priority : 'medium') as TaskPriority, status: (STATUS_META[r.status] ? r.status : 'backlog') as TaskStatus, deps: [] } as Task;
+          // Resolve the CSV `assignee` column to a real project member id.
+          // Match case-insensitively on the member's full name. Fall back
+          // to the current user when no match (so the task isn't orphaned).
+          const assigneeName = (r.assignee || '').toLowerCase();
+          const member = assigneeName
+            ? Object.values(membersRef.current).find(m => m.name.toLowerCase() === assigneeName)
+            : undefined;
+          const assigneeId = member?.id || userIdRef.current;
+          return {
+            id: defaultIdGenerator.generate('t'),
+            projectId,
+            name: r.name || 'Untitled task',
+            description: r.description || undefined,
+            assignee: assigneeId,
+            start: r.start || TODAY.toISOString().slice(0, 10),
+            duration: Number(r.duration) || 3,
+            progress: Number(r.progress) || 0,
+            priority: (PRIORITY_META[r.priority] ? r.priority : 'medium') as TaskPriority,
+            status: (STATUS_META[r.status] ? r.status : 'backlog') as TaskStatus,
+            deps: [],
+          } as Task;
         });
-        if (rows.length) addTasksBulk(projectId, rows);
+        if (!rows.length) return;
+        const projectTasks = tasksByProject[projectId] || [];
+        const snapshot = projectTasks;
+        // Optimistic local insert.
+        commit(projectId, [...projectTasks, ...rows]);
+        toast.success(`Importing ${rows.length} task${rows.length > 1 ? 's' : ''}…`);
+        // Persist each row via POST. Reconcile the temp id with the server
+        // id on success; remove the row on failure.
+        Promise.all(rows.map(row => apiCreateTask(projectId, {
+          name: row.name,
+          description: row.description,
+          status: row.status,
+          priority: row.priority,
+          assigneeId: row.assignee || undefined,
+          dueDate: row.dueDate,
+          startDate: row.start,
+          duration: row.duration,
+        }).then(res => ({ rowId: row.id, res })))).then(results => {
+          let failed = 0;
+          for (const { rowId, res } of results) {
+            if (!res.ok) {
+              failed++;
+              setTasksByProject(prev => ({
+                ...prev,
+                [projectId]: (prev[projectId] || []).filter(t => t.id !== rowId),
+              }));
+              continue;
+            }
+            const serverId = res.data?.task?.id;
+            if (!serverId || serverId === rowId) continue;
+            setTasksByProject(prev => ({
+              ...prev,
+              [projectId]: (prev[projectId] || []).map(t => t.id === rowId ? { ...t, id: serverId } : t),
+            }));
+          }
+          if (failed > 0) {
+            toast.error(`Failed to import ${failed} task${failed > 1 ? 's' : ''} on server`);
+            // If every row failed, restore the snapshot.
+            if (failed === results.length) setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+          } else {
+            toast.success(`Imported ${rows.length} task${rows.length > 1 ? 's' : ''}`);
+          }
+        });
       },
     });
-  }, [addTasksBulk]);
+  }, [tasksByProject, commit]);
 
   const exportCSV = useCallback((projectId: string) => {
     const project = projects[projectId];
     if (!project) return;
     const projectTasks = tasksByProject[projectId] || [];
-    const csv = Papa.unparse(projectTasks.map(t => ({ name: t.name, description: t.description || '', assignee: TEAM.find(m => m.id === t.assignee)?.name || '', start: t.start, due_date: t.dueDate || '', duration: t.duration, progress: t.progress, priority: t.priority, status: t.status, tags: (t.tags || []).join(', ') })));
+    const csv = Papa.unparse(projectTasks.map(t => ({
+      name: t.name,
+      description: t.description || '',
+      assignee: resolveMemberName(t.assignee),
+      start: t.start,
+      due_date: t.dueDate || '',
+      duration: t.duration,
+      progress: t.progress,
+      priority: t.priority,
+      status: t.status,
+      tags: (t.tags || []).join(', '),
+    })));
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = `${project.name.replace(/\s+/g, '-')}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [tasksByProject, projects]);
+  }, [tasksByProject, projects, resolveMemberName]);
 
   const attachFilesToSelected = useCallback((projectId: string, fileList: FileList) => {
     if (!selectedIds.size || !projectId) return;
@@ -1129,8 +1479,8 @@ export function useFlowDeckStore(): FlowDeckState {
       ...prev,
       [projectId]: [...(prev[projectId] || []), comment],
     }));
-    const member = TEAM.find(m => m.id === userIdRef.current);
-    logActivity(projectId, taskId, 'comment', `${member?.name || 'Someone'} ${parentId ? 'replied' : 'commented'}`);
+    const actorName = resolveMemberName(userIdRef.current);
+    logActivity(projectId, taskId, 'comment', `${actorName} ${parentId ? 'replied' : 'commented'}`);
     // Persist to PostgreSQL. The API returns the canonical server comment —
     // we swap the temp id for the server id so subsequent edits/deletes
     // target the right row. On failure we roll back the optimistic insert.
@@ -1149,7 +1499,7 @@ export function useFlowDeckStore(): FlowDeckState {
         ),
       }));
     });
-  }, [commentsByProject, logActivity]);
+  }, [commentsByProject, logActivity, resolveMemberName]);
 
   const deleteComment = useCallback((projectId: string, commentId: string) => {
     if (!projectId) return;
@@ -1268,8 +1618,7 @@ export function useFlowDeckStore(): FlowDeckState {
     const snapshot = projectTasks;
     // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, followers: newFollowers } : t));
-    const member = TEAM.find(m => m.id === userId);
-    const memberName = member?.name || 'Someone';
+    const memberName = resolveMemberName(userId);
     logActivity(projectId, taskId, 'comment', `${memberName} ${isFollowing ? 'stopped following' : 'is now following'} this task`);
     // Persist to PostgreSQL.
     const persist = isFollowing ? apiUnfollowTask(taskId) : apiFollowTask(taskId);
@@ -1278,7 +1627,7 @@ export function useFlowDeckStore(): FlowDeckState {
       setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
       toast.error(isFollowing ? 'Failed to unfollow task' : 'Failed to follow task', { description: res.error });
     });
-  }, [tasksByProject, commit, logActivity]);
+  }, [tasksByProject, commit, logActivity, resolveMemberName]);
 
   /* ---- Time Logs ---- */
   const addTimeLog = useCallback((projectId: string, taskId: string, minutes: number, note: string) => {
@@ -1384,7 +1733,7 @@ export function useFlowDeckStore(): FlowDeckState {
       result = result.filter(t =>
         t.name.toLowerCase().includes(q) ||
         (t.description || '').toLowerCase().includes(q) ||
-        TEAM.find(m => m.id === t.assignee)?.name.toLowerCase().includes(q)
+        resolveMemberName(t.assignee).toLowerCase().includes(q)
       );
     }
     /* Structured filters */
@@ -1398,7 +1747,7 @@ export function useFlowDeckStore(): FlowDeckState {
     if (dueBefore) result = result.filter(t => Boolean(t.dueDate && t.dueDate <= dueBefore));
     if (dueAfter) result = result.filter(t => Boolean(t.dueDate && t.dueDate >= dueAfter));
     return result;
-  }, [tasks, searchQuery, searchFilters]);
+  }, [tasks, searchQuery, searchFilters, resolveMemberName]);
 
   const gridActions: GridActions = useMemo(() => ({
     selectedIds, setSelectedIds,
@@ -1784,8 +2133,8 @@ export function useFlowDeckStore(): FlowDeckState {
     const snapshot = projectTasks;
     // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, parentId: null, level: newLevel } : t));
-    const member = TEAM.find(m => m.id === userIdRef.current);
-    logActivity(projectId, taskId, 'created', `${member?.name || 'Someone'} promoted subtask to top-level`);
+    const actorName = resolveMemberName(userIdRef.current);
+    logActivity(projectId, taskId, 'created', `${actorName} promoted subtask to top-level`);
     toast.success('Subtask promoted', { description: task.name });
     // Persist to PostgreSQL — clearing parentId promotes the task.
     apiUpdateTask(taskId, { parentId: null }).then((res) => {
@@ -1793,7 +2142,7 @@ export function useFlowDeckStore(): FlowDeckState {
       setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
       toast.error('Failed to promote subtask', { description: res.error });
     });
-  }, [tasksByProject, commit, logActivity]);
+  }, [tasksByProject, commit, logActivity, resolveMemberName]);
 
   /* ---- #33: Demote task to subtask ---- */
   const demoteToSubtask = useCallback((projectId: string, taskId: string, newParentId: string) => {
@@ -1806,8 +2155,8 @@ export function useFlowDeckStore(): FlowDeckState {
     // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, parentId: newParentId, level: newLevel } : t));
     const parentTask = projectTasks.find(t => t.id === newParentId);
-    const member = TEAM.find(m => m.id === userIdRef.current);
-    logActivity(projectId, taskId, 'created', `${member?.name || 'Someone'} converted task to subtask of "${parentTask?.name || 'task'}"`);
+    const actorName = resolveMemberName(userIdRef.current);
+    logActivity(projectId, taskId, 'created', `${actorName} converted task to subtask of "${parentTask?.name || 'task'}"`);
     toast.success('Converted to subtask', { description: task.name });
     // Persist to PostgreSQL — setting parentId demotes the task under the
     // new parent. The server enforces no-self-parent and no-circular
@@ -1823,41 +2172,79 @@ export function useFlowDeckStore(): FlowDeckState {
   /* ---- #35: Sections ---- */
   const addSection = useCallback((projectId: string, name: string) => {
     if (!projectId) return;
-    const id = defaultIdGenerator.generate('sec');
+    const tempId = defaultIdGenerator.generate('sec');
     const currentSections = sectionsByProject[projectId] || [];
-    const newSection: Section = { id, projectId, name, position: currentSections.length, collapsed: false };
+    const position = currentSections.length;
+    const newSection: Section = { id: tempId, projectId, name, position, collapsed: false };
+    // Snapshot for rollback — captures the pre-insert section list so we can
+    // restore it if the API rejects the create.
+    const snapshot = currentSections;
     // Optimistic local update.
     setSectionsByProject(prev => ({ ...prev, [projectId]: [...(prev[projectId] || []), newSection] }));
     toast.success('Section added', { description: name });
-    // Persist to PostgreSQL.
-    apiCreateSection(projectId, name).then((res) => {
-      if (!res.ok) toast.error('Failed to create section on server', { description: res.error });
+    // Persist to PostgreSQL. The API returns the canonical server section —
+    // we swap the temp id for the server id so subsequent edits target the
+    // right row. On failure we roll back the optimistic insert.
+    apiCreateSection(projectId, name, position).then((res) => {
+      if (!res.ok) {
+        setSectionsByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        toast.error('Failed to create section on server', { description: res.error });
+        return;
+      }
+      const serverId = res.data?.section?.id;
+      if (!serverId || serverId === tempId) return;
+      setSectionsByProject(prev => ({
+        ...prev,
+        [projectId]: (prev[projectId] || []).map(s => s.id === tempId ? { ...s, id: serverId } : s),
+      }));
+      // Re-point any tasks that were optimistically assigned to the temp id.
+      setTasksByProject(prev => {
+        const list = prev[projectId] || [];
+        const hasRef = list.some(t => t.sectionId === tempId);
+        if (!hasRef) return prev;
+        return { ...prev, [projectId]: list.map(t => t.sectionId === tempId ? { ...t, sectionId: serverId } : t) };
+      });
     });
   }, [sectionsByProject]);
 
   const renameSection = useCallback((projectId: string, sectionId: string, name: string) => {
     if (!projectId) return;
+    const snapshot = sectionsByProject[projectId] || [];
+    // Optimistic local update.
     setSectionsByProject(prev => ({
       ...prev,
       [projectId]: (prev[projectId] || []).map(s => s.id === sectionId ? { ...s, name } : s),
     }));
-  }, []);
+    // Persist to PostgreSQL. Roll back on failure.
+    apiUpdateSection(projectId, sectionId, { name }).then((res) => {
+      if (res.ok) return;
+      setSectionsByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to rename section', { description: res.error });
+    });
+  }, [sectionsByProject]);
 
   const deleteSection = useCallback((projectId: string, sectionId: string) => {
     if (!projectId) return;
     const projectTasks = tasksByProject[projectId] || [];
-    // Optimistic local update.
+    const snapshotTasks = projectTasks;
+    const snapshotSections = sectionsByProject[projectId] || [];
+    // Optimistic local update — null out sectionId on tasks in this section,
+    // then remove the section.
     commit(projectId, projectTasks.map(t => t.sectionId === sectionId ? { ...t, sectionId: null } : t));
     setSectionsByProject(prev => ({
       ...prev,
       [projectId]: (prev[projectId] || []).filter(s => s.id !== sectionId),
     }));
     toast.success('Section removed');
-    // Persist to PostgreSQL.
+    // Persist to PostgreSQL. Roll back (restore the section + restore the
+    // sectionId on the previously-attached tasks) on failure.
     apiDeleteSection(projectId, sectionId).then((res) => {
-      if (!res.ok) toast.error('Failed to delete section on server', { description: res.error });
+      if (res.ok) return;
+      setSectionsByProject(prev => ({ ...prev, [projectId]: snapshotSections }));
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshotTasks }));
+      toast.error('Failed to delete section on server', { description: res.error });
     });
-  }, [tasksByProject, commit]);
+  }, [tasksByProject, sectionsByProject, commit]);
 
   const toggleSectionCollapsed = useCallback((projectId: string, sectionId: string) => {
     if (!projectId) return;
@@ -1876,12 +2263,31 @@ export function useFlowDeckStore(): FlowDeckState {
     currentSections.splice(toIndex, 0, removed);
     /* Re-number positions */
     const renumbered = currentSections.map((s, i) => ({ ...s, position: i }));
+    const snapshot = sectionsByProject[projectId] || [];
+    // Optimistic local update.
     setSectionsByProject(prev => ({ ...prev, [projectId]: renumbered }));
+    // Persist the new position of the moved section. (Siblings keep their
+    // server-side positions; only the moved section needs an update here.
+    // The server's `updateSection` accepts a position int.)
+    apiUpdateSection(projectId, sectionId, { position: toIndex }).then((res) => {
+      if (res.ok) return;
+      setSectionsByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to reorder section', { description: res.error });
+    });
   }, [sectionsByProject]);
 
   const setTaskSection = useCallback((projectId: string, taskId: string, sectionId: string | null) => {
     const projectTasks = tasksByProject[projectId] || [];
+    const snapshot = projectTasks;
+    // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, sectionId } : t));
+    // Persist to PostgreSQL via the task PATCH endpoint (the sectionId field
+    // on Task). Roll back on failure.
+    apiUpdateTask(taskId, { sectionId }).then((res) => {
+      if (res.ok) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to move task to section', { description: res.error });
+    });
   }, [tasksByProject, commit]);
 
   /* Close menus on view change */
@@ -1890,69 +2296,152 @@ export function useFlowDeckStore(): FlowDeckState {
   /* ====== Batch 7: Project Management Actions ====== */
 
   const updateProject = useCallback((projectId: string, patch: Partial<Project>) => {
-    setProjects(prev => {
-      const p = prev[projectId];
-      if (!p) return prev;
-      return { ...prev, [projectId]: { ...p, ...patch } };
+    const prevProject = projects[projectId];
+    if (!prevProject) return;
+    // Snapshot for rollback — captures the pre-update project so we can
+    // restore it if the API rejects the change.
+    const snapshot = prevProject;
+    // Optimistic local update.
+    setProjects(prev => ({ ...prev, [projectId]: { ...prev[projectId], ...patch } }));
+    // Translate the frontend Project shape to the API's update schema. The
+    // frontend uses `start`/`end`; the API uses `startDate`/`endDate`.
+    const apiPatch: Record<string, unknown> = {};
+    if (patch.name !== undefined) apiPatch.name = patch.name;
+    if (patch.description !== undefined) apiPatch.description = patch.description ?? null;
+    if (patch.color !== undefined) apiPatch.color = patch.color;
+    if (patch.start !== undefined) apiPatch.startDate = patch.start || null;
+    if (patch.end !== undefined) apiPatch.endDate = patch.end || null;
+    apiUpdateProject(projectId, apiPatch).then((res) => {
+      if (res.ok) return;
+      setProjects(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save project', { description: res.error });
     });
-  }, []);
+  }, [projects]);
 
   const toggleProjectFavorite = useCallback((projectId: string) => {
-    setProjects(prev => {
-      const p = prev[projectId];
-      if (!p) return prev;
-      return { ...prev, [projectId]: { ...p, isFavorite: !p.isFavorite } };
+    const prevProject = projects[projectId];
+    if (!prevProject) return;
+    const snapshot = prevProject;
+    // Optimistic local update.
+    setProjects(prev => ({
+      ...prev,
+      [projectId]: { ...prev[projectId], isFavorite: !prev[projectId].isFavorite },
+    }));
+    // The server treats `{ favorite: boolean }` as a toggle trigger — any
+    // boolean will do, and the server flips the per-user flag.
+    apiToggleProjectFavorite(projectId).then((res) => {
+      if (res.ok) return;
+      setProjects(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to toggle favorite', { description: res.error });
     });
-  }, []);
+  }, [projects]);
 
   const archiveProject = useCallback((projectId: string) => {
-    setProjects(prev => {
-      const p = prev[projectId];
-      if (!p) return prev;
-      return { ...prev, [projectId]: { ...p, isArchived: true } };
-    });
+    const prevProject = projects[projectId];
+    if (!prevProject) return;
+    const snapshot = prevProject;
+    // Optimistic local update.
+    setProjects(prev => ({ ...prev, [projectId]: { ...prev[projectId], isArchived: true } }));
     if (currentProjectId === projectId) goToPortfolio();
     toast.success('Project archived');
-  }, [currentProjectId, goToPortfolio]);
+    apiArchiveProject(projectId).then((res) => {
+      if (res.ok) return;
+      setProjects(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to archive project', { description: res.error });
+    });
+  }, [projects, currentProjectId, goToPortfolio]);
 
   const restoreProject = useCallback((projectId: string) => {
-    setProjects(prev => {
-      const p = prev[projectId];
-      if (!p) return prev;
-      return { ...prev, [projectId]: { ...p, isArchived: false } };
-    });
+    const prevProject = projects[projectId];
+    if (!prevProject) return;
+    const snapshot = prevProject;
+    // Optimistic local update.
+    setProjects(prev => ({ ...prev, [projectId]: { ...prev[projectId], isArchived: false } }));
     toast.success('Project restored');
-  }, []);
+    apiRestoreProject(projectId).then((res) => {
+      if (res.ok) return;
+      setProjects(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to restore project', { description: res.error });
+    });
+  }, [projects]);
 
   const setProjectMembers = useCallback((projectId: string, members: string[]) => {
-    setProjects(prev => {
-      const p = prev[projectId];
-      if (!p) return prev;
-      return { ...prev, [projectId]: { ...p, members } };
+    const prevProject = projects[projectId];
+    if (!prevProject) return;
+    const prevMembers = prevProject.members || [];
+    const snapshot = prevProject;
+    // Optimistic local update — apply the full new member list immediately.
+    setProjects(prev => ({ ...prev, [projectId]: { ...prev[projectId], members } }));
+
+    // Diff against the previous list to figure out what to add/remove via
+    // the API. We fire the requests in parallel; on any failure we roll
+    // back the whole change so the UI matches the server's state.
+    const added = members.filter(id => !prevMembers.includes(id));
+    const removed = prevMembers.filter(id => !members.includes(id));
+    if (added.length === 0 && removed.length === 0) return;
+
+    const ops: Promise<{ ok: boolean; error?: string }>[] = [
+      ...added.map(id => apiAddProjectMember(projectId, id)),
+      ...removed.map(id => apiRemoveProjectMember(projectId, id)),
+    ];
+    Promise.all(ops).then((results) => {
+      const failed = results.find(r => !r.ok);
+      if (!failed) return;
+      setProjects(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to update project members', { description: failed.error });
     });
-  }, []);
+  }, [projects]);
 
   const addProjectStatusUpdate = useCallback((projectId: string, text: string, color: 'green' | 'yellow' | 'red') => {
     if (!projectId) return;
-    const id = defaultIdGenerator.generate('su');
+    const tempId = defaultIdGenerator.generate('su');
     const update: ProjectStatusUpdate = {
-      id, projectId: projectId, authorId: userIdRef.current,
+      id: tempId, projectId: projectId, authorId: userIdRef.current,
       text, color, createdAt: new Date().toISOString(),
     };
+    // Snapshot for rollback — captures the pre-insert status-update list.
+    const snapshot = statusUpdatesByProject[projectId] || [];
+    // Optimistic local update.
     setStatusUpdatesByProject(prev => ({
       ...prev,
       [projectId]: [...(prev[projectId] || []), update],
     }));
     toast.success('Status update posted');
-  }, []);
+    // Persist to PostgreSQL. The API returns the canonical server update —
+    // we swap the temp id for the server id so subsequent deletes target the
+    // right row. On failure we roll back the optimistic insert.
+    apiCreateProjectStatusUpdate(projectId, { text, color }).then((res) => {
+      if (!res.ok) {
+        setStatusUpdatesByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        toast.error('Failed to post status update', { description: res.error });
+        return;
+      }
+      const serverId = res.data?.update?.id;
+      if (!serverId || serverId === tempId) return;
+      setStatusUpdatesByProject(prev => ({
+        ...prev,
+        [projectId]: (prev[projectId] || []).map(su => su.id === tempId ? { ...su, id: serverId } : su),
+      }));
+    });
+  }, [statusUpdatesByProject]);
 
   const deleteProjectStatusUpdate = useCallback((projectId: string, id: string) => {
     if (!projectId) return;
+    // Snapshot for rollback — captures the pre-delete list so we can restore
+    // it if the API rejects the delete.
+    const snapshot = statusUpdatesByProject[projectId] || [];
+    // Optimistic local update.
     setStatusUpdatesByProject(prev => ({
       ...prev,
       [projectId]: (prev[projectId] || []).filter(su => su.id !== id),
     }));
-  }, []);
+    // Persist to PostgreSQL. Roll back on failure.
+    apiDeleteProjectStatusUpdate(projectId, id).then((res) => {
+      if (res.ok) return;
+      setStatusUpdatesByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to delete status update', { description: res.error });
+    });
+  }, [statusUpdatesByProject]);
 
   const saveProjectAsTemplate = useCallback((projectId: string, name: string, includeTasks: boolean) => {
     if (!projectId) return;
@@ -2077,10 +2566,33 @@ export function useFlowDeckStore(): FlowDeckState {
   /* ---- Approvals ---- */
   const addApproval = useCallback((approval: ApprovalRequest) => { setApprovals(prev => [...prev, approval]); toast.success('Approval requested'); }, []);
   const resolveApproval = useCallback((id: string, approved: boolean, comment?: string) => {
+    // Optimistic update
+    const snapshot = approvals;
     setApprovals(prev => prev.map(a => a.id === id ? { ...a, status: approved ? 'approved' as const : 'rejected' as const, resolvedAt: new Date().toISOString(), comment } : a));
     toast.success(approved ? 'Approved' : 'Rejected');
-  }, []);
-  const deleteApproval = useCallback((id: string) => { setApprovals(prev => prev.filter(a => a.id !== id)); }, []);
+    // Persist via PATCH /api/approvals/:id
+    fetch(`/api/approvals/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approved, comment }),
+    }).then(res => {
+      if (res.ok) return;
+      setApprovals(snapshot);
+      toast.error('Failed to resolve approval');
+    }).catch(() => {
+      setApprovals(snapshot);
+      toast.error('Failed to resolve approval');
+    });
+  }, [approvals]);
+  const deleteApproval = useCallback((id: string) => {
+    // Optimistic removal with snapshot for rollback
+    const snapshot = approvals;
+    setApprovals(prev => prev.filter(a => a.id !== id));
+    toast.success('Approval deleted');
+    fetch(`/api/approvals/${id}`, { method: 'DELETE' })
+      .then(res => { if (res.ok) return; setApprovals(snapshot); toast.error('Failed to delete approval'); })
+      .catch(() => { setApprovals(snapshot); toast.error('Failed to delete approval'); });
+  }, [approvals]);
 
   /* ---- Budget & Expense ---- */
   const addBudget = useCallback((budget: Budget) => { setBudgets(prev => [...prev, budget]); toast.success('Budget created'); }, []);
@@ -2121,6 +2633,10 @@ export function useFlowDeckStore(): FlowDeckState {
     tagsByProject, commentsByProject, activityByProject, timeLogsByProject, sectionsByProject,
     currentUserId,
     setCurrentUserId,
+    currentUserName,
+    setCurrentUserName,
+    membersById,
+    registerMembers,
     currentProjectId, activeView, selectedTaskId, selectedIds, searchQuery,
     showNewTask, showNewProject, projectMenuOpen, shareOpen, sidebarOpen, moreMenuOpen,
     durationUnit, clipboard, past, future,
@@ -2130,7 +2646,7 @@ export function useFlowDeckStore(): FlowDeckState {
     searchFilters, setSearchFilters, activeFilterCount, clearFilters,
     timeLogs, taskTimeLogs,
     gridActions,
-    openProject, syncProjectFromRoute, syncProjectTasks, syncProjectTags, syncProjectComments, syncProjectFiles, syncProjects, upsertProject, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
+    openProject, syncProjectFromRoute, syncProjectTasks, syncProjectTags, syncProjectComments, syncProjectFiles, syncProjectMembers, syncProjectStatusUpdates, syncProjects, upsertProject, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
     updateTask, addTask, removeTask, removeTasksBulk, moveStatus, toggleComplete,
     duplicateTask, duplicateTaskWithOptions, duplicateTasksBulk,
     moveTaskToProject, moveTasksToProjectBulk,

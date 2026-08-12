@@ -6,6 +6,7 @@ import { useForms } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { toast } from 'sonner';
 import type { Form, FormSubmission } from '@/features/flowdeck/model';
+import { apiUpdateForm, apiListFormSubmissions } from '@/lib/api-client';
 
 export default function FormsRoutePage() {
   const state = useFlowDeck();
@@ -24,6 +25,41 @@ export default function FormsRoutePage() {
     }
   }, [data]);
 
+  // Load submissions for every form in the current project. Each form's
+  // submissions live under /api/projects/:pid/forms/:formId/submissions —
+  // fetch them in parallel and flatten into a single list for the view.
+  useEffect(() => {
+    if (!projectId || forms.length === 0) {
+      setSubmissions([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const projectForms = forms.filter(f => f.projectId === projectId);
+      const results = await Promise.all(
+        projectForms.map(f => apiListFormSubmissions(projectId, f.id)),
+      );
+      if (cancelled) return;
+      const all: FormSubmission[] = [];
+      for (const r of results) {
+        if (!r.ok) continue;
+        for (const raw of r.submissions as Array<Record<string, unknown>>) {
+          all.push({
+            id: raw.id as string,
+            formId: raw.formId as string,
+            projectId: raw.projectId as string,
+            data: (raw.data ?? {}) as Record<string, string>,
+            submittedAt: raw.submittedAt as string,
+            submittedBy: (raw.submittedBy as string) ?? undefined,
+            convertedTaskId: (raw.convertedTaskId as string) ?? undefined,
+          });
+        }
+      }
+      setSubmissions(all);
+    })();
+    return () => { cancelled = true; };
+  }, [projectId, forms]);
+
   const handleAddForm = useCallback(async (form: Partial<Form>) => {
     if (!projectId) return;
     try {
@@ -36,6 +72,18 @@ export default function FormsRoutePage() {
       refetch();
     } catch { toast.error('Failed to create form'); }
   }, [projectId, refetch]);
+
+  const handleUpdateForm = useCallback(async (id: string, patch: Partial<Form>) => {
+    if (!projectId) return;
+    // Optimistic local update + rollback on failure. The form's fields can
+    // be large, so we only snapshot the single record being changed.
+    const snapshot = forms;
+    setForms(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f));
+    const res = await apiUpdateForm(projectId, id, patch as Record<string, unknown>);
+    if (res.ok) return;
+    setForms(snapshot);
+    toast.error('Failed to update form', { description: res.error });
+  }, [projectId, forms]);
 
   const handleDeleteForm = useCallback(async (id: string) => {
     if (!projectId) return;
@@ -55,7 +103,7 @@ export default function FormsRoutePage() {
       projects={state.projects}
       currentProjectId={projectId ?? ''}
       onAddForm={handleAddForm as any}
-      onUpdateForm={() => {}}
+      onUpdateForm={handleUpdateForm}
       onDeleteForm={handleDeleteForm}
     />
   );

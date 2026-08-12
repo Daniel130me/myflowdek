@@ -4,6 +4,7 @@ import React from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
 import { TaskDetailPanel } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { useProjectMembers } from '@/features/flowdeck/components/ui';
 import { getTaskForProject } from '@/features/tasks/selectors/getTaskForProject';
 import { useCloseOverlay } from '@/shared/navigation/useCloseOverlay';
 import { routes } from '@/shared/navigation/routes';
@@ -15,6 +16,8 @@ export default function InterceptedTaskDetailPage() {
   const taskId = typeof params.taskId === 'string' ? params.taskId : '';
   const state = useFlowDeck();
   const close = useCloseOverlay(routes.projectTasks(projectId));
+
+  const { members } = useProjectMembers(projectId);
 
   const task = getTaskForProject(state.tasksByProject, projectId, taskId);
   if (!task) {
@@ -72,6 +75,7 @@ export default function InterceptedTaskDetailPage() {
       onAddFiles={(files) => state.addFiles(projectId, files)}
       onDuplicateTaskWithOptions={(taskId, opts) => state.duplicateTaskWithOptions(projectId, taskId, opts)}
       onMoveToProject={(taskId, targetProjectId) => state.moveTaskToProject(projectId, taskId, targetProjectId)}
+      members={members}
     />
   );
 }

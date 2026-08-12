@@ -6,14 +6,14 @@ import {
   Indent, Outdent, Hash, Scissors, Copy, ClipboardPaste, Paperclip,
   FileUp, FileDown, Printer, Share2, ArrowLeft,
 } from 'lucide-react';
-import { COLORS, COLOR_SWATCHES, TEAM } from '@/features/flowdeck/model';
+import { COLORS, COLOR_SWATCHES, type MemberInfo } from '@/features/flowdeck/model';
 import { useViewport } from '../../hooks/useViewport';
 import { Avatar } from '../ui/Avatar';
 import { FF } from '../ui/styles';
 import type { GridActions } from './types';
 
-export function MobileToolbarSheet({ projectId, grid, hasSelection, onClose }: {
-  projectId: string; grid: GridActions; hasSelection: boolean; onClose: () => void;
+export function MobileToolbarSheet({ projectId, grid, hasSelection, onClose, members = [] }: {
+  projectId: string; grid: GridActions; hasSelection: boolean; onClose: () => void; members?: MemberInfo[];
 }) {
   const { isMobile } = useViewport();
   const [colorPicker, setColorPicker] = React.useState(false);
@@ -97,7 +97,7 @@ export function MobileToolbarSheet({ projectId, grid, hasSelection, onClose }: {
         {assignPicker && (
           <>
             <button onClick={() => setAssignPicker(false)} style={{ display: 'flex', alignItems: 'center', gap: 6, border: 'none', background: 'none', cursor: 'pointer', fontFamily: FF, fontSize: 14, fontWeight: 600, color: COLORS.gray, padding: '8px 0', minHeight: 44 }}><ArrowLeft size={16} /> Assign to</button>
-            {TEAM.map(m => (
+            {members.map(m => (
               <button key={m.id} onClick={() => { grid.onBulkAssign(projectId, m.id); onClose(); }} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', padding: '12px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: FF, fontSize: 14, borderRadius: 12, minHeight: 48 }}>
                 <Avatar id={m.id} size={22} /> {m.name}
               </button>

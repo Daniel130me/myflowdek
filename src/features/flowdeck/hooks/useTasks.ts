@@ -17,6 +17,7 @@ interface ApiTask {
   progress: number;
   sortOrder: number;
   isMilestone: boolean;
+  recurrence?: string | null;
   assigneeId: string | null;
   parentId: string | null;
   completedAt: string | null;
@@ -40,6 +41,7 @@ function mapTask(api: ApiTask): Task {
     deps: [],
     parentId: api.parentId ?? null,
     milestone: api.isMilestone,
+    recurrence: api.recurrence ?? null,
     createdAt: api.createdAt ?? undefined,
   };
 }

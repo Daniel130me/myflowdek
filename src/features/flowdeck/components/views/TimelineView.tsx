@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  COLORS, STATUS_META, STATUS_ORDER, TEAM, TODAY, ZOOM_LEVELS,
+  COLORS, STATUS_META, STATUS_ORDER, TODAY, ZOOM_LEVELS,
   EPIC_PALETTE, TASK_COLOR_FALLBACK,
   offsetDays, addDays, fmtDate, fmtRange,
   getTopParent, buildParentSummary, getDirectChildren, getDescendantIds,
@@ -12,7 +12,7 @@ import {
   ZoomIn, ZoomOut, Filter, Rows3, LocateFixed, Diamond,
   FolderTree, Users, ChevronRight, ChevronDown, Route,
 } from 'lucide-react';
-import { Avatar, StatusPill, PriorityFlag, SectionHeader, ToolbarBtn, TaskCheckbox } from '../ui';
+import { Avatar, StatusPill, PriorityFlag, SectionHeader, ToolbarBtn, TaskCheckbox, useMemberDirectory, useProjectMembers } from '../ui';
 import { FF } from '../ui/styles';
 import { GridToolbar, type GridActions } from '../toolbar';
 import { useViewport } from '../../hooks/useViewport';
@@ -125,6 +125,10 @@ export function TimelineView({ projectId, project, tasks, onOpenTask, onToggleCo
   grid: GridActions;
 }) {
   const { isMobile } = useViewport();
+  // Real project members — registered into the global MemberDirectory so
+  // Avatar + the assignee-grouping logic below resolve real users.
+  const { members: projectMembers } = useProjectMembers(projectId);
+  const { lookup } = useMemberDirectory();
   const [dayWidth, setDayWidth] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 720) ? 20 : 28);
   const [labelWidth, setLabelWidth] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 720) ? 140 : 280);
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -301,11 +305,28 @@ export function TimelineView({ projectId, project, tasks, onOpenTask, onToggleCo
       roots.forEach(r => addTask(r, 0));
 
     } else if (groupMode === 'assignee') {
-      TEAM.forEach(m => {
+      // Group by assignee using real project members (falling back to the
+      // global directory so any task whose assignee isn't a current
+      // project member still shows up under a labelled group).
+      const seen = new Set<string>();
+      // First, project members (ordered)…
+      projectMembers.forEach(m => {
         const mine = visibleTasks.filter(t => t.assignee === m.id);
         if (!mine.length) return;
+        seen.add(m.id);
         rows.push({ kind: 'assignee-group', assigneeId: m.id, label: m.name });
         mine.forEach(t => rows.push({ kind: 'task', task: t, depth: 0, paletteIdx: getPaletteIdx(t.id) }));
+      });
+      // …then any remaining assignees that have tasks but aren't in the
+      // project members list (e.g. a former member who still owns tasks).
+      visibleTasks.forEach(t => {
+        if (seen.has(t.assignee)) return;
+        seen.add(t.assignee);
+        const info = lookup(t.assignee);
+        const mine = visibleTasks.filter(x => x.assignee === t.assignee);
+        if (!mine.length) return;
+        rows.push({ kind: 'assignee-group', assigneeId: t.assignee, label: info?.name ?? 'Unassigned' });
+        mine.forEach(x => rows.push({ kind: 'task', task: x, depth: 0, paletteIdx: getPaletteIdx(x.id) }));
       });
 
     } else {
@@ -420,9 +441,22 @@ export function TimelineView({ projectId, project, tasks, onOpenTask, onToggleCo
     const mobileAssigneeGroups = (() => {
       if (groupMode === 'assignee') {
         const groups: { memberId: string; name: string; items: Task[] }[] = [];
-        TEAM.forEach(m => {
+        const seen = new Set<string>();
+        projectMembers.forEach(m => {
           const mine = visibleTasks.filter(t => t.assignee === m.id);
-          if (mine.length) groups.push({ memberId: m.id, name: m.name, items: mine });
+          if (mine.length) {
+            seen.add(m.id);
+            groups.push({ memberId: m.id, name: m.name, items: mine });
+          }
+        });
+        // Catch any remaining assignees not in the project members list.
+        visibleTasks.forEach(t => {
+          if (seen.has(t.assignee)) return;
+          seen.add(t.assignee);
+          const mine = visibleTasks.filter(x => x.assignee === t.assignee);
+          if (!mine.length) return;
+          const info = lookup(t.assignee);
+          groups.push({ memberId: t.assignee, name: info?.name ?? 'Unassigned', items: mine });
         });
         return groups;
       }
@@ -431,7 +465,7 @@ export function TimelineView({ projectId, project, tasks, onOpenTask, onToggleCo
 
     return (
       <div>
-        <GridToolbar projectId={projectId} tasks={tasks} grid={grid} />
+        <GridToolbar projectId={projectId} tasks={tasks} grid={grid} members={projectMembers} />
         <SectionHeader title="Timeline" subtitle="Tap a task to view details" />
 
         {/* Group mode selector */}
@@ -660,7 +694,7 @@ export function TimelineView({ projectId, project, tasks, onOpenTask, onToggleCo
 
   return (
     <div>
-      <GridToolbar projectId={projectId} tasks={tasks} grid={grid} />
+      <GridToolbar projectId={projectId} tasks={tasks} grid={grid} members={projectMembers} />
       <SectionHeader title="Timeline" subtitle="Click a bar to view or edit task details · lines show dependencies" />
 
       {/* Toolbar */}

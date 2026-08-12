@@ -2,9 +2,10 @@
 
 import React, { useState } from 'react';
 import { LayoutGrid, Sun, Moon, Star, Archive, LogOut } from 'lucide-react';
-import { FONT_FAMILY as FF } from '@/features/flowdeck/model';
+import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { Avatar } from '../ui';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../auth';
 import { NAV } from './navItems';
 import { WorkspaceSelector } from './WorkspaceSelector';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaces';
@@ -25,8 +26,16 @@ export function Sidebar({ project, projects, activeView, onNavigate, goToPortfol
   onSelectWorkspace?: (id: string) => void;
 }) {
   const { isDark, toggle, colors, layout } = useTheme();
+  const auth = useAuth();
   const S = layout.sidebar;
   const [showArchived, setShowArchived] = useState(false);
+
+  // Real authenticated user identity — replaces the hard-coded
+  // `<Avatar id="u5" />` + "Wale Johnson" demo label.
+  const me = auth.user;
+  const myName = me?.name ?? 'User';
+  const myRole = me?.role ?? 'Signed in';
+  const myUserId = me?.id ?? '';
 
   const favoriteProjects = Object.values(projects).filter(p => p.isFavorite && !p.isArchived);
   const archivedProjects = Object.values(projects).filter(p => p.isArchived);
@@ -152,11 +161,20 @@ export function Sidebar({ project, projects, activeView, onNavigate, goToPortfol
       <div style={{ padding: '16px 16px 20px', borderTop: `1px solid ${S.divider}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ border: '2px solid rgba(255,255,255,0.15)', borderRadius: '50%' }}>
-            <Avatar id="u5" size={32} />
+            {myUserId ? <Avatar id={myUserId} size={32} /> : (
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%',
+                background: me?.avatarColor ?? COLORS.accent,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#FFFFFF', fontSize: 12, fontWeight: 700, fontFamily: FF,
+              }}>
+                {myName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()}
+              </div>
+            )}
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 600 }}>Wale Johnson</div>
-            <div style={{ color: S.textDim, fontSize: 11.5, fontWeight: 400 }}>Away this week</div>
+            <div style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{myName}</div>
+            <div style={{ color: S.textDim, fontSize: 11.5, fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{myRole}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <button

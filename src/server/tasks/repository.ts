@@ -15,6 +15,7 @@ const taskSelect = {
   progress: true,
   sortOrder: true,
   isMilestone: true,
+  recurrence: true,
   completedAt: true,
   assigneeId: true,
   createdById: true,

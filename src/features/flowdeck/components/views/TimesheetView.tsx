@@ -26,6 +26,20 @@ interface TimesheetViewProps {
   onAddEntry: (entry: TimesheetEntry) => void;
   onUpdateEntry: (id: string, patch: Partial<TimesheetEntry>) => void;
   onDeleteEntry: (id: string) => void;
+  /**
+   * Submit a batch of entries for approval (POST /api/timesheets/submit).
+   * If omitted, the view falls back to marking each entry as submitted via
+   * `onUpdateEntry` (legacy behaviour — not persisted through the dedicated
+   * submit endpoint).
+   */
+  onSubmit?: (entryIds: string[]) => void | Promise<void>;
+  /**
+   * Approve a batch of submitted entries (POST /api/timesheets/approve).
+   * Only project OWNER/ADMIN can call this successfully (the server enforces
+   * the APPROVE_TIMESHEETS capability). If omitted, the Approve button is
+   * not rendered.
+   */
+  onApprove?: (entryIds: string[]) => void | Promise<void>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -76,7 +90,7 @@ function isToday(d: Date): boolean {
 
 export function TimesheetView({
   timesheets, tasks, projects, currentProjectId, currentUserId,
-  onAddEntry, onUpdateEntry, onDeleteEntry,
+  onAddEntry, onUpdateEntry, onDeleteEntry, onSubmit, onApprove,
 }: TimesheetViewProps) {
   const { isMobile } = useViewport();
   const [weekOffset, setWeekOffset] = useState(0);
@@ -188,18 +202,47 @@ export function TimesheetView({
     setNoteDraft('');
   }, [notePopover, noteDraft, onUpdateEntry]);
 
-  /* Submit for approval */
-  const handleSubmit = useCallback(() => {
+  /* Submit for approval — uses the dedicated /api/timesheets/submit endpoint
+   * when `onSubmit` is provided (the canonical path). Falls back to the
+   * legacy "mark each entry submitted via onUpdateEntry" behaviour when the
+   * caller hasn't wired the dedicated submit handler. */
+  const handleSubmit = useCallback(async () => {
     const unsubmitted = weekEntries.filter(e => !e.submitted);
     if (unsubmitted.length === 0) {
       toast.info('All entries already submitted');
+      return;
+    }
+    if (onSubmit) {
+      try {
+        await onSubmit(unsubmitted.map(e => e.id));
+        toast.success(`${unsubmitted.length} time ${unsubmitted.length === 1 ? 'entry' : 'entries'} submitted for approval`);
+      } catch {
+        toast.error('Failed to submit entries for approval');
+      }
       return;
     }
     for (const e of unsubmitted) {
       onUpdateEntry(e.id, { submitted: true });
     }
     toast.success(`${unsubmitted.length} time ${unsubmitted.length === 1 ? 'entry' : 'entries'} submitted for approval`);
-  }, [weekEntries, onUpdateEntry]);
+  }, [weekEntries, onUpdateEntry, onSubmit]);
+
+  /* Approve submitted entries — uses the dedicated /api/timesheets/approve
+   * endpoint when `onApprove` is provided. */
+  const handleApprove = useCallback(async () => {
+    const submittedNotApproved = weekEntries.filter(e => e.submitted && !e.approved);
+    if (submittedNotApproved.length === 0) {
+      toast.info('No entries pending approval');
+      return;
+    }
+    if (!onApprove) return;
+    try {
+      await onApprove(submittedNotApproved.map(e => e.id));
+      toast.success(`${submittedNotApproved.length} entr${submittedNotApproved.length === 1 ? 'y' : 'ies'} approved`);
+    } catch {
+      toast.error('Failed to approve entries');
+    }
+  }, [weekEntries, onApprove]);
 
   /* Get hours for a cell */
   const getCellHours = (taskId: string, dateKey: string): number => {
@@ -611,6 +654,35 @@ export function TimesheetView({
     </button>
   ) : null;
 
+  /* ---- Approve button (managers only — server enforces capability) ----
+   * Renders when the caller wires `onApprove` AND there are submitted-but-
+   * not-yet-approved entries in the current week. */
+  const hasSubmittedNotApproved = weekEntries.some(e => e.submitted && !e.approved);
+  const approveBtn = (onApprove && hasSubmittedNotApproved) ? (
+    <button
+      onClick={handleApprove}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: isMobile ? '8px 14px' : '9px 18px',
+        borderRadius: 10, border: 'none', cursor: 'pointer',
+        background: COLORS.green,
+        color: '#FFFFFF',
+        fontFamily: FF, fontSize: isMobile ? 12 : 13, fontWeight: 600,
+        transition: 'all 0.15s',
+        boxShadow: '0 2px 8px rgba(22,163,74,0.25)',
+      }}
+    >
+      <CheckCircle size={isMobile ? 14 : 16} /> Approve
+    </button>
+  ) : null;
+
+  const headerActions = (
+    <div style={{ display: 'flex', gap: 8 }}>
+      {approveBtn}
+      {submitBtn}
+    </div>
+  );
+
   /* ---- Note Popover ---- */
   const notePopoverEl = notePopover ? (
     <div
@@ -684,7 +756,7 @@ export function TimesheetView({
       <SectionHeader
         title="Timesheet"
         subtitle={`${member?.name || 'Team member'} \u2022 ${projectName}`}
-        right={submitBtn}
+        right={headerActions}
       />
       {weekNav}
       {memberSelector}

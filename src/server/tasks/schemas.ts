@@ -28,6 +28,10 @@ export const updateTaskSchema = z.object({
   assigneeId: z.string().optional().nullable(),
   parentId: z.string().optional().nullable(),
   sectionId: z.string().optional().nullable(),
+  /** Recurrence pattern: 'daily' | 'weekly' | 'monthly' | null. When set,
+   *  a background job creates the next occurrence after completion. Pass
+   *  null to clear the recurrence. */
+  recurrence: z.enum(['daily', 'weekly', 'monthly']).nullable().optional(),
 });
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;

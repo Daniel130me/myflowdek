@@ -6,6 +6,21 @@ export interface TeamMember {
   color: string;
 }
 
+/**
+ * Lightweight member identity used by the global MemberDirectory — the
+ * minimum needed to render an avatar + display name. Sourced from real
+ * `GET /api/projects/:id/members` responses (the `user` projection on
+ * ProjectMember).
+ */
+export interface MemberInfo {
+  id: string;
+  name: string;
+  /** Optional role / job title (display-only). */
+  role?: string;
+  /** Optional avatar colour (hex). */
+  color?: string;
+}
+
 /* ---------------------------------- Project ---------------------------------- */
 export interface Project {
   id: string;

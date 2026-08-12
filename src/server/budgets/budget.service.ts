@@ -1,4 +1,5 @@
 import { db } from '@/server/db/client';
+import { Prisma } from '@prisma/client';
 import { AuthError } from '@/server/auth/authorization';
 import { z } from 'zod';
 
@@ -6,6 +7,14 @@ export const createBudgetSchema = z.object({
   name: z.string().trim().min(1).max(200),
   totalBudget: z.number().min(0).default(0),
   currency: z.string().trim().max(3).default('USD'),
+  startDate: z.iso.datetime().optional().nullable(),
+  endDate: z.iso.datetime().optional().nullable(),
+});
+
+export const updateBudgetSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  totalBudget: z.number().min(0).optional(),
+  currency: z.string().trim().max(3).optional(),
   startDate: z.iso.datetime().optional().nullable(),
   endDate: z.iso.datetime().optional().nullable(),
 });
@@ -19,6 +28,7 @@ export const createExpenseSchema = z.object({
 });
 
 export type CreateBudgetInput = z.infer<typeof createBudgetSchema>;
+export type UpdateBudgetInput = z.infer<typeof updateBudgetSchema>;
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
 
 export function listBudgets(projectId: string) {
@@ -45,6 +55,31 @@ export async function createBudget(projectId: string, input: CreateBudgetInput) 
 export async function deleteBudget(budgetId: string) {
   await db.budget.delete({ where: { id: budgetId } })
     .catch(() => { throw new AuthError('Budget not found', 404); });
+}
+
+/** Update a budget's editable fields. */
+export async function updateBudget(budgetId: string, input: UpdateBudgetInput) {
+  try {
+    return await db.budget.update({
+      where: { id: budgetId },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.totalBudget !== undefined ? { totalBudget: input.totalBudget } : {}),
+        ...(input.currency !== undefined ? { currency: input.currency } : {}),
+        ...(input.startDate !== undefined
+          ? { startDate: input.startDate ? new Date(input.startDate) : null }
+          : {}),
+        ...(input.endDate !== undefined
+          ? { endDate: input.endDate ? new Date(input.endDate) : null }
+          : {}),
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AuthError('Budget not found', 404);
+    }
+    throw err;
+  }
 }
 
 export function listExpenses(budgetId: string) {

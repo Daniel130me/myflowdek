@@ -183,9 +183,26 @@ export function apiUnfollowTask(taskId: string) {
 
 /* -------------------------- Section mutations -------------------------- */
 
-/** POST /api/projects/:projectId/sections — create a section. */
-export function apiCreateSection(projectId: string, name: string) {
-  return apiCall(`/api/projects/${projectId}/sections`, json('POST', { name }));
+/**
+ * POST /api/projects/:projectId/sections — create a section.
+ *
+ * Returns the server-created section so the store can replace the optimistic
+ * temp id with the canonical server id.
+ */
+export function apiCreateSection(projectId: string, name: string, position?: number) {
+  return apiCallWithData<{ section: { id: string; [key: string]: unknown } }>(
+    `/api/projects/${projectId}/sections`,
+    json('POST', { name, ...(position !== undefined ? { position } : {}) }),
+  );
+}
+
+/** PATCH /api/projects/:projectId/sections/:sectionId — rename/reorder/collapse. */
+export function apiUpdateSection(
+  projectId: string,
+  sectionId: string,
+  patch: { name?: string; position?: number; collapsed?: boolean },
+) {
+  return apiCall(`/api/projects/${projectId}/sections/${sectionId}`, json('PATCH', patch));
 }
 
 /** DELETE /api/projects/:projectId/sections/:sectionId — delete a section. */
@@ -213,4 +230,167 @@ export function apiAddTimeLog(
 /** DELETE /api/tasks/:taskId/time-logs/:logId — delete a time-log entry. */
 export function apiDeleteTimeLog(taskId: string, logId: string) {
   return apiCall(`/api/tasks/${taskId}/time-logs/${logId}`, { method: 'DELETE' });
+}
+
+/* ------------------------- Project mutations ------------------------- */
+
+/** PATCH /api/projects/:projectId — update project fields (name, description, color, dates). */
+export function apiUpdateProject(projectId: string, patch: Record<string, unknown>) {
+  return apiCall(`/api/projects/${projectId}`, json('PATCH', patch));
+}
+
+/** PATCH /api/projects/:projectId with `{ favorite: true }` — toggles the per-user favourite flag. */
+export function apiToggleProjectFavorite(projectId: string) {
+  return apiCall(`/api/projects/${projectId}`, json('PATCH', { favorite: true }));
+}
+
+/** POST /api/projects/:projectId/archive — soft-delete (archive) a project. */
+export function apiArchiveProject(projectId: string) {
+  return apiCall(`/api/projects/${projectId}/archive`, { method: 'POST' });
+}
+
+/** POST /api/projects/:projectId/restore — restore an archived project. */
+export function apiRestoreProject(projectId: string) {
+  return apiCall(`/api/projects/${projectId}/restore`, { method: 'POST' });
+}
+
+/* ---------------------- Project member mutations --------------------- */
+
+/** GET /api/projects/:projectId/members — list project members. */
+export async function apiListProjectMembers(projectId: string) {
+  try {
+    const res = await fetch(`/api/projects/${projectId}/members`);
+    if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+    const data = (await res.json()) as { members: { userId: string; role: string }[] };
+    return { ok: true as const, members: data.members };
+  } catch {
+    return { ok: false as const, error: 'Network error' };
+  }
+}
+
+/** POST /api/projects/:projectId/members — add a member. */
+export function apiAddProjectMember(
+  projectId: string,
+  userId: string,
+  role: string = 'MEMBER',
+) {
+  return apiCall(`/api/projects/${projectId}/members`, json('POST', { userId, role }));
+}
+
+/** DELETE /api/projects/:projectId/members/:userId — remove a member (or leave). */
+export function apiRemoveProjectMember(projectId: string, userId: string) {
+  return apiCall(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' });
+}
+
+/* ----------------- Project status update mutations ------------------- */
+
+/** POST /api/projects/:projectId/status-updates — post a status update. */
+export function apiCreateProjectStatusUpdate(
+  projectId: string,
+  input: { text: string; color: 'green' | 'yellow' | 'red' },
+) {
+  return apiCallWithData<{ update: { id: string; [key: string]: unknown } }>(
+    `/api/projects/${projectId}/status-updates`,
+    json('POST', input),
+  );
+}
+
+/** DELETE /api/projects/:projectId/status-updates/:updateId — delete a status update. */
+export function apiDeleteProjectStatusUpdate(projectId: string, updateId: string) {
+  return apiCall(`/api/projects/${projectId}/status-updates/${updateId}`, { method: 'DELETE' });
+}
+
+/* --------------------- Key result mutations -------------------------- */
+
+/** PATCH /api/workspaces/:wid/goals/:goalId/key-results/:krId — update a KR. */
+export function apiUpdateKeyResult(
+  workspaceId: string,
+  goalId: string,
+  krId: string,
+  patch: Record<string, unknown>,
+) {
+  return apiCall(
+    `/api/workspaces/${workspaceId}/goals/${goalId}/key-results/${krId}`,
+    json('PATCH', patch),
+  );
+}
+
+/** DELETE /api/workspaces/:wid/goals/:goalId/key-results/:krId — delete a KR. */
+export function apiDeleteKeyResult(
+  workspaceId: string,
+  goalId: string,
+  krId: string,
+) {
+  return apiCall(
+    `/api/workspaces/${workspaceId}/goals/${goalId}/key-results/${krId}`,
+    { method: 'DELETE' },
+  );
+}
+
+/* ----------------------- Form mutations ------------------------------ */
+
+/** PATCH /api/projects/:projectId/forms/:formId — update form fields/isActive. */
+export function apiUpdateForm(projectId: string, formId: string, patch: Record<string, unknown>) {
+  return apiCall(`/api/projects/${projectId}/forms/${formId}`, json('PATCH', patch));
+}
+
+/** GET /api/projects/:projectId/forms/:formId/submissions — list submissions. */
+export async function apiListFormSubmissions(projectId: string, formId: string) {
+  try {
+    const res = await fetch(`/api/projects/${projectId}/forms/${formId}/submissions`);
+    if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+    const data = (await res.json()) as { submissions: unknown[] };
+    return { ok: true as const, submissions: data.submissions };
+  } catch {
+    return { ok: false as const, error: 'Network error' };
+  }
+}
+
+/* --------------------- Budget mutations ------------------------------ */
+
+/** PATCH /api/projects/:projectId/budgets/:budgetId — update budget fields. */
+export function apiUpdateBudget(projectId: string, budgetId: string, patch: Record<string, unknown>) {
+  return apiCall(`/api/projects/${projectId}/budgets/${budgetId}`, json('PATCH', patch));
+}
+
+/** GET /api/projects/:projectId/budgets/:budgetId — list expenses for a budget. */
+export async function apiListExpenses(projectId: string, budgetId: string) {
+  try {
+    const res = await fetch(`/api/projects/${projectId}/budgets/${budgetId}`);
+    if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+    const data = (await res.json()) as { expenses: unknown[] };
+    return { ok: true as const, expenses: data.expenses };
+  } catch {
+    return { ok: false as const, error: 'Network error' };
+  }
+}
+
+/** DELETE /api/projects/:projectId/budgets/:budgetId/expenses/:expenseId — delete an expense. */
+export function apiDeleteExpense(projectId: string, budgetId: string, expenseId: string) {
+  return apiCall(
+    `/api/projects/${projectId}/budgets/${budgetId}/expenses/${expenseId}`,
+    { method: 'DELETE' },
+  );
+}
+
+/* --------------------- Timesheet mutations --------------------------- */
+
+/** PATCH /api/timesheets/:entryId — update an entry (hours, note, date). */
+export function apiUpdateTimesheetEntry(entryId: string, patch: Record<string, unknown>) {
+  return apiCall(`/api/timesheets/${entryId}`, json('PATCH', patch));
+}
+
+/** DELETE /api/timesheets/:entryId — delete an entry (only if not yet submitted). */
+export function apiDeleteTimesheetEntry(entryId: string) {
+  return apiCall(`/api/timesheets/${entryId}`, { method: 'DELETE' });
+}
+
+/** POST /api/timesheets/submit — submit a batch of entries for approval. */
+export function apiSubmitTimesheets(entryIds: string[]) {
+  return apiCall('/api/timesheets/submit', json('POST', { entryIds }));
+}
+
+/** POST /api/timesheets/approve — approve a batch of submitted entries. */
+export function apiApproveTimesheets(entryIds: string[]) {
+  return apiCall('/api/timesheets/approve', json('POST', { entryIds }));
 }

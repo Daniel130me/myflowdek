@@ -1,12 +1,13 @@
 'use client';
 
-import React, { forwardRef, useImperativeHandle, useRef, useState, useEffect, useCallback } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useState, useEffect, useMemo } from 'react';
 import { Menu, Search, Plus, ChevronDown, SlidersHorizontal, LogOut } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { GlobalSearch } from '../ui/GlobalSearch';
-import { FONT_FAMILY as FF, TEAM, COLORS, CURRENT_USER_ID, teamById, type SearchFilters } from '@/features/flowdeck/model';
-import { Avatar, SearchFilterPanel } from '../ui';
+import { FONT_FAMILY as FF, COLORS, type SearchFilters } from '@/features/flowdeck/model';
+import { Avatar, SearchFilterPanel, useProjectMembers } from '../ui';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../auth';
 import type { Project, Tag } from '@/features/flowdeck/model';
 
 export interface TopBarHandle { focusSearch: () => void; }
@@ -35,6 +36,21 @@ export const TopBar = forwardRef<TopBarHandle, {
   const S = layout;
   const accentSoft = colors.accentSoft;
 
+  // Real authenticated user identity — replaces the hard-coded
+  // teamById[CURRENT_USER_ID] lookup.
+  const auth = useAuth();
+  const me = auth.user;
+  const myName = me?.name ?? 'User';
+  const myRole = me?.role ?? '';
+  const myAvatarColor = me?.avatarColor ?? COLORS.accent;
+  const initials = myName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+
+  // Real project members for the avatar stack (TopBar shows up to 5 of the
+  // current project's members). Falls back to an empty list when no
+  // project is open — the stack is hidden in that case anyway.
+  const { members: projectMembers } = useProjectMembers(project?.id ?? null);
+  const avatarStack = useMemo(() => projectMembers.slice(0, 5), [projectMembers]);
+
   // Keyboard shortcut: Ctrl+K / Cmd+K opens global search.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -58,9 +74,6 @@ export const TopBar = forwardRef<TopBarHandle, {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [userMenuOpen]);
-
-  const me = teamById[CURRENT_USER_ID];
-  const initials = me ? me.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : 'U';
 
   return (
     <header style={{
@@ -132,15 +145,15 @@ export const TopBar = forwardRef<TopBarHandle, {
                   <span style={{ position: 'absolute', top: -2, right: -4, width: 15, height: 15, borderRadius: '50%', background: COLORS.accent, color: '#FFFFFF', fontSize: 9, fontWeight: 700, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{activeFilterCount}</span>
                 )}
               </button>
-              <SearchFilterPanel open={filterOpen} onClose={() => setFilterOpen(false)} filters={searchFilters} onChange={onSearchFiltersChange} onClear={onClearFilters} activeFilterCount={activeFilterCount} tags={tags} />
+              <SearchFilterPanel open={filterOpen} onClose={() => setFilterOpen(false)} filters={searchFilters} onChange={onSearchFiltersChange} onClear={onClearFilters} activeFilterCount={activeFilterCount} tags={tags} members={projectMembers} />
             </div>
           )}
         </div>
       )}
 
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 12 }}>
-        {!isMobile && project && (
-          <div style={{ display: 'flex' }}>{TEAM.slice(0, 5).map((t, i) => (
+        {!isMobile && project && avatarStack.length > 0 && (
+          <div style={{ display: 'flex' }}>{avatarStack.map((t, i) => (
             <div key={t.id} style={{ marginLeft: i === 0 ? 0 : -8, border: `2px solid ${S.topbar.bg}`, borderRadius: '50%', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
               <Avatar id={t.id} size={30} />
             </div>
@@ -165,13 +178,13 @@ export const TopBar = forwardRef<TopBarHandle, {
               onClick={() => setUserMenuOpen(o => !o)}
               style={{
                 width: isMobile ? 34 : 36, height: isMobile ? 34 : 36, borderRadius: '50%',
-                background: '#16A34A', border: `2px solid ${S.topbar.bg}`, cursor: 'pointer',
+                background: myAvatarColor, border: `2px solid ${S.topbar.bg}`, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: isMobile ? 12 : 13, fontWeight: 800, color: '#FFFFFF',
                 fontFamily: FF, flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
                 padding: 0, outline: 'none',
               }}
-              title={me?.name || 'User menu'}
+              title={myName}
             >
               {initials}
             </button>
@@ -184,8 +197,8 @@ export const TopBar = forwardRef<TopBarHandle, {
               }}>
                 {/* User info header */}
                 <div style={{ padding: '10px 12px', borderBottom: `1px solid ${S.topbar.border}`, marginBottom: 4 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: colors.ink, fontFamily: FF }}>{me?.name || 'User'}</div>
-                  <div style={{ fontSize: 11, color: colors.gray, marginTop: 2, fontFamily: FF }}>{me?.role || ''}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: colors.ink, fontFamily: FF }}>{myName}</div>
+                  <div style={{ fontSize: 11, color: colors.gray, marginTop: 2, fontFamily: FF }}>{myRole}</div>
                 </div>
                 <button
                   onClick={() => { setUserMenuOpen(false); onLogout(); }}

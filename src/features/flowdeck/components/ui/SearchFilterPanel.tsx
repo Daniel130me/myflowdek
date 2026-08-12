@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, SlidersHorizontal, CalendarDays, Bookmark, BookmarkCheck, Trash2 } from 'lucide-react';
-import { COLORS, STATUS_META, STATUS_ORDER, PRIORITY_META, TEAM, type SearchFilters, type SavedFilter, type Tag, EMPTY_FILTERS } from '@/features/flowdeck/model';
+import { COLORS, STATUS_META, STATUS_ORDER, PRIORITY_META, type SearchFilters, type SavedFilter, type Tag, type MemberInfo, EMPTY_FILTERS } from '@/features/flowdeck/model';
 import { FF } from './styles';
 import { Avatar } from './Avatar';
 import { TagPill } from './TagPill';
@@ -15,13 +15,17 @@ interface SearchFilterPanelProps {
   onClear: () => void;
   activeFilterCount: number;
   tags: Tag[];
+  /** Real project members (sourced from `useProjectMembers`). When
+   *  omitted the assignee section is hidden — we never fall back to the
+   *  mock TEAM since filters must apply to real assignee ids. */
+  members?: MemberInfo[];
   savedFilters?: SavedFilter[];
   onSaveFilter?: (name: string, filters: SearchFilters) => void;
   onDeleteSavedFilter?: (id: string) => void;
   onApplySavedFilter?: (id: string) => void;
 }
 
-export function SearchFilterPanel({ open, onClose, filters, onChange, onClear, activeFilterCount, tags, savedFilters, onSaveFilter, onDeleteSavedFilter, onApplySavedFilter }: SearchFilterPanelProps) {
+export function SearchFilterPanel({ open, onClose, filters, onChange, onClear, activeFilterCount, tags, members = [], savedFilters, onSaveFilter, onDeleteSavedFilter, onApplySavedFilter }: SearchFilterPanelProps) {
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [saveName, setSaveName] = useState('');
 
@@ -161,20 +165,22 @@ export function SearchFilterPanel({ open, onClose, filters, onChange, onClear, a
         </div>
 
         {/* Assignee */}
-        <div style={sectionStyle}>
-          <div style={labelStyle}>Assignee</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {TEAM.map(m => {
-              const active = filters.assignees.includes(m.id);
-              return (
-                <button key={m.id} onClick={() => set('assignees', toggleArray(filters.assignees, m.id))} style={active ? pillActive : pillBase}>
-                  <Avatar id={m.id} size={16} />
-                  {m.name.split(' ')[0]}
-                </button>
-              );
-            })}
+        {members.length > 0 && (
+          <div style={sectionStyle}>
+            <div style={labelStyle}>Assignee</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {members.map(m => {
+                const active = filters.assignees.includes(m.id);
+                return (
+                  <button key={m.id} onClick={() => set('assignees', toggleArray(filters.assignees, m.id))} style={active ? pillActive : pillBase}>
+                    <Avatar id={m.id} size={16} />
+                    {m.name.split(' ')[0]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Tags */}
         {tags.length > 0 && (

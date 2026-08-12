@@ -6,7 +6,7 @@ import {
   Link2, Unlink2, Bold, Palette, Milestone, Clock, Tag as TagIcon, FileUp,
   CalendarDays, ArrowRight, FolderInput, Play,
 } from 'lucide-react';
-import { COLORS, TEAM, PRIORITY_META, TAG_COLORS, STATUS_META, STATUS_ORDER, type Tag, type Project } from '@/features/flowdeck/model';
+import { COLORS, PRIORITY_META, TAG_COLORS, STATUS_META, STATUS_ORDER, type Tag, type Project, type MemberInfo } from '@/features/flowdeck/model';
 import { FF } from './styles';
 import { useViewport } from '../../hooks/useViewport';
 
@@ -32,6 +32,9 @@ interface BulkActionBarProps {
   onBulkMoveToProject?: (projectId: string, targetProjectId: string) => void;
   tags?: Tag[];
   projects?: Record<string, Project>;
+  /** Real project members (sourced from `useProjectMembers`). When
+   *  omitted the assign popover shows an empty state. */
+  members?: MemberInfo[];
   currentProjectId: string;
 }
 
@@ -39,7 +42,7 @@ export function BulkActionBar({
   count, onClearSelection, onBulkAssign, onSetPriority, onComplete,
   onDelete, onLink, onUnlink, onBold, onMilestone, onAttachFiles,
   onDuplicateBulk, onBulkSetDueDate, onBulkAddTag, onBulkRemoveTag, onBulkSetStatus,
-  onBulkMoveToProject, tags = [], projects, currentProjectId,
+  onBulkMoveToProject, tags = [], projects, members = [], currentProjectId,
 }: BulkActionBarProps) {
   const { isMobile } = useViewport();
   const [showAssign, setShowAssign] = React.useState(false);
@@ -127,9 +130,11 @@ export function BulkActionBar({
           <>
             <div onClick={closeAll} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
             <div style={popover}>
-              {TEAM.map(m => (
+              {members.length === 0 ? (
+                <div style={{ padding: '10px 12px', fontSize: 12, color: COLORS.gray, fontFamily: FF }}>No members loaded</div>
+              ) : members.map(m => (
                 <button key={m.id} onClick={() => { onBulkAssign(currentProjectId, m.id); closeAll(); }} style={popItem(m.name, COLORS.ink)}>
-                  <div style={{ width: 8, height: 8, borderRadius: 4, background: m.color }} />
+                  <div style={{ width: 8, height: 8, borderRadius: 4, background: m.color || COLORS.accent }} />
                   {m.name}
                 </button>
               ))}

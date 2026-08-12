@@ -8,13 +8,16 @@ import { useProject } from '@/features/flowdeck/hooks/useProject';
 import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { useProjectComments } from '@/features/flowdeck/hooks/useProjectComments';
 import { useProjectFiles } from '@/features/flowdeck/hooks/useProjectFiles';
+import { useProjectMembers } from '@/features/flowdeck/hooks/useProjectMembers';
+import { useProjectStatusUpdates } from '@/features/flowdeck/hooks/useProjectStatusUpdates';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
 
 /**
- * Project overview page — the project details come from the real API
- * (GET /api/projects/:id). Task, file, and status-update data still come
- * from the mock store until those backends are wired in later phases.
+ * Project overview page — the project details, tasks, files, members, and
+ * status updates all come from the real API. Mutations are wired through the
+ * shared store (which performs optimistic updates + API persistence +
+ * rollback on failure), so any change survives a browser refresh.
  */
 export default function ProjectOverviewPage() {
   const router = useRouter();
@@ -23,10 +26,13 @@ export default function ProjectOverviewPage() {
   const state = useFlowDeck();
   const { project: apiProject, loading } = useProject(projectId);
 
-  // Fetch real tasks, comments, and files from the API and sync into the store.
+  // Fetch real tasks, comments, files, members, and status updates from the
+  // API and sync into the store.
   useProjectTasks(projectId);
   useProjectComments(projectId);
   useProjectFiles(projectId);
+  useProjectMembers(projectId);
+  useProjectStatusUpdates(projectId);
 
   if (!projectId) {
     notFound();
@@ -49,8 +55,6 @@ export default function ProjectOverviewPage() {
     notFound();
   }
 
-  // Tasks/files/status still from mock store — will be wired to real APIs
-  // in subsequent phases.
   const tasks = state.tasksByProject[projectId!] ?? [];
   const files = state.filesByProject[projectId!] ?? [];
   const statusUpdates = state.statusUpdatesByProject[projectId!] ?? [];

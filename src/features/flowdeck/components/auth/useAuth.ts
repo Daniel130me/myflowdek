@@ -10,6 +10,7 @@ import {
 } from '@/lib/auth.constants';
 
 export interface UserProfile {
+  id: string;
   name: string;
   email: string;
   role: string;
@@ -72,6 +73,7 @@ export function useAuth() {
 
   const user: UserProfile | null = session?.user
     ? {
+        id: session.user.id,
         name: session.user.name ?? nameFromEmail(session.user.email),
         email: session.user.email,
         role: session.user.jobTitle ?? DEFAULT_JOB_TITLE_FALLBACK,

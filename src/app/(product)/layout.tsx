@@ -9,6 +9,7 @@ import { useKeyboardShortcuts } from '@/features/flowdeck/hooks/useKeyboardShort
 import { ThemeProvider, useTheme } from '@/features/flowdeck/hooks/useTheme';
 import { FlowdekDataProvider } from '@/providers/FlowdekDataProvider';
 import { WorkspaceProvider } from '@/providers/WorkspaceProvider';
+import { MemberDirectoryProvider, useProjectMembers } from '@/features/flowdeck/components/ui';
 import { useAuth } from '@/features/flowdeck/components/auth';
 import {
   Sidebar, MobileSidebar, TopBar, MobileSearchRow, BottomNav, MoreMenu,
@@ -45,12 +46,14 @@ export default function ProductLayout({ children, modal }: { children: React.Rea
   return (
     <ThemeProvider>
       <FlowdekDataProvider>
-        <WorkspaceProvider>
-          <ProductShellInner onLogout={auth.logout} modal={modal}>
-            {children}
-          </ProductShellInner>
-          <Toaster />
-        </WorkspaceProvider>
+        <MemberDirectoryProvider>
+          <WorkspaceProvider>
+            <ProductShellInner onLogout={auth.logout} modal={modal}>
+              {children}
+            </ProductShellInner>
+            <Toaster />
+          </WorkspaceProvider>
+        </MemberDirectoryProvider>
       </FlowdekDataProvider>
     </ThemeProvider>
   );
@@ -82,6 +85,12 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
   // Extract route parameters & current view without fallbacks
   const routeProjectId = getSingleParam(params?.projectId);
   const activeView = getViewFromPathname(pathname);
+
+  // Fetch real project members for the current route so the BulkActionBar
+  // assign popover + the TopBar avatar stack + assignee selectors all see
+  // real member data. The result is also registered into the global
+  // MemberDirectory via the hook.
+  const { members: routeProjectMembers } = useProjectMembers(routeProjectId);
 
   // Keyboard shortcut listeners
   useKeyboardShortcuts({
@@ -255,6 +264,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
           onBulkMoveToProject={(pid, targetProjectId) => state.moveTasksToProjectBulk(pid, state.selectedIds, targetProjectId)}
           tags={state.tags}
           projects={projects}
+          members={routeProjectMembers}
           currentProjectId={routeProjectId}
         />
       )}

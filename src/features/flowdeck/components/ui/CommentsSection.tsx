@@ -2,9 +2,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Trash2, Pencil, Reply, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
-import { COLORS, TEAM, CURRENT_USER_ID, FF, type Comment, type ActivityEntry, type Reaction } from '@/features/flowdeck/model';
+import { COLORS, FF, type Comment, type ActivityEntry, type Reaction, type MemberInfo } from '@/features/flowdeck/model';
 import { Avatar } from './Avatar';
 import { Field } from './Field';
+import { useMemberDirectory } from './MemberDirectory';
 
 /* ---- Quick-reaction emojis ---- */
 const QUICK_REACTIONS = ['❤️', '👍', '🎉', '🎊', '👏', '😮', '😎', '👀'];
@@ -18,14 +19,26 @@ interface CommentsSectionProps {
   onDeleteComment: (commentId: string) => void;
   onEditComment?: (commentId: string, newText: string) => void;
   onToggleReaction?: (commentId: string, emoji: string) => void;
+  /** The authenticated user's id — used to show edit/delete buttons on
+   *  the user's own comments + render the main input avatar. Defaults to
+   *  an empty string (no edit/delete actions shown) when omitted. */
+  currentUserId?: string;
 }
 
 export function CommentsSection({
   taskId, comments, activity, onAddComment, onDeleteComment, onEditComment, onToggleReaction,
+  currentUserId = '',
 }: CommentsSectionProps) {
   const [text, setText] = useState('');
   const [activeTab, setActiveTab] = useState<'comments' | 'activity'>('comments');
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Real member directory — powers @mention lookup + reaction tooltips +
+  // comment author names. Falls back to an empty list when no projects
+  // have been opened yet (the directory hydrates on first
+  // `useProjectMembers` call).
+  const { list: directoryMembers } = useMemberDirectory();
+  const memberList: MemberInfo[] = directoryMembers;
 
   /* All comments for this task, sorted chronologically */
   const taskComments = comments
@@ -76,9 +89,9 @@ export function CommentsSection({
     return parts.map((part, i) => {
       if (part.startsWith('@')) {
         const username = part.slice(1);
-        const member = TEAM.find(m => m.name.toLowerCase().split(' ').some(n => n.toLowerCase().startsWith(username.toLowerCase())));
+        const member = memberList.find(m => m.name.toLowerCase().split(' ').some(n => n.toLowerCase().startsWith(username.toLowerCase())));
         return (
-          <span key={i} style={{ fontWeight: 600, color: member?.color || COLORS.teal, backgroundColor: member ? `${member.color}15` : 'transparent', padding: '1px 4px', borderRadius: 4 }}>{part}</span>
+          <span key={i} style={{ fontWeight: 600, color: member?.color || COLORS.teal, backgroundColor: member?.color ? `${member.color}15` : 'transparent', padding: '1px 4px', borderRadius: 4 }}>{part}</span>
         );
       }
       return part;
@@ -93,8 +106,8 @@ export function CommentsSection({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const mentionMatches = mentionQuery
-    ? TEAM.filter(m => m.name.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 5)
-    : TEAM.slice(0, 5);
+    ? memberList.filter(m => m.name.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 5)
+    : memberList.slice(0, 5);
 
   function handleTextChange(val: string) {
     setText(val);
@@ -149,7 +162,7 @@ export function CommentsSection({
   }
 
   /* ---- Mention autocomplete dropdown (shared) ---- */
-  function MentionDropdown({ matches, idx, onSelect, position }: { matches: typeof TEAM; idx: number; onSelect: (name: string) => void; position: 'above' | 'below' }) {
+  function MentionDropdown({ matches, idx, onSelect, position }: { matches: MemberInfo[]; idx: number; onSelect: (name: string) => void; position: 'above' | 'below' }) {
     if (matches.length === 0) return null;
     return (
       <div style={{ position: position === 'above' ? 'absolute' as const : 'absolute' as const, ...(position === 'above' ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }), left: 0, background: '#FFFFFF', border: `1px solid ${COLORS.line}`, borderRadius: 10, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04)', zIndex: 10, padding: 4, minWidth: 200, maxHeight: 200, overflowY: 'auto' }}>
@@ -166,7 +179,7 @@ export function CommentsSection({
             <Avatar id={m.id} size={24} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, fontFamily: FF, color: COLORS.ink }}>{m.name}</div>
-              <div style={{ fontSize: 11, color: COLORS.gray, fontFamily: FF }}>{m.role}</div>
+              <div style={{ fontSize: 11, color: COLORS.gray, fontFamily: FF }}>{m.role ?? ''}</div>
             </div>
           </button>
         ))}
@@ -180,13 +193,13 @@ export function CommentsSection({
     return (
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
         {reactions.map(r => {
-          const hasReacted = r.userIds.includes(CURRENT_USER_ID);
+          const hasReacted = r.userIds.includes(currentUserId);
           return (
             <button
               key={r.emoji}
               type="button"
               onClick={() => onToggleReaction && onToggleReaction(commentId, r.emoji)}
-              title={r.userIds.map(uid => TEAM.find(m => m.id === uid)?.name).filter(Boolean).join(', ')}
+              title={r.userIds.map(uid => memberList.find(m => m.id === uid)?.name).filter(Boolean).join(', ')}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 9999,
                 border: hasReacted ? `1.5px solid ${COLORS.accent}` : `1px solid ${COLORS.line}`,
@@ -278,7 +291,7 @@ export function CommentsSection({
 
   /* ---- Single comment card ---- */
   function CommentCard({ comment, isReply = false }: { comment: Comment; isReply?: boolean }) {
-    const author = TEAM.find(m => m.id === comment.authorId);
+    const author = memberList.find(m => m.id === comment.authorId);
     const [editing, setEditing] = useState(false);
     const [editDraft, setEditDraft] = useState(comment.text);
     const [showReplyInput, setShowReplyInput] = useState(false);
@@ -294,8 +307,8 @@ export function CommentsSection({
     const [replyCursorPos, setReplyCursorPos] = useState(0);
 
     const replyMentionMatches = replyMentionQuery
-      ? TEAM.filter(m => m.name.toLowerCase().includes(replyMentionQuery.toLowerCase())).slice(0, 5)
-      : TEAM.slice(0, 5);
+      ? memberList.filter(m => m.name.toLowerCase().includes(replyMentionQuery.toLowerCase())).slice(0, 5)
+      : memberList.slice(0, 5);
 
     const replies = repliesMap.get(comment.id) || [];
     const hasReplies = replies.length > 0;
@@ -379,7 +392,7 @@ export function CommentsSection({
                 onMouseEnter={e => { e.currentTarget.style.color = COLORS.gray; }}
                 onMouseLeave={e => { e.currentTarget.style.color = COLORS.grayLight; }}
               ><Reply size={12} /></button>
-              {comment.authorId === CURRENT_USER_ID && !editing && (
+              {comment.authorId === currentUserId && !editing && (
                 <button
                   type="button"
                   onClick={() => setEditing(true)}
@@ -389,7 +402,7 @@ export function CommentsSection({
                   onMouseLeave={e => { e.currentTarget.style.color = COLORS.grayLight; }}
                 ><Pencil size={12} /></button>
               )}
-              {comment.authorId === CURRENT_USER_ID && (
+              {comment.authorId === currentUserId && (
                 <button
                   type="button"
                   onClick={() => onDeleteComment(comment.id)}
@@ -525,7 +538,7 @@ export function CommentsSection({
           </div>
           {/* Main comment input */}
           <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'flex-start' }}>
-            <Avatar id={CURRENT_USER_ID} size={28} />
+            <Avatar id={currentUserId} size={28} />
             <div style={{ flex: 1, position: 'relative' }}>
               <textarea
                 ref={textareaRef}
@@ -572,7 +585,7 @@ export function CommentsSection({
             <div style={{ textAlign: 'center', color: COLORS.gray, fontSize: 12.5, fontFamily: FF, padding: '12px 0' }}>No activity recorded yet.</div>
           )}
           {taskActivity.map(a => {
-            const author = TEAM.find(m => m.id === a.authorId);
+            const author = memberList.find(m => m.id === a.authorId);
             return (
               <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: `1px solid ${COLORS.lineLight}` }}>
                 <Avatar id={a.authorId} size={20} />

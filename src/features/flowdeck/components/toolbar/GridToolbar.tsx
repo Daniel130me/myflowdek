@@ -6,7 +6,7 @@ import {
   Link2, Unlink2, Trash2, Bold, Palette, Hash, Diamond, FileUp, FileDown,
   Printer, Scissors, Copy, ClipboardPaste, Paperclip, Columns3, Share2,
 } from 'lucide-react';
-import { COLORS, TEAM, COLOR_SWATCHES, type Task } from '@/features/flowdeck/model';
+import { COLORS, COLOR_SWATCHES, type Task, type MemberInfo } from '@/features/flowdeck/model';
 import { useViewport } from '../../hooks/useViewport';
 import { Avatar } from '../ui/Avatar';
 import { selectStyle, popoverRowStyle, FF } from '../ui/styles';
@@ -14,7 +14,7 @@ import { ColumnManager } from './ColumnManager';
 import type { GridActions } from './types';
 import { MobileToolbarSheet } from './MobileToolbarSheet';
 
-export function GridToolbar({ projectId, tasks, grid, filterSlot, extraLeft }: { projectId: string; tasks: Task[]; grid: GridActions; filterSlot?: React.ReactNode; extraLeft?: React.ReactNode }) {
+export function GridToolbar({ projectId, tasks, grid, filterSlot, extraLeft, members = [] }: { projectId: string; tasks: Task[]; grid: GridActions; filterSlot?: React.ReactNode; extraLeft?: React.ReactNode; members?: MemberInfo[] }) {
   const { isMobile } = useViewport();
   const [open, setOpen] = React.useState<string | null>(null);
   const [mobileSheet, setMobileSheet] = React.useState(false);
@@ -42,7 +42,7 @@ export function GridToolbar({ projectId, tasks, grid, filterSlot, extraLeft }: {
           {hasSelection && <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF, marginRight: 4 }}>{grid.selectedIds.size} selected</span>}
           <button onClick={() => setMobileSheet(true)} style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${COLORS.line}`, borderRadius: 10, background: '#F3F4F6', color: COLORS.ink, cursor: 'pointer' }}><MoreHorizontal size={18} /></button>
         </div>
-        {mobileSheet && <MobileToolbarSheet projectId={projectId} grid={grid} hasSelection={hasSelection} onClose={() => setMobileSheet(false)} />}
+        {mobileSheet && <MobileToolbarSheet projectId={projectId} grid={grid} hasSelection={hasSelection} onClose={() => setMobileSheet(false)} members={members} />}
       </>
     );
   }
@@ -96,7 +96,7 @@ export function GridToolbar({ projectId, tasks, grid, filterSlot, extraLeft }: {
       {iconBtn(UserPlus, 'assign', 'Assign to\u2026', {
         disabled: !hasSelection,
         popover: (
-          <div>{TEAM.map(m => (
+          <div>{members.map(m => (
             <button key={m.id} onClick={() => { grid.onBulkAssign(projectId, m.id); setOpen(null); }} style={popoverRowStyle}>
               <Avatar id={m.id} size={18} /> {m.name}
             </button>

@@ -60,7 +60,7 @@ export default function ApprovalsRoutePage() {
       currentUserId={state.currentUserId}
       onAddApproval={handleAddApproval as any}
       onResolveApproval={handleResolveApproval as any}
-      onDeleteApproval={() => {}}
+      onDeleteApproval={(id: string) => state.deleteApproval(id)}
     />
   );
 }
