@@ -1,8 +1,9 @@
 'use client';
 
-import React, { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useState, useEffect, useCallback } from 'react';
 import { Menu, Search, Plus, ChevronDown, SlidersHorizontal, LogOut } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
+import { GlobalSearch } from '../ui/GlobalSearch';
 import { FONT_FAMILY as FF, TEAM, COLORS, CURRENT_USER_ID, teamById, type SearchFilters } from '@/features/flowdeck/model';
 import { Avatar, SearchFilterPanel } from '../ui';
 import { useTheme } from '../../hooks/useTheme';
@@ -27,11 +28,24 @@ export const TopBar = forwardRef<TopBarHandle, {
   const searchRef = useRef<HTMLInputElement>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   useImperativeHandle(ref, () => ({ focusSearch: () => searchRef.current?.focus() }), []);
   const { colors, layout } = useTheme();
   const S = layout;
   const accentSoft = colors.accentSoft;
+
+  // Keyboard shortcut: Ctrl+K / Cmd+K opens global search.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setGlobalSearchOpen(true);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   // Close user menu on outside click
   useEffect(() => {
@@ -190,6 +204,9 @@ export const TopBar = forwardRef<TopBarHandle, {
           </div>
         )}
       </div>
+
+      {/* Global search overlay */}
+      <GlobalSearch open={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
     </header>
   );
 });

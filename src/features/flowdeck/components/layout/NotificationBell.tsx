@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Bell, X, Check, CheckCheck } from 'lucide-react';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
+import { routes } from '@/shared/navigation/routes';
 
 interface NotificationItem {
   id: string;
@@ -27,6 +29,7 @@ interface NotificationItem {
 const POLL_INTERVAL_MS = 30_000;
 
 export function NotificationBell() {
+  const router = useRouter();
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -170,7 +173,16 @@ export function NotificationBell() {
                   display: 'flex', gap: 10, cursor: 'pointer',
                   background: n.readAt ? 'transparent' : 'rgba(254,128,41,0.04)',
                 }}
-                onClick={() => { if (!n.readAt) handleMarkRead(n.id); }}
+                onClick={() => {
+                  if (!n.readAt) handleMarkRead(n.id);
+                  // Navigate to the related project/task if available.
+                  if (n.projectId && n.taskId) {
+                    router.push(routes.task(n.projectId, n.taskId));
+                  } else if (n.projectId) {
+                    router.push(routes.projectOverview(n.projectId));
+                  }
+                  setOpen(false);
+                }}
               >
                 {/* Actor avatar */}
                 <div style={{
