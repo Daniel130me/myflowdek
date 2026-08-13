@@ -11,6 +11,47 @@
  * id. Read-only mutations return `{ ok, error }`.
  */
 
+import type { Task } from '@/features/flowdeck/model';
+
+/**
+ * Translate the frontend Task shape into the field names the backend
+ * `POST /api/projects/:id/tasks` and `PATCH /api/tasks/:id` endpoints
+ * expect.
+ *
+ * The frontend Task type uses `assignee` and `start`; the API uses
+ * `assigneeId` and `startDate`. This helper is the single source of truth
+ * for that translation so the store never accidentally sends a
+ * frontend-only field name to the API.
+ *
+ * Only fields that have a corresponding API column are emitted — `tags`,
+ * `followers`, `customFields`, and `storyPoints` are intentionally NOT
+ * included here because they have dedicated endpoints (or no API yet). The
+ * Zod route schemas would silently strip them anyway, but going through
+ * this mapping makes the contract explicit and keeps the network payload
+ * minimal.
+ *
+ * Only keys whose value is `!== undefined` are emitted, so callers can
+ * pass a sparse patch (e.g. `{ status: 'done' }`) without clearing every
+ * other field on the server.
+ */
+export function taskToApiPayload(task: Partial<Task>): Record<string, unknown> {
+  return {
+    ...(task.name !== undefined ? { name: task.name } : {}),
+    ...(task.description !== undefined ? { description: task.description } : {}),
+    ...(task.status !== undefined ? { status: task.status } : {}),
+    ...(task.priority !== undefined ? { priority: task.priority } : {}),
+    ...(task.assignee !== undefined ? { assigneeId: task.assignee || null } : {}),
+    ...(task.start !== undefined ? { startDate: task.start || null } : {}),
+    ...(task.dueDate !== undefined ? { dueDate: task.dueDate || null } : {}),
+    ...(task.parentId !== undefined ? { parentId: task.parentId || null } : {}),
+    ...(task.sectionId !== undefined ? { sectionId: task.sectionId || null } : {}),
+    ...(task.recurrence !== undefined ? { recurrence: task.recurrence || null } : {}),
+    ...(task.progress !== undefined ? { progress: task.progress } : {}),
+    ...(task.duration !== undefined ? { duration: task.duration } : {}),
+    ...(task.sortOrder !== undefined ? { sortOrder: task.sortOrder } : {}),
+  };
+}
+
 /** Generic fetch wrapper that returns { ok, error } instead of throwing. */
 async function apiCall(
   url: string,
@@ -72,27 +113,21 @@ export function apiDeleteTask(taskId: string) {
 /**
  * POST /api/projects/:projectId/tasks — create a task.
  *
+ * Accepts the already-mapped API payload (i.e. the output of
+ * `taskToApiPayload`). Callers should build the payload with that helper so
+ * the frontend→API field-name translation (assignee → assigneeId, start →
+ * startDate, …) stays in one place.
+ *
  * Returns the server-created task so the store can replace the optimistic
  * temp id with the canonical server id.
  */
 export function apiCreateTask(
   projectId: string,
-  input: {
-    name: string;
-    description?: string;
-    status?: string;
-    priority?: string;
-    assigneeId?: string;
-    parentId?: string | null;
-    sectionId?: string | null;
-    dueDate?: string | null;
-    startDate?: string | null;
-    duration?: number;
-  },
+  payload: Record<string, unknown>,
 ) {
   return apiCallWithData<{ task: { id: string; [key: string]: unknown } }>(
     `/api/projects/${projectId}/tasks`,
-    json('POST', input),
+    json('POST', payload),
   );
 }
 
@@ -208,6 +243,27 @@ export function apiUpdateSection(
 /** DELETE /api/projects/:projectId/sections/:sectionId — delete a section. */
 export function apiDeleteSection(projectId: string, sectionId: string) {
   return apiCall(`/api/projects/${projectId}/sections/${sectionId}`, { method: 'DELETE' });
+}
+
+/* ------------------------------ Tag mutations ----------------------------- */
+
+/**
+ * POST /api/projects/:projectId/tags — create a project tag.
+ * Returns the server-created tag so the store can reconcile the temp id.
+ */
+export function apiCreateTag(
+  projectId: string,
+  input: { name: string; color?: string },
+) {
+  return apiCallWithData<{ tag: { id: string; name: string; color: string } }>(
+    `/api/projects/${projectId}/tags`,
+    json('POST', input),
+  );
+}
+
+/** DELETE /api/projects/:projectId/tags/:tagId — delete a project tag. */
+export function apiDeleteTag(projectId: string, tagId: string) {
+  return apiCall(`/api/projects/${projectId}/tags/${tagId}`, { method: 'DELETE' });
 }
 
 /* --------------------------- Time-log mutations ------------------------- */

@@ -7,6 +7,7 @@ import {
 import { checkMutationLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { executeBulkAction, bulkActionSchema } from '@/server/tasks/bulk.service';
 import type { ProjectCapability } from '@/server/auth/capabilities';
+import { db } from '@/server/db/client';
 
 /**
  * Map each bulk action type to the project capability it requires.
@@ -35,6 +36,13 @@ const BULK_ACTION_CAPABILITY: Record<string, ProjectCapability> = {
  *
  * Authorization is enforced through the centralized capability matrix:
  * each action type maps to a specific project capability.
+ *
+ * Security hardening (FCP-4): before dispatching to the service, the route
+ * verifies that EVERY task id in the request belongs to this project. If any
+ * task id is foreign, the entire operation is rejected with a 400 — no partial
+ * mutation ever reaches the database. The assignee (when set) must be a
+ * ProjectMember, and the tag (for addTag / removeTag) must belong to this
+ * project, so cross-project TaskTag rows can never be created or deleted.
  */
 export async function POST(
   request: Request,
@@ -68,6 +76,56 @@ export async function POST(
     // target project (membership + CREATE_TASK capability).
     if (action.action === 'move') {
       await requireProjectCapability(user.id, action.targetProjectId, 'CREATE_TASK');
+    }
+
+    // ---- Task ownership: EVERY task id in the payload must belong to this
+    // project. If any id is foreign (cross-project tampering, stale id,
+    // deleted task), reject the entire operation — no partial mutation.
+    // Deduplicate so a caller passing the same id twice doesn't trip the
+    // length check.
+    const uniqueTaskIds = Array.from(new Set(action.taskIds));
+    const projectTasks = await db.task.findMany({
+      where: { id: { in: uniqueTaskIds }, projectId },
+      select: { id: true },
+    });
+    if (projectTasks.length !== uniqueTaskIds.length) {
+      return NextResponse.json(
+        { error: 'Some tasks do not belong to this project' },
+        { status: 400 },
+      );
+    }
+
+    // ---- Assignee membership: when an assignee is set (not cleared), the
+    // target user must be a ProjectMember of this project. Unassigning
+    // (assigneeId === null) is always allowed.
+    if (action.action === 'assignee' && action.assigneeId) {
+      const assigneeMembership = await db.projectMember.findUnique({
+        where: { projectId_userId: { projectId, userId: action.assigneeId } },
+      });
+      if (!assigneeMembership) {
+        return NextResponse.json(
+          { error: 'Assignee is not a member of this project' },
+          { status: 400 },
+        );
+      }
+    }
+
+    // ---- Tag ownership: the tag must belong to this project. Without this
+    // check a caller could pass a tagId from another project and create or
+    // delete cross-project TaskTag rows. (The service re-verifies this for
+    // addTag as defense in depth; we do it here so the response shape and
+    // status code are consistent across add/remove.)
+    if (action.action === 'addTag' || action.action === 'removeTag') {
+      const tag = await db.tag.findUnique({
+        where: { id: action.tagId },
+        select: { projectId: true },
+      });
+      if (!tag || tag.projectId !== projectId) {
+        return NextResponse.json(
+          { error: 'Tag does not belong to this project' },
+          { status: 400 },
+        );
+      }
     }
 
     const result = await executeBulkAction(projectId, action);

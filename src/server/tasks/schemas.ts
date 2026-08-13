@@ -28,6 +28,8 @@ export const updateTaskSchema = z.object({
   assigneeId: z.string().optional().nullable(),
   parentId: z.string().optional().nullable(),
   sectionId: z.string().optional().nullable(),
+  /** Sort order for manual task ordering within a project. */
+  sortOrder: z.number().int().optional(),
   /** Recurrence pattern: 'daily' | 'weekly' | 'monthly' | null. When set,
    *  a background job creates the next occurrence after completion. Pass
    *  null to clear the recurrence. */

@@ -50,6 +50,7 @@ const taskSelect = {
   assigneeId: true,
   createdById: true,
   parentId: true,
+  sectionId: true,
   completedAt: true,
   createdAt: true,
   updatedAt: true,

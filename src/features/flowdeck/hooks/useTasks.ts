@@ -20,6 +20,7 @@ interface ApiTask {
   recurrence?: string | null;
   assigneeId: string | null;
   parentId: string | null;
+  sectionId: string | null;
   completedAt: string | null;
   createdAt?: string;
 }
@@ -40,6 +41,7 @@ function mapTask(api: ApiTask): Task {
     priority: api.priority as TaskPriority,
     deps: [],
     parentId: api.parentId ?? null,
+    sectionId: api.sectionId ?? null,
     milestone: api.isMilestone,
     recurrence: api.recurrence ?? null,
     createdAt: api.createdAt ?? undefined,

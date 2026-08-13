@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { MoreHorizontal, GripVertical, Plus, Repeat, ChevronRight, ChevronDown, Trash2, X } from 'lucide-react';
-import { COLORS, STATUS_META, STATUS_ORDER, teamById, fmtRange, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task, type Tag, type Project, type Section } from '@/features/flowdeck/model';
-import { Avatar, StatusPill, PriorityFlag, SectionHeader, TaskCheckbox, TagPills, TagFilterBar, FF, TaskContextMenu, InlineTaskName } from '../ui';
+import { COLORS, STATUS_META, STATUS_ORDER, fmtRange, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task, type Tag, type Project, type Section } from '@/features/flowdeck/model';
+import { Avatar, StatusPill, PriorityFlag, SectionHeader, TaskCheckbox, TagPills, TagFilterBar, FF, TaskContextMenu, InlineTaskName, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 
 function computeNextDateStr(dateStr: string, recurrence: string): string {
@@ -219,6 +219,7 @@ interface TaskListViewProps {
 
 export function TaskListView({ tasks, tags = [], projects, currentProjectId, allTasks = [], sections = [], onOpenTask, onMove, onToggleComplete, onReorder, onQuickAdd, onUpdateTask, onRemoveTask, onDuplicateTask, onToggleTaskTag, onMoveToProject, onPromoteSubtask, onDemoteToSubtask, onAddSection, onRenameSection, onDeleteSection, onToggleSectionCollapsed, onSetRecurrence, onSetTaskSection }: TaskListViewProps) {
   const { isMobile } = useViewport();
+  const { lookup: lookupMember } = useMemberDirectory();
   const [sortKey, setSortKey] = useState('start');
   const [tagFilter, setTagFilter] = useState<Set<string>>(new Set());
   const tagMap = useMemo(() => Object.fromEntries(tags.map(t => [t.id, t])), [tags]);
@@ -330,7 +331,7 @@ export function TaskListView({ tasks, tags = [], projects, currentProjectId, all
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginLeft: 30, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Avatar id={t.assignee} size={22} />
-              <span style={{ fontSize: 12.5, color: COLORS.gray, fontFamily: FF }}>{teamById[t.assignee]?.name.split(' ')[0]}</span>
+              <span style={{ fontSize: 12.5, color: COLORS.gray, fontFamily: FF }}>{lookupMember(t.assignee)?.name.split(' ')[0]}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {t.recurrence && (
@@ -411,7 +412,7 @@ export function TaskListView({ tasks, tags = [], projects, currentProjectId, all
             <InlineTaskName name={t.name} isDone={isDone} style={{ textDecoration: isDone ? 'line-through' : 'none', color: isDone ? COLORS.gray : COLORS.ink }} onSave={(newName) => onUpdateTask?.(t.id, { name: newName })} onOpenTask={() => onOpenTask(t.id)} />
             {t.tags && t.tags.length > 0 && <div style={{ marginTop: 4 }}><TagPills tags={t.tags} tagMap={tagMap} /></div>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Avatar id={t.assignee} size={20} /><span style={{ fontSize: 12.5 }}>{teamById[t.assignee]?.name.split(' ')[0]}</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Avatar id={t.assignee} size={20} /><span style={{ fontSize: 12.5 }}>{lookupMember(t.assignee)?.name.split(' ')[0]}</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             {t.recurrence && (
               <span title={t.dueDate ? `Next: ${computeNextDateStr(t.dueDate, t.recurrence)}` : 'Recurring task'} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, color: '#0891B2', background: '#CFFAFE', padding: '2px 7px', borderRadius: 9999, fontFamily: FF }}><Repeat size={9} />{t.recurrence}</span>

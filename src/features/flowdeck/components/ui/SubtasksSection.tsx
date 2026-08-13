@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Plus, Check } from 'lucide-react';
-import { COLORS, STATUS_META, teamById, getDirectChildren, buildParentSummary, type Task } from '@/features/flowdeck/model';
+import { COLORS, STATUS_META, getDirectChildren, buildParentSummary, type Task } from '@/features/flowdeck/model';
 import { Avatar } from './Avatar';
 import { FF } from './styles';
 

@@ -20,14 +20,13 @@ import {
   FF,
   fmtDate,
   TODAY,
-  teamById,
-  CURRENT_USER_ID,
   type Budget,
   type Expense,
   type Project,
 } from '@/features/flowdeck/model';
-import { SectionHeader, Avatar } from '../ui';
+import { SectionHeader, Avatar, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
+import { useAuth } from '../auth';
 import { toast } from 'sonner';
 
 /* -------------------------------------------------------------------------- */
@@ -133,6 +132,14 @@ export function BudgetView({
   onDeleteExpense,
 }: BudgetViewProps) {
   const { isMobile } = useViewport();
+  // Real authenticated user identity — replaces the hard-coded
+  // CURRENT_USER_ID fallback for newly-created expenses.
+  const auth = useAuth();
+  const myUserId = auth.user?.id ?? '';
+  // Resolve expense creator ids to display names via the global
+  // MemberDirectory (populated by `useProjectMembers` for every opened
+  // project). Falls back to undefined for unknown ids.
+  const { lookup: lookupMember } = useMemberDirectory();
 
   /* ---- State ---- */
   const [showBudgetForm, setShowBudgetForm] = useState(false);
@@ -217,7 +224,7 @@ export function BudgetView({
       amount: Number(expAmount),
       category: expCategory,
       date: expDate,
-      createdBy: CURRENT_USER_ID,
+      createdBy: myUserId,
       createdAt: TODAY.toISOString(),
     };
     onAddExpense(newExpense);
@@ -233,7 +240,7 @@ export function BudgetView({
     setExpDate(TODAY.toISOString().slice(0, 10));
     setAddingExpenseFor(null);
     toast.success('Expense added');
-  }, [expDesc, expAmount, expCategory, expDate, budgets, expenses, onAddExpense, onUpdateBudget]);
+  }, [expDesc, expAmount, expCategory, expDate, budgets, expenses, onAddExpense, onUpdateBudget, myUserId]);
 
   const handleDeleteExpense = useCallback((expenseId: string, budgetId: string) => {
     const expense = expenses.find(e => e.id === expenseId);
@@ -657,7 +664,7 @@ export function BudgetView({
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {[...budgetExpenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(expense => {
-                          const creator = teamById[expense.createdBy];
+                          const creator = lookupMember(expense.createdBy);
                           const catStyle = categoryBadgeColor(expense.category);
                           return (
                             <div key={expense.id} style={{

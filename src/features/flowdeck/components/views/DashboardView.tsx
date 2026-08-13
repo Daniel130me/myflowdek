@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { COLORS, STATUS_META, STATUS_ORDER, TEAM, TODAY, dayMs, fmtDate, fmtRange, addDays, teamById, type Task, type Project, type FileItem, type ProjectStatusUpdate } from '@/features/flowdeck/model';
+import { COLORS, STATUS_META, STATUS_ORDER, TODAY, dayMs, fmtDate, fmtRange, addDays, type Task, type Project, type FileItem, type ProjectStatusUpdate } from '@/features/flowdeck/model';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { Users, AlertTriangle, CheckCircle2, TrendingUp, Star, Archive, Save, Plus, X, UserPlus, Trash2 } from 'lucide-react';
-import { Avatar, StatusPill, PriorityFlag, Card, SectionHeader, StatCard, FileThumbnailGrid, FF } from '../ui';
+import { Avatar, StatusPill, PriorityFlag, Card, SectionHeader, StatCard, FileThumbnailGrid, FF, useMemberDirectory, useProjectMembers } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 
 const STATUS_COLORS: Record<string, string> = { green: '#16A34A', yellow: '#D97706', red: '#DC2626' };
@@ -23,6 +23,11 @@ export function DashboardView({ project, tasks, files = [], statusUpdates = [], 
   onOpenTask: (id: string) => void;
 }) {
   const { isMobile } = useViewport();
+  // Real project members — registered into the global MemberDirectory so
+  // Avatar + the member picker resolve real users. Used for the workload
+  // chart and the "Manage members" picker.
+  const { members: projectMembers } = useProjectMembers(project.id);
+  const { lookup: lookupMember } = useMemberDirectory();
   const total = tasks.length;
   const byStatus = STATUS_ORDER.map(s => ({ name: STATUS_META[s].label, value: tasks.filter(t => t.status === s).length, color: STATUS_META[s].color }));
   const done = tasks.filter(t => t.status === 'done').length;
@@ -30,7 +35,7 @@ export function DashboardView({ project, tasks, files = [], statusUpdates = [], 
   const overdue = tasks.filter(t => t.status !== 'done' && addDays(t.start, t.duration) < TODAY);
   const dueSoon = tasks.filter(t => t.status !== 'done').sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()).slice(0, isMobile ? 4 : 5);
   const members = project.members || [];
-  const workload = TEAM.filter(m => members.includes(m.id)).map(m => ({ name: m.name.split(' ')[0], tasks: tasks.filter(t => t.assignee === m.id && t.status !== 'done').length })).filter(w => w.tasks > 0);
+  const workload = projectMembers.filter(m => members.includes(m.id)).map(m => ({ name: m.name.split(' ')[0], tasks: tasks.filter(t => t.assignee === m.id && t.status !== 'done').length })).filter(w => w.tasks > 0);
   const daysLeft = Math.max(0, Math.ceil((new Date(project.end).getTime() - TODAY.getTime()) / dayMs));
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'status'>('overview');
@@ -99,7 +104,7 @@ export function DashboardView({ project, tasks, files = [], statusUpdates = [], 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex' }}>
           {members.map((id, i) => {
-            const m = teamById[id];
+            const m = lookupMember(id);
             return (
               <div key={id} style={{ marginLeft: i === 0 ? 0 : -6, border: '2px solid #FFFFFF', borderRadius: '50%', position: 'relative', cursor: 'default' }} title={m?.name || id}>
                 <Avatar id={id} size={isMobile ? 28 : 32} />
@@ -117,7 +122,7 @@ export function DashboardView({ project, tasks, files = [], statusUpdates = [], 
               <>
                 <div onClick={() => setShowMemberPicker(false)} style={{ position: 'fixed', inset: 0, zIndex: 49 }} />
                 <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: '#FFFFFF', border: `1px solid ${COLORS.line}`, borderRadius: 12, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.08)', zIndex: 50, padding: 6, minWidth: 220, maxHeight: 300, overflowY: 'auto' }}>
-                  {TEAM.map(m => {
+                  {projectMembers.map(m => {
                     const isMember = members.includes(m.id);
                     return (
                       <button key={m.id} onClick={() => {
@@ -228,7 +233,7 @@ export function DashboardView({ project, tasks, files = [], statusUpdates = [], 
           {sortedUpdates.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
               {sortedUpdates.map(su => {
-                const author = teamById[su.authorId];
+                const author = lookupMember(su.authorId);
                 return (
                   <div key={su.id} style={{ display: 'flex', gap: 14, padding: '14px 0', borderBottom: `1px solid ${COLORS.line}`, position: 'relative' }}>
                     <div style={{ position: 'absolute', left: 15, top: 0, bottom: 0, width: 2, background: `${STATUS_COLORS[su.color]}22` }} />

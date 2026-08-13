@@ -8,7 +8,7 @@ import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { useProjectTags } from '@/features/flowdeck/hooks/useProjectTags';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
-import { TEAM } from '@/features/flowdeck/model';
+import { useMemberDirectory } from '@/features/flowdeck/components/ui';
 
 export default function ProjectTasksPage() {
   const router = useRouter();
@@ -21,6 +21,7 @@ export default function ProjectTasksPage() {
   useProjectTags(projectId);
 
   const projectTasks = useMemo(() => state.tasksByProject[projectId] ?? [], [state.tasksByProject, projectId]);
+  const { lookup: lookupMember } = useMemberDirectory();
   
   const filteredTasks = useMemo(() => {
     let result = projectTasks;
@@ -32,7 +33,7 @@ export default function ProjectTasksPage() {
       result = result.filter(t =>
         t.name.toLowerCase().includes(q) ||
         (t.description || '').toLowerCase().includes(q) ||
-        TEAM.find(m => m.id === t.assignee)?.name.toLowerCase().includes(q)
+        (lookupMember(t.assignee)?.name || '').toLowerCase().includes(q)
       );
     }
     /* Structured filters */
@@ -46,7 +47,7 @@ export default function ProjectTasksPage() {
     if (f.dueAfter) result = result.filter(t => Boolean(t.dueDate && t.dueDate >= f.dueAfter!));
     
     return result;
-  }, [projectTasks, state.searchQuery, state.searchFilters]);
+  }, [projectTasks, state.searchQuery, state.searchFilters, lookupMember]);
 
   const tags = useMemo(() => state.tagsByProject[projectId] ?? [], [state.tagsByProject, projectId]);
   const sections = useMemo(() => state.sectionsByProject[projectId] ?? [], [state.sectionsByProject, projectId]);

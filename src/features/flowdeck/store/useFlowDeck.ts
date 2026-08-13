@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   STATUS_META, PRIORITY_META, TEAM, TODAY,
   INITIAL_PROJECTS, initialTasks, initialFiles, initialRaid,
-  INITIAL_TAGS, initialComments, initialTimeLogs, MEMBER_CAPACITY, CURRENT_USER_ID,
+  INITIAL_TAGS, initialComments, initialTimeLogs, CURRENT_USER_ID,
   PROJECT_TEMPLATES,
   FONT_FAMILY as FF,
   type Task, type Project, type FileItem, type RaidItem, type CustomColumn, type TaskStatus, type TaskPriority,
@@ -26,11 +26,13 @@ import {
   apiAddTaskTag, apiRemoveTaskTag,
   apiFollowTask, apiUnfollowTask,
   apiCreateSection, apiDeleteSection, apiUpdateSection,
+  apiCreateTag, apiDeleteTag,
   apiAddDependency, apiRemoveDependency,
   apiAddTimeLog, apiDeleteTimeLog,
   apiUpdateProject, apiToggleProjectFavorite, apiArchiveProject, apiRestoreProject,
   apiAddProjectMember, apiRemoveProjectMember,
   apiCreateProjectStatusUpdate, apiDeleteProjectStatusUpdate,
+  taskToApiPayload,
 } from '@/lib/api-client';
 
 /* ---- LocalStorage persistence ---- */
@@ -283,44 +285,58 @@ export interface FlowDeckState {
 }
 
 export function useFlowDeckStore(): FlowDeckState {
-  /* ---- Hydration-safe initial state (useEffect will load from localStorage) ---- */
+  /* ---- Hydration-safe initial state ----
+   *
+   * FCP-5: the authenticated production app MUST NOT seed business data from
+   * the mock fixtures. All collections start empty — real data is fetched
+   * from the API on demand (useProjects, useProjectTasks, useProjectTags,
+   * useProjectComments, useProjectFiles, useStatusUpdates, useMyTasks, …).
+   *
+   * Demo fixtures are only used when the build explicitly opts in via
+   * `NEXT_PUBLIC_DEMO_MODE=true` AND `NODE_ENV === 'development'`. This
+   * keeps the legacy mock-only dev workflow working without leaking demo
+   * data into production builds.
+   */
+  const isDemoMode =
+    process.env.NODE_ENV === 'development' &&
+    process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+
   const persistedRef = useRef<Record<string, unknown> | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
-  const [projects, setProjects] = useState<Record<string, Project>>(INITIAL_PROJECTS);
-  const [tasksByProject, setTasksByProject] = useState<Record<string, Task[]>>(initialTasks);
-  const [filesByProject, setFilesByProject] = useState<Record<string, FileItem[]>>(initialFiles);
-  const [raidByProject, setRaidByProject] = useState<Record<string, RaidItem[]>>(initialRaid);
+  const [projects, setProjects] = useState<Record<string, Project>>(
+    isDemoMode ? INITIAL_PROJECTS : {},
+  );
+  const [tasksByProject, setTasksByProject] = useState<Record<string, Task[]>>(
+    isDemoMode ? initialTasks : {},
+  );
+  const [filesByProject, setFilesByProject] = useState<Record<string, FileItem[]>>(
+    isDemoMode ? initialFiles : {},
+  );
+  const [raidByProject, setRaidByProject] = useState<Record<string, RaidItem[]>>(
+    isDemoMode ? initialRaid : {},
+  );
   const [customColsByProject, setCustomColsByProject] = useState<Record<string, CustomColumn[]>>({});
-  const [tagsByProject, setTagsByProject] = useState<Record<string, Tag[]>>(INITIAL_TAGS);
-  const [commentsByProject, setCommentsByProject] = useState<Record<string, Comment[]>>(initialComments);
+  const [tagsByProject, setTagsByProject] = useState<Record<string, Tag[]>>(
+    isDemoMode ? INITIAL_TAGS : {},
+  );
+  const [commentsByProject, setCommentsByProject] = useState<Record<string, Comment[]>>(
+    isDemoMode ? initialComments : {},
+  );
 
-  /* Load persisted state on mount */
+  /* Load ONLY UI preferences from localStorage on mount.
+   *
+   * FCP-5: business data (projects, tasks, comments, tags, time logs,
+   * goals, automations, approvals, budgets, expenses, timesheets, …) is
+   * server-owned and must NOT be restored from localStorage — doing so
+   * would resurrect stale data after the server has moved on (deleted
+   * tasks, renamed projects, offboarded members, etc.). The only things
+   * we restore are pure UI preferences that don't reflect business state.
+   */
   useEffect(() => {
     const persisted = loadPersistedState();
     persistedRef.current = persisted;
     if (persisted) {
-      if (persisted.projects) setProjects(persisted.projects as Record<string, Project>);
-      if (persisted.tasksByProject) setTasksByProject(persisted.tasksByProject as Record<string, Task[]>);
-      if (persisted.filesByProject) setFilesByProject(persisted.filesByProject as Record<string, FileItem[]>);
-      if (persisted.raidByProject) setRaidByProject(persisted.raidByProject as Record<string, RaidItem[]>);
-      if (persisted.customColsByProject) setCustomColsByProject(persisted.customColsByProject as Record<string, CustomColumn[]>);
-      if (persisted.tagsByProject) setTagsByProject(persisted.tagsByProject as Record<string, Tag[]>);
-      if (persisted.commentsByProject) setCommentsByProject(persisted.commentsByProject as Record<string, Comment[]>);
-      if (persisted.activityByProject) setActivityByProject(persisted.activityByProject as Record<string, ActivityEntry[]>);
-      if (persisted.timeLogsByProject) setTimeLogsByProject(persisted.timeLogsByProject as Record<string, TimeLog[]>);
-      if (persisted.sectionsByProject) setSectionsByProject(persisted.sectionsByProject as Record<string, Section[]>);
-      if (persisted.statusUpdatesByProject) setStatusUpdatesByProject(persisted.statusUpdatesByProject as Record<string, ProjectStatusUpdate[]>);
-      if (persisted.goals) setGoals(persisted.goals as Goal[]);
-      if (persisted.keyResults) setKeyResults(persisted.keyResults as KeyResult[]);
-      if (persisted.savedFilters) setSavedFilters(persisted.savedFilters as SavedFilter[]);
-      if (persisted.automations) setAutomations(persisted.automations as AutomationRule[]);
-      if (persisted.forms) setForms(persisted.forms as Form[]);
-      if (persisted.submissions) setSubmissions(persisted.submissions as FormSubmission[]);
-      if (persisted.approvals) setApprovals(persisted.approvals as ApprovalRequest[]);
-      if (persisted.budgets) setBudgets(persisted.budgets as Budget[]);
-      if (persisted.expenses) setExpenses(persisted.expenses as Expense[]);
-      if (persisted.timesheets) setTimesheets(persisted.timesheets as TimesheetEntry[]);
       if (persisted.currentProjectId) setCurrentProjectId(persisted.currentProjectId as string | null);
       if (persisted.activeView) setActiveView(persisted.activeView as string);
     }
@@ -329,11 +345,14 @@ export function useFlowDeckStore(): FlowDeckState {
 
   const [activityByProject, setActivityByProject] = useState<Record<string, ActivityEntry[]>>({});
 
-  // Authenticated user identity. Initialized from the demo constant as a
-  // fallback (for the mock-only store), but overridden by the session via
-  // setCurrentUserId() in FlowdekDataProvider. The ref lets useCallback
-  // actions read the latest value without re-creating on every change.
-  const [currentUserId, setCurrentUserIdState] = useState<string>(CURRENT_USER_ID);
+  // Authenticated user identity. Starts empty in production (the session
+  // is the source of truth and is set via setCurrentUserId() in
+  // FlowdekDataProvider on mount). In demo/dev mode the legacy
+  // CURRENT_USER_ID constant is used as a fallback so the mock-only
+  // workflow still resolves the current user before the session hydrates.
+  const [currentUserId, setCurrentUserIdState] = useState<string>(
+    isDemoMode ? CURRENT_USER_ID : '',
+  );
   const userIdRef = useRef(currentUserId);
   userIdRef.current = currentUserId;
   const setCurrentUserId = useCallback((id: string) => {
@@ -358,12 +377,16 @@ export function useFlowDeckStore(): FlowDeckState {
    *   - the MemberDirectory context (`lookup()` helper for Avatar + activity
    *     labels)
    *
-   * Seeded with the mock TEAM so the legacy demo data still renders before
-   * the members API responds (the seeded entries get overwritten by real
-   * data the first time `useProjectMembers` runs for any project).
+   * FCP-5: starts empty in production. The map is populated on demand by
+   * `useProjectMembers` whenever a project is opened. In demo/dev mode it
+   * is seeded with the mock TEAM so the legacy demo data still renders
+   * before the members API responds (the seeded entries get overwritten by
+   * real data the first time `useProjectMembers` runs for any project).
    */
   const [membersById, setMembersById] = useState<Record<string, MemberInfo>>(
-    () => Object.fromEntries(TEAM.map(m => [m.id, { id: m.id, name: m.name, role: m.role, color: m.color }])),
+    () => isDemoMode
+      ? Object.fromEntries(TEAM.map(m => [m.id, { id: m.id, name: m.name, role: m.role, color: m.color }]))
+      : {},
   );
   const membersRef = useRef(membersById);
   membersRef.current = membersById;
@@ -416,35 +439,58 @@ export function useFlowDeckStore(): FlowDeckState {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [viewingFileId, setViewingFileId] = useState<string | null>(null);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(EMPTY_FILTERS);
-  const [timeLogsByProject, setTimeLogsByProject] = useState<Record<string, TimeLog[]>>(initialTimeLogs);
+  const [timeLogsByProject, setTimeLogsByProject] = useState<Record<string, TimeLog[]>>(
+    isDemoMode ? initialTimeLogs : {},
+  );
   const [sectionsByProject, setSectionsByProject] = useState<Record<string, Section[]>>({});
   const [statusUpdatesByProject, setStatusUpdatesByProject] = useState<Record<string, ProjectStatusUpdate[]>>({});
 
-  /* #47: Goals & Key Results */
-  const [goals, setGoals] = useState<Goal[]>([  
-    { id: 'g1', title: 'Improve Website Performance', status: 'on_track', startDate: '2026-07-01', endDate: '2026-09-30', linkedProjectIds: ['p1'] },
-    { id: 'g2', title: 'Launch Mobile App MVP', status: 'at_risk', startDate: '2026-08-01', endDate: '2026-12-31', linkedProjectIds: ['p2'] },
-  ]);
-  const [keyResults, setKeyResults] = useState<KeyResult[]>([
-    { id: 'kr1', goalId: 'g1', title: 'Reduce page load time to under 2 seconds', targetValue: 2, currentValue: 3.5, unit: 'seconds' },
-    { id: 'kr2', goalId: 'g1', title: 'Achieve 90+ Lighthouse performance score', targetValue: 90, currentValue: 72, unit: 'score' },
-    { id: 'kr3', goalId: 'g1', title: 'Zero critical accessibility issues', targetValue: 0, currentValue: 3, unit: 'issues' },
-    { id: 'kr4', goalId: 'g2', title: 'Complete core user flows', targetValue: 5, currentValue: 2, unit: 'flows' },
-    { id: 'kr5', goalId: 'g2', title: 'Pass App Store review', targetValue: 1, currentValue: 0, unit: 'submission' },
-  ]);
+  /* #47: Goals & Key Results
+   *
+   * FCP-5: starts empty in production. Goals/key results are server-owned
+   * (Goal.workspaceId FK was added in FCP-4-2-6-10) and are fetched on
+   * demand from the API. The legacy demo seed only runs in explicit
+   * demo/dev mode. */
+  const [goals, setGoals] = useState<Goal[]>(
+    isDemoMode
+      ? [
+          { id: 'g1', title: 'Improve Website Performance', status: 'on_track', startDate: '2026-07-01', endDate: '2026-09-30', linkedProjectIds: ['p1'] },
+          { id: 'g2', title: 'Launch Mobile App MVP', status: 'at_risk', startDate: '2026-08-01', endDate: '2026-12-31', linkedProjectIds: ['p2'] },
+        ]
+      : [],
+  );
+  const [keyResults, setKeyResults] = useState<KeyResult[]>(
+    isDemoMode
+      ? [
+          { id: 'kr1', goalId: 'g1', title: 'Reduce page load time to under 2 seconds', targetValue: 2, currentValue: 3.5, unit: 'seconds' },
+          { id: 'kr2', goalId: 'g1', title: 'Achieve 90+ Lighthouse performance score', targetValue: 90, currentValue: 72, unit: 'score' },
+          { id: 'kr3', goalId: 'g1', title: 'Zero critical accessibility issues', targetValue: 0, currentValue: 3, unit: 'issues' },
+          { id: 'kr4', goalId: 'g2', title: 'Complete core user flows', targetValue: 5, currentValue: 2, unit: 'flows' },
+          { id: 'kr5', goalId: 'g2', title: 'Pass App Store review', targetValue: 1, currentValue: 0, unit: 'submission' },
+        ]
+      : [],
+  );
 
   /* #49: Saved Filters */
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
 
-  /* Automations */
-  const [automations, setAutomations] = useState<AutomationRule[]>([
-    { id: 'auto-1', name: 'Auto-move to Review', enabled: true, createdAt: new Date().toISOString(),
-      trigger: { type: 'status_change', value: 'inprogress' },
-      actions: [{ type: 'add_comment', value: 'Task moved to In Progress — review when ready.' }] },
-    { id: 'auto-2', name: 'Escalate overdue tasks', enabled: true, createdAt: new Date().toISOString(),
-      trigger: { type: 'due_date_approaching', daysBefore: 0 },
-      actions: [{ type: 'set_priority', value: 'high' }] },
-  ]);
+  /* Automations.
+   *
+   * FCP-5: starts empty in production. Automation rules are server-owned
+   * and fetched on demand. The legacy demo seed only runs in explicit
+   * demo/dev mode. */
+  const [automations, setAutomations] = useState<AutomationRule[]>(
+    isDemoMode
+      ? [
+          { id: 'auto-1', name: 'Auto-move to Review', enabled: true, createdAt: new Date().toISOString(),
+            trigger: { type: 'status_change', value: 'inprogress' },
+            actions: [{ type: 'add_comment', value: 'Task moved to In Progress — review when ready.' }] },
+          { id: 'auto-2', name: 'Escalate overdue tasks', enabled: true, createdAt: new Date().toISOString(),
+            trigger: { type: 'due_date_approaching', daysBefore: 0 },
+            actions: [{ type: 'set_priority', value: 'high' }] },
+        ]
+      : [],
+  );
 
   /* Forms */
   const [forms, setForms] = useState<Form[]>([]);
@@ -698,7 +744,13 @@ export function useFlowDeckStore(): FlowDeckState {
     // Persist to PostgreSQL. On failure, restore the snapshot (full project
     // task list at the moment before the optimistic update) so the UI doesn't
     // show a change the server rejected.
-    apiUpdateTask(id, patch).then((res) => {
+    //
+    // The patch goes through `taskToApiPayload` so the frontend-only field
+    // names (`assignee`, `start`) are translated to the API's
+    // (`assigneeId`, `startDate`) and unsupported fields (`tags`,
+    // `followers`, `customFields`, `storyPoints`) are dropped before they
+    // reach the wire — those have dedicated endpoints or no API yet.
+    apiUpdateTask(id, taskToApiPayload(patch)).then((res) => {
       if (res.ok) return;
       setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
       toast.error('Failed to save task change', { description: res.error });
@@ -718,7 +770,7 @@ export function useFlowDeckStore(): FlowDeckState {
       commit(projectId, projectTasks.map(t => t.id === id ? { ...t, ...patch } : t));
       logActivity(projectId, id, 'reopened', `${actorName} reopened this task`);
       toast.info('Task reopened', { description: task.name });
-      apiUpdateTask(id, patch).then((res) => {
+      apiUpdateTask(id, taskToApiPayload(patch)).then((res) => {
         if (res.ok) return;
         setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
         toast.error('Failed to reopen task', { description: res.error });
@@ -731,7 +783,7 @@ export function useFlowDeckStore(): FlowDeckState {
       commit(projectId, projectTasks.map(t => t.id === id ? { ...t, ...patch } : t));
       logActivity(projectId, id, 'completed', `${actorName} marked as done`);
       toast.success('Task completed', { description: task.name });
-      apiUpdateTask(id, patch).then((res) => {
+      apiUpdateTask(id, taskToApiPayload(patch)).then((res) => {
         if (res.ok) return;
         setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
         toast.error('Failed to complete task', { description: res.error });
@@ -782,18 +834,18 @@ export function useFlowDeckStore(): FlowDeckState {
     // Persist to PostgreSQL. The API returns the canonical server task — we
     // swap the temp id for the server id so subsequent edits target the
     // right row. On failure we roll back the optimistic insert.
-    apiCreateTask(projectId, {
+    apiCreateTask(projectId, taskToApiPayload({
       name: input.name,
       description: input.description,
       status: input.status,
       priority: input.priority,
-      assigneeId: input.assignee,
+      assignee: input.assignee,
       parentId: input.parentId,
       sectionId: input.sectionId,
       dueDate: input.dueDate,
-      startDate: input.start,
+      start: input.start,
       duration: input.duration,
-    }).then((res) => {
+    })).then((res) => {
       if (!res.ok) {
         setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
         toast.error('Failed to create task on server', { description: res.error });
@@ -1085,7 +1137,7 @@ export function useFlowDeckStore(): FlowDeckState {
     // Persist each task's recurrence via individual PATCHes. The recurrence
     // schema field accepts 'daily' | 'weekly' | 'monthly' | null.
     const ids = [...selectedIds];
-    Promise.all(ids.map(id => apiUpdateTask(id, { recurrence: freq }))).then(results => {
+    Promise.all(ids.map(id => apiUpdateTask(id, taskToApiPayload({ recurrence: freq })))).then(results => {
       const firstFailure = results.find(r => !r.ok);
       if (!firstFailure) return;
       setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
@@ -1145,18 +1197,18 @@ export function useFlowDeckStore(): FlowDeckState {
     toast.success(`Pasted ${clones.length} task${clones.length > 1 ? 's' : ''}`);
     // Persist each clone via POST. Reconcile the temp id with the server id
     // on success; remove the clone on failure.
-    Promise.all(clones.map(clone => apiCreateTask(projectId, {
+    Promise.all(clones.map(clone => apiCreateTask(projectId, taskToApiPayload({
       name: clone.name,
       description: clone.description,
       status: clone.status,
       priority: clone.priority,
-      assigneeId: clone.assignee || undefined,
+      assignee: clone.assignee || undefined,
       parentId: clone.parentId,
       sectionId: clone.sectionId,
       dueDate: clone.dueDate,
-      startDate: clone.start,
+      start: clone.start,
       duration: clone.duration,
-    }).then(res => ({ cloneId: clone.id, res })))).then(results => {
+    })).then(res => ({ cloneId: clone.id, res })))).then(results => {
       let anyFailure = false;
       for (const { cloneId, res } of results) {
         if (!res.ok) {
@@ -1230,16 +1282,16 @@ export function useFlowDeckStore(): FlowDeckState {
         toast.success(`Importing ${rows.length} task${rows.length > 1 ? 's' : ''}…`);
         // Persist each row via POST. Reconcile the temp id with the server
         // id on success; remove the row on failure.
-        Promise.all(rows.map(row => apiCreateTask(projectId, {
+        Promise.all(rows.map(row => apiCreateTask(projectId, taskToApiPayload({
           name: row.name,
           description: row.description,
           status: row.status,
           priority: row.priority,
-          assigneeId: row.assignee || undefined,
+          assignee: row.assignee || undefined,
           dueDate: row.dueDate,
-          startDate: row.start,
+          start: row.start,
           duration: row.duration,
-        }).then(res => ({ rowId: row.id, res })))).then(results => {
+        })).then(res => ({ rowId: row.id, res })))).then(results => {
           let failed = 0;
           for (const { rowId, res } of results) {
             if (!res.ok) {
@@ -1344,18 +1396,48 @@ export function useFlowDeckStore(): FlowDeckState {
   /* ---- Tags ---- */
   const addTag = useCallback((projectId: string, tag: Tag) => {
     if (!projectId) return;
-    setTagsByProject(prev => ({ ...prev, [projectId]: [...(prev[projectId] || []), tag] }));
+    // Optimistic insert with temp ID.
+    const tempId = tag.id || defaultIdGenerator.generate('tag');
+    const optimistic = { ...tag, id: tempId };
+    const snapshot = tagsByProject[projectId] || [];
+    setTagsByProject(prev => ({ ...prev, [projectId]: [...(prev[projectId] || []), optimistic] }));
     toast.success('Tag created', { description: tag.name });
-  }, []);
+    // Persist via POST /api/projects/:projectId/tags. Reconcile the temp ID
+    // with the server ID on success; roll back on failure.
+    apiCreateTag(projectId, { name: tag.name, color: tag.color }).then((res) => {
+      if (!res.ok) {
+        setTagsByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        toast.error('Failed to create tag', { description: res.error });
+        return;
+      }
+      const serverId = res.data?.tag?.id;
+      if (!serverId || serverId === tempId) return;
+      setTagsByProject(prev => ({
+        ...prev,
+        [projectId]: (prev[projectId] || []).map(t => t.id === tempId ? { ...t, id: serverId } : t),
+      }));
+    });
+  }, [tagsByProject]);
 
   const removeTag = useCallback((projectId: string, tagId: string) => {
     if (!projectId) return;
     const tagList = tagsByProject[projectId] || [];
     const tag = tagList.find(t => t.id === tagId);
+    // Snapshot for rollback.
+    const snapshotTags = tagList;
+    const snapshotTasks = tasksByProject[projectId] || [];
+    // Optimistic local update.
     setTagsByProject(prev => ({ ...prev, [projectId]: tagList.filter(t => t.id !== tagId) }));
     const projectTasks = tasksByProject[projectId] || [];
     commit(projectId, projectTasks.map(t => ({ ...t, tags: (t.tags || []).filter(tid => tid !== tagId) })));
     toast.success('Tag removed', { description: tag?.name || 'Tag' });
+    // Persist via DELETE /api/projects/:projectId/tags/:tagId. Roll back on failure.
+    apiDeleteTag(projectId, tagId).then((res) => {
+      if (res.ok) return;
+      setTagsByProject(prev => ({ ...prev, [projectId]: snapshotTags }));
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshotTasks }));
+      toast.error('Failed to delete tag', { description: res.error });
+    });
   }, [tagsByProject, tasksByProject, commit]);
 
   const toggleTaskTag = useCallback((projectId: string, taskId: string, tagId: string) => {
@@ -1392,7 +1474,21 @@ export function useFlowDeckStore(): FlowDeckState {
     const arr = [...projectTasks];
     const [removed] = arr.splice(idx, 1);
     arr.splice(toIndex, 0, removed);
-    commit(projectId, arr);
+    // Snapshot for rollback.
+    const snapshot = projectTasks;
+    // Optimistic local update — reassign sortOrder based on new positions.
+    const reordered = arr.map((t, i) => ({ ...t, sortOrder: i }));
+    commit(projectId, reordered);
+    // Persist sortOrder changes via PATCH /api/tasks/:id for the moved task.
+    // Only persist if this isn't a temp ID (temp IDs haven't been POSTed yet).
+    if (!taskId.startsWith('t_') && !taskId.startsWith('t-')) {
+      apiUpdateTask(taskId, { sortOrder: toIndex }).then((res) => {
+        if (res.ok) return;
+        // Roll back on failure.
+        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        toast.error('Failed to save task order');
+      });
+    }
   }, [tasksByProject, commit]);
 
   /* ---- Quick Add ---- */
@@ -1422,12 +1518,12 @@ export function useFlowDeckStore(): FlowDeckState {
     logActivity(projectId, tempId, 'created', `Task "${newTask.name}" was created`);
     // Persist to PostgreSQL. Reconcile the temp id with the canonical server
     // id so subsequent edits target the right row. On failure we roll back.
-    apiCreateTask(projectId, {
+    apiCreateTask(projectId, taskToApiPayload({
       name: name.trim(),
-      status: opts?.status,
+      status: opts?.status as TaskStatus | undefined,
       parentId: opts?.parentId,
-      startDate: opts?.startOverride,
-    }).then((res) => {
+      start: opts?.startOverride,
+    })).then((res) => {
       if (!res.ok) {
         setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
         toast.error('Failed to create task on server', { description: res.error });
@@ -1874,18 +1970,18 @@ export function useFlowDeckStore(): FlowDeckState {
       serverParentId: string | null,
       tempCloneId: string,
     ): Promise<string | null> => {
-      const res = await apiCreateTask(projectId, {
+      const res = await apiCreateTask(projectId, taskToApiPayload({
         name: source.name + ' (copy)',
         description: source.description,
         status: 'backlog',
         priority: source.priority,
-        assigneeId: source.assignee,
+        assignee: source.assignee,
         parentId: serverParentId,
         sectionId: source.sectionId,
         dueDate: source.dueDate,
-        startDate: source.start,
+        start: source.start,
         duration: source.duration,
-      });
+      }));
       if (!res.ok) return null;
       const serverId = res.data?.task?.id;
       if (serverId && serverId !== tempCloneId) {
@@ -2137,7 +2233,7 @@ export function useFlowDeckStore(): FlowDeckState {
     logActivity(projectId, taskId, 'created', `${actorName} promoted subtask to top-level`);
     toast.success('Subtask promoted', { description: task.name });
     // Persist to PostgreSQL — clearing parentId promotes the task.
-    apiUpdateTask(taskId, { parentId: null }).then((res) => {
+    apiUpdateTask(taskId, taskToApiPayload({ parentId: null })).then((res) => {
       if (res.ok) return;
       setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
       toast.error('Failed to promote subtask', { description: res.error });
@@ -2161,7 +2257,7 @@ export function useFlowDeckStore(): FlowDeckState {
     // Persist to PostgreSQL — setting parentId demotes the task under the
     // new parent. The server enforces no-self-parent and no-circular
     // hierarchy, so on a 400 we roll back the optimistic change.
-    apiUpdateTask(taskId, { parentId: newParentId }).then((res) => {
+    apiUpdateTask(taskId, taskToApiPayload({ parentId: newParentId })).then((res) => {
       if (res.ok) return;
       setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
       toast.error('Failed to convert task to subtask', { description: res.error });
@@ -2283,7 +2379,7 @@ export function useFlowDeckStore(): FlowDeckState {
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, sectionId } : t));
     // Persist to PostgreSQL via the task PATCH endpoint (the sectionId field
     // on Task). Roll back on failure.
-    apiUpdateTask(taskId, { sectionId }).then((res) => {
+    apiUpdateTask(taskId, taskToApiPayload({ sectionId })).then((res) => {
       if (res.ok) return;
       setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
       toast.error('Failed to move task to section', { description: res.error });

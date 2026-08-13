@@ -5,7 +5,7 @@ import {
   ArrowRight, ArrowLeft, Check, Users, Briefcase, Palette, Sparkles, Layers, Rocket,
   LayoutDashboard, Kanban, Table2, CalendarDays, BarChart3, GanttChart, X, SkipForward,
 } from 'lucide-react';
-import { COLORS, FF, PROJECT_COLORS, TEAM, teamById } from '@/features/flowdeck/model';
+import { COLORS, FF, PROJECT_COLORS } from '@/features/flowdeck/model';
 import type { OnboardingData, UserProfile } from './useAuth';
 
 interface OnboardingFlowProps {
@@ -75,8 +75,13 @@ export function OnboardingFlow({ user, onComplete, onUpdateUser, onSkip }: Onboa
   const [projectColor, setProjectColor] = useState(PROJECT_COLORS[0]);
   const [projectDesc, setProjectDesc] = useState('');
 
-  // Step 2 state
+  // Step 2 state — list of invitee emails. The server's onboarding
+  // endpoint expects an array of email strings (it creates Invitation
+  // records with those addresses), so we no longer seed the list with the
+  // demo TEAM ids. The user types real email addresses instead.
   const [invitedMembers, setInvitedMembers] = useState<Set<string>>(new Set());
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteError, setInviteError] = useState('');
 
   // Step 3 state
   const [defaultView, setDefaultView] = useState('dashboard');
@@ -101,12 +106,23 @@ export function OnboardingFlow({ user, onComplete, onUpdateUser, onSkip }: Onboa
     }
   }, [step]);
 
-  const toggleMember = useCallback((id: string) => {
-    setInvitedMembers(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+  const addInviteEmail = useCallback(() => {
+    const clean = inviteEmail.trim().toLowerCase();
+    if (!clean) { setInviteError(''); return; }
+    // Lightweight email format check — the server does its own validation
+    // when the invitation is created, but we want to surface obvious typos
+    // before the user moves on.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+      setInviteError('Enter a valid email address');
+      return;
+    }
+    setInvitedMembers(prev => { const next = new Set(prev); next.add(clean); return next; });
+    setInviteEmail('');
+    setInviteError('');
+  }, [inviteEmail]);
+
+  const removeInviteEmail = useCallback((email: string) => {
+    setInvitedMembers(prev => { const next = new Set(prev); next.delete(email); return next; });
   }, []);
 
   const resolvedRole = role === 'Other' ? otherRole.trim() || 'Other' : role;
@@ -510,40 +526,74 @@ export function OnboardingFlow({ user, onComplete, onUpdateUser, onSkip }: Onboa
           <Users size={24} color={COLORS.green} />
         </div>
         <h2 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 800, marginBottom: 8, letterSpacing: -0.3 }}>Invite your team</h2>
-        <p style={{ fontSize: isMobile ? 14 : 15, color: COLORS.gray, marginBottom: isMobile ? 24 : 32, lineHeight: 1.6 }}>Select team members to collaborate with on your project. You can invite more later.</p>
+        <p style={{ fontSize: isMobile ? 14 : 15, color: COLORS.gray, marginBottom: isMobile ? 24 : 32, lineHeight: 1.6 }}>Invite teammates by email. They'll receive an invitation to join your workspace once you finish setup.</p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {TEAM.map(m => {
-            const isInvited = invitedMembers.has(m.id);
-            return (
-              <button
-                key={m.id}
-                onClick={() => toggleMember(m.id)}
+        {/* Email input + add button */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <input
+            type="email"
+            value={inviteEmail}
+            onChange={e => setInviteEmail(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addInviteEmail(); } }}
+            placeholder="teammate@company.com"
+            style={{ ...inputStyle, flex: 1, ...(focused === 'inviteEmail' ? inputFocus : {}) }}
+            onFocus={() => setFocused('inviteEmail')}
+            onBlur={() => setFocused(null)}
+          />
+          <button
+            onClick={addInviteEmail}
+            disabled={!inviteEmail.trim()}
+            style={{
+              padding: '0 16px', borderRadius: 10, border: 'none',
+              background: inviteEmail.trim() ? COLORS.accent : COLORS.line,
+              color: '#FFFFFF', fontSize: 13, fontWeight: 600, fontFamily: FF,
+              cursor: inviteEmail.trim() ? 'pointer' : 'not-allowed',
+              minHeight: 44, whiteSpace: 'nowrap',
+            }}
+          >Add</button>
+        </div>
+        {inviteError && (
+          <div style={{ fontSize: 12, color: COLORS.red, marginBottom: 8, fontFamily: FF }}>{inviteError}</div>
+        )}
+
+        {/* List of invited emails */}
+        {invitedMembers.size > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[...invitedMembers].map(email => (
+              <div
+                key={email}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 14,
+                  display: 'flex', alignItems: 'center', gap: 10,
                   padding: isMobile ? '10px 12px' : '12px 16px', borderRadius: 12,
-                  border: isInvited ? `1.5px solid ${COLORS.accent}` : `1px solid ${COLORS.line}`,
-                  background: isInvited ? COLORS.accentSoft : '#FFFFFF',
-                  cursor: 'pointer', transition: 'all 0.15s',
-                  textAlign: 'left', fontFamily: FF, width: '100%',
+                  border: `1px solid ${COLORS.line}`, background: '#FFFFFF',
                 }}
               >
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#FFFFFF', flexShrink: 0 }}>
-                  {m.name.split(' ').map(w => w[0]).join('')}
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: COLORS.accentSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.accent, flexShrink: 0 }}>
+                  <Users size={16} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>{m.name}</div>
-                  <div style={{ fontSize: 12, color: COLORS.gray }}>{m.role}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</div>
+                  <div style={{ fontSize: 12, color: COLORS.gray }}>Invitation will be sent</div>
                 </div>
-                {isInvited && <Check size={18} color={COLORS.accent} />}
-              </button>
-            );
-          })}
-        </div>
+                <button
+                  onClick={() => removeInviteEmail(email)}
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 4, display: 'flex' }}
+                  title="Remove"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: '24px 12px', textAlign: 'center', color: COLORS.gray, fontSize: 13, fontFamily: FF, border: `1px dashed ${COLORS.line}`, borderRadius: 12 }}>
+            No invitations yet. Add emails above to invite your team — you can also do this later.
+          </div>
+        )}
 
         {invitedMembers.size > 0 && (
           <div style={{ marginTop: 16, padding: '10px 14px', background: COLORS.greenSoft, borderRadius: 10, fontSize: 13, color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Users size={15} /> {invitedMembers.size} member{invitedMembers.size > 1 ? 's' : ''} selected
+            <Users size={15} /> {invitedMembers.size} invitation{invitedMembers.size > 1 ? 's' : ''} ready to send
           </div>
         )}
       </>

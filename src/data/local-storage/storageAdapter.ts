@@ -1,6 +1,14 @@
 import { z } from 'zod';
-import { INITIAL_PROJECTS, initialTasks, initialFiles, initialRaid } from '@/features/flowdeck/model/data';
 import type { Project, Task, FileItem, RaidItem } from '@/features/flowdeck/model';
+
+/**
+ * FCP-5: this adapter no longer seeds business-data defaults from the mock
+ * fixtures. The store starts empty in production and is populated on demand
+ * from the API; localStorage only carries UI preferences. The mock data
+ * arrays (`INITIAL_PROJECTS`, `initialTasks`, …) remain exported from
+ * `model/data.ts` for the explicit demo/dev mode, but they are NOT used as
+ * fallback defaults here.
+ */
 
 export const STORAGE_KEY = 'flowdeck-state-v1';
 export const TEMPLATES_STORAGE_KEY = 'flowdeck-custom-templates-v1';
@@ -249,10 +257,15 @@ export function migrateState(rawState: unknown): PersistedState {
 
   return {
     version: STORAGE_VERSION,
-    projects: (validated.projects && Object.keys(validated.projects).length > 0 ? validated.projects : INITIAL_PROJECTS) as Record<string, Project>,
-    tasksByProject: (validated.tasksByProject ?? initialTasks) as Record<string, Task[]>,
-    filesByProject: (validated.filesByProject ?? initialFiles) as Record<string, FileItem[]>,
-    raidByProject: (validated.raidByProject ?? initialRaid) as Record<string, RaidItem[]>,
+    // FCP-5: business-data fields are passed through as-is when present in
+    // localStorage, but we no longer fall back to the mock fixtures when
+    // they're missing. The store ignores these fields anyway (it only
+    // hydrates `currentProjectId` and `activeView` from localStorage); they
+    // remain in the schema for backward compatibility with older writes.
+    projects: (validated.projects ?? {}) as Record<string, Project>,
+    tasksByProject: (validated.tasksByProject ?? {}) as Record<string, Task[]>,
+    filesByProject: (validated.filesByProject ?? {}) as Record<string, FileItem[]>,
+    raidByProject: (validated.raidByProject ?? {}) as Record<string, RaidItem[]>,
     customColsByProject: validated.customColsByProject ?? {},
     tagsByProject: validated.tagsByProject ?? {},
     commentsByProject: validated.commentsByProject ?? {},
@@ -262,9 +275,9 @@ export function migrateState(rawState: unknown): PersistedState {
     statusUpdatesByProject: validated.statusUpdatesByProject ?? {},
     savedFilters: validated.savedFilters ?? [],
     activeView: validated.activeView,
-    tasks: (Array.isArray(validated.tasks) ? validated.tasks : Object.values(validated.tasksByProject || initialTasks).flat()) as Task[],
-    files: (Array.isArray(validated.files) ? validated.files : Object.values(validated.filesByProject || initialFiles).flat()) as FileItem[],
-    raidItems: (Array.isArray(validated.raidItems) ? validated.raidItems : Object.values(validated.raidByProject || initialRaid).flat()) as RaidItem[],
+    tasks: (Array.isArray(validated.tasks) ? validated.tasks : Object.values(validated.tasksByProject ?? {}).flat()) as Task[],
+    files: (Array.isArray(validated.files) ? validated.files : Object.values(validated.filesByProject ?? {}).flat()) as FileItem[],
+    raidItems: (Array.isArray(validated.raidItems) ? validated.raidItems : Object.values(validated.raidByProject ?? {}).flat()) as RaidItem[],
     goals: Array.isArray(validated.goals) ? validated.goals : [],
     keyResults: Array.isArray(validated.keyResults) ? validated.keyResults : [],
     automations: Array.isArray(validated.automations) ? validated.automations : [],
@@ -283,12 +296,16 @@ export function migrateState(rawState: unknown): PersistedState {
 }
 
 export function createDefaultPersistedState(): PersistedState {
+  // FCP-5: defaults are empty — the store does NOT seed business data from
+  // localStorage. Only UI preferences (`currentProjectId`, `activeView`)
+  // survive a missing/corrupted localStorage entry; everything else is
+  // fetched from the API.
   return {
     version: STORAGE_VERSION,
-    projects: INITIAL_PROJECTS,
-    tasksByProject: initialTasks,
-    filesByProject: initialFiles,
-    raidByProject: initialRaid,
+    projects: {},
+    tasksByProject: {},
+    filesByProject: {},
+    raidByProject: {},
     customColsByProject: {},
     tagsByProject: {},
     commentsByProject: {},
@@ -298,9 +315,9 @@ export function createDefaultPersistedState(): PersistedState {
     statusUpdatesByProject: {},
     savedFilters: [],
     activeView: undefined,
-    tasks: Object.values(initialTasks).flat(),
-    files: Object.values(initialFiles).flat(),
-    raidItems: Object.values(initialRaid).flat(),
+    tasks: [],
+    files: [],
+    raidItems: [],
     goals: [],
     keyResults: [],
     automations: [],

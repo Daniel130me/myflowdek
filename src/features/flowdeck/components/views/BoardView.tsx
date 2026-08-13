@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Plus, Repeat, Layers } from 'lucide-react';
-import { TEAM, PRIORITY_META, COLORS, STATUS_META, STATUS_ORDER, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task, type FileItem, type Tag, type Project } from '@/features/flowdeck/model';
-import { Avatar, PriorityFlag, SectionHeader, FileThumbnailGrid, TaskCheckbox, TagPills, TagFilterBar, FF, TaskContextMenu, InlineTaskName } from '../ui';
+import { PRIORITY_META, COLORS, STATUS_META, STATUS_ORDER, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task, type FileItem, type Tag, type Project } from '@/features/flowdeck/model';
+import { Avatar, PriorityFlag, SectionHeader, FileThumbnailGrid, TaskCheckbox, TagPills, TagFilterBar, FF, TaskContextMenu, InlineTaskName, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 
 /* Helper: compute next occurrence date for recurring badge tooltip */
@@ -71,6 +71,8 @@ export function BoardView({
 }: BoardViewProps) {
   const { isMobile, isTablet } = useViewport();
   const stacked = isMobile || isTablet;
+  // Real project member directory — used for the assignee swimlane grouping.
+  const { lookup: lookupMember } = useMemberDirectory();
 
   /* ---------- swimlane state ---------- */
   const [swimlaneBy, setSwimlaneBy] = useState<string>('none');
@@ -114,7 +116,7 @@ export function BoardView({
     filteredTasks.forEach(t => {
       let key = 'Unassigned';
       if (swimlaneBy === 'assignee') {
-        const m = TEAM.find(tm => tm.id === t.assignee);
+        const m = lookupMember(t.assignee);
         key = m ? m.name : 'Unassigned';
       } else if (swimlaneBy === 'priority') {
         key = PRIORITY_META[t.priority]?.label || t.priority;
@@ -127,7 +129,7 @@ export function BoardView({
       groups.get(key)!.push(t);
     });
     return groups;
-  }, [swimlaneBy, filteredTasks]);
+  }, [swimlaneBy, filteredTasks, lookupMember]);
 
   const toggleSwimlaneCollapse = useCallback((key: string) => {
     setCollapsedSwimlanes(prev => {

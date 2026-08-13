@@ -1,21 +1,28 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { COLORS, TEAM, MEMBER_CAPACITY, type Task, type TimeLog, TODAY, addDays } from '@/features/flowdeck/model';
-import { Avatar, SectionHeader, FF } from '../ui';
+import { COLORS, type Task, type TimeLog, TODAY, addDays } from '@/features/flowdeck/model';
+import { Avatar, SectionHeader, FF, useProjectMembers } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 import { ChevronDown, ChevronRight, AlertTriangle, Clock } from 'lucide-react';
 
-export function TeamView({ tasks, timeLogs }: { tasks: Task[]; timeLogs?: TimeLog[] }) {
+export function TeamView({ tasks, timeLogs, projectId }: { tasks: Task[]; timeLogs?: TimeLog[]; projectId?: string | null }) {
   const { isMobile } = useViewport();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Real project members — drives the workload cards. Falls back to an
+  // empty list when no project is selected.
+  const { members } = useProjectMembers(projectId ?? null);
 
   const rows = useMemo(() => {
-    return TEAM.map(m => {
+    return members.map(m => {
       const mine = tasks.filter(t => t.assignee === m.id);
       const active = mine.filter(t => t.status !== 'done');
       const done = mine.filter(t => t.status === 'done');
-      const capacity = MEMBER_CAPACITY[m.id] || 40;
+      // Capacity: real ProjectMember rows don't carry a per-user capacity
+      // figure, so we default to a standard 40h work week. The legacy
+      // MEMBER_CAPACITY map is keyed by demo ids and would never match real
+      // user ids.
+      const capacity = 40;
 
       /* Estimated hours: 6h/day * duration for active tasks */
       const estimatedHours = active.reduce((sum, t) => sum + t.duration * 6, 0);
@@ -41,7 +48,7 @@ export function TeamView({ tasks, timeLogs }: { tasks: Task[]; timeLogs?: TimeLo
         thisWeek: thisWeek.length, activeTasks: active,
       };
     });
-  }, [tasks, timeLogs]);
+  }, [members, tasks, timeLogs]);
 
   const totalCapacity = rows.reduce((s, r) => s + r.capacity, 0);
   const totalAllocated = rows.reduce((s, r) => s + r.estimatedHours, 0);
@@ -49,7 +56,7 @@ export function TeamView({ tasks, timeLogs }: { tasks: Task[]; timeLogs?: TimeLo
 
   return (
     <div>
-      <SectionHeader title="Team Workload" subtitle={`${TEAM.length} members · ${totalCapacity}h weekly capacity`} />
+      <SectionHeader title="Team Workload" subtitle={`${members.length} members · ${totalCapacity}h weekly capacity`} />
 
       {/* Summary stats */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(3, 1fr)', gap: isMobile ? 8 : 12, marginBottom: isMobile ? 16 : 20 }}>

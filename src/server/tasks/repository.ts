@@ -20,6 +20,7 @@ const taskSelect = {
   assigneeId: true,
   createdById: true,
   parentId: true,
+  sectionId: true,
   createdAt: true,
   updatedAt: true,
 } as const;

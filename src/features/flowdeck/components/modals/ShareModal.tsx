@@ -2,17 +2,27 @@
 
 import React from 'react';
 import { X, Check } from 'lucide-react';
-import { COLORS, TEAM, type Project } from '@/features/flowdeck/model';
+import { COLORS, type Project } from '@/features/flowdeck/model';
 import { useViewport } from '../../hooks/useViewport';
 import { Avatar } from '../ui/Avatar';
 import { Field } from '../ui/Field';
 import { selectStyle, FF } from '../ui/styles';
+import { useProjectMembers } from '../ui/MemberDirectory';
 
 export function ShareModal({ project, onClose }: { project: Project; onClose: () => void }) {
   const [link] = React.useState(`https://flowdeck.app/share/${project.id}-${Math.random().toString(36).slice(2, 8)}`);
   const [copied, setCopied] = React.useState(false);
-  const [people, setPeople] = React.useState<(typeof TEAM[number] & { access: 'view' | 'edit' })[]>(TEAM.slice(0, 4).map(m => ({ ...m, access: 'edit' })));
+  // Real project members — populates the "People with access" list. Falls
+  // back to an empty list when the API hasn't loaded yet.
+  const { members } = useProjectMembers(project.id);
+  const [people, setPeople] = React.useState<{ id: string; name: string; access: 'view' | 'edit' }[]>([]);
 
+  // Seed the access list from real members once they load. Each member
+  // defaults to 'edit' access, matching the previous demo behaviour.
+  React.useEffect(() => {
+    if (members.length === 0) return;
+    setPeople(members.slice(0, 4).map(m => ({ id: m.id, name: m.name, access: 'edit' as const })));
+  }, [members]);
   function copyLink() {
     if (navigator.clipboard) navigator.clipboard.writeText(link);
     setCopied(true);

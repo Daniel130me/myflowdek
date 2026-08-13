@@ -2,13 +2,22 @@
 
 import React, { useRef, useState, useCallback } from 'react';
 import { Upload, Trash2, Paperclip, Eye, Download } from 'lucide-react';
-import { COLORS, TODAY, CURRENT_USER_ID, teamById, fmtSize, fmtDate, extOf, type Task, type FileItem } from '@/features/flowdeck/model';
-import { Avatar, SectionHeader, FileThumbnail, FF } from '../ui';
+import { COLORS, TODAY, fmtSize, fmtDate, extOf, type Task, type FileItem } from '@/features/flowdeck/model';
+import { Avatar, SectionHeader, FileThumbnail, FF, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
+import { useAuth } from '../auth';
 
 export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }: { files: FileItem[]; tasks: Task[]; onAdd: (files: FileItem[]) => void; onRemove: (id: string) => void; onLink: (id: string, taskId: string | null) => void; onViewFile: (id: string) => void }) {
   const { isMobile } = useViewport();
   const inputRef = useRef<HTMLInputElement>(null);
+  // Real authenticated user identity — replaces the hard-coded
+  // CURRENT_USER_ID fallback for newly-uploaded files.
+  const auth = useAuth();
+  const myUserId = auth.user?.id ?? '';
+  // Resolve uploader ids to display names via the global MemberDirectory
+  // (populated by `useProjectMembers` for every opened project). Falls back
+  // to undefined for unknown ids — the label renders empty in that case.
+  const { lookup: lookupMember } = useMemberDirectory();
 
   /* Track hover state for desktop cards */
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -21,7 +30,7 @@ export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }:
     const now = TODAY.toISOString().slice(0, 10);
     const newFiles: FileItem[] = picked.map(f => ({
       id: 'f' + Math.random().toString(36).slice(2, 8),
-      name: f.name, size: f.size, uploadedBy: CURRENT_USER_ID, uploadedAt: now,
+      name: f.name, size: f.size, uploadedBy: myUserId, uploadedAt: now,
       linkedTaskId: null, url: URL.createObjectURL(f),
     }));
     onAdd(newFiles);
@@ -90,7 +99,7 @@ export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }:
                 {/* Footer: uploader + link task */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px 10px' }}>
                   <Avatar id={f.uploadedBy} size={18} />
-                  <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF }}>{teamById[f.uploadedBy]?.name.split(' ')[0]}</span>
+                  <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF }}>{lookupMember(f.uploadedBy)?.name.split(' ')[0]}</span>
                   <select value={f.linkedTaskId || ''} onChange={e => onLink(f.id, e.target.value || null)} style={{ marginLeft: 'auto', border: `1px solid ${COLORS.line}`, borderRadius: 8, fontSize: 11, padding: '4px 6px', cursor: 'pointer', maxWidth: 120, fontFamily: FF }}><option value="">Link task...</option>{tasks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
                 </div>
               </div>
@@ -153,7 +162,7 @@ export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }:
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Avatar id={f.uploadedBy} size={18} />
-                    <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF }}>{teamById[f.uploadedBy]?.name.split(' ')[0]}</span>
+                    <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF }}>{lookupMember(f.uploadedBy)?.name.split(' ')[0]}</span>
                     <span style={{ fontSize: 12, color: COLORS.line }}>·</span>
                     <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF }}>{fmtSize(f.size)}</span>
                   </div>

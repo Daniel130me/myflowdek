@@ -10,7 +10,7 @@ import {
   Shield, FolderOpen, Users, BarChart3, Link2, Inbox, Plus, Undo2, Redo2,
   Sun, Moon, SunMoon, Briefcase, ClipboardList,
 } from 'lucide-react';
-import { NAV_ITEMS, FF, STATUS_META, PRIORITY_META, TEAM, type Task, type Project } from '@/features/flowdeck/model';
+import { NAV_ITEMS, FF, STATUS_META, PRIORITY_META, type Task, type Project } from '@/features/flowdeck/model';
 
 const VIEW_ICONS: Record<string, React.ElementType> = {
   mytasks: ClipboardList, dashboard: LayoutDashboard, timeline: GanttChart,
@@ -124,7 +124,6 @@ export function CommandPalette({
         {allTasks.length > 0 && (
           <CommandGroup heading="Tasks">
             {allTasks.slice(0, 8).map(t => {
-              const member = TEAM.find(m => m.id === t.assignee);
               const proj = projects[t._projectId];
               return (
                 <CommandItem key={t.id} onSelect={() => handleSelect(() => {

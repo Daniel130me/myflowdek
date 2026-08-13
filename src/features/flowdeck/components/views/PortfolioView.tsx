@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { COLORS, TEAM, TODAY, dayMs, fmtDate, addDays, type Task, type Project } from '@/features/flowdeck/model';
+import { COLORS, TODAY, dayMs, fmtDate, addDays, type Task, type Project } from '@/features/flowdeck/model';
 import { Plus, Trash2, Star, Archive, RotateCcw, Users, Grid3X3, List, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Avatar, SectionHeader, FF } from '../ui';
 import { useViewport } from '../../hooks/useViewport';

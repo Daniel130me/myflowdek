@@ -2,9 +2,10 @@
 
 import React, { useState, useRef } from 'react';
 import { Clock, Plus, Trash2, Timer } from 'lucide-react';
-import { COLORS, TEAM, type TimeLog } from '@/features/flowdeck/model';
+import { COLORS, type TimeLog } from '@/features/flowdeck/model';
 import { FF } from './styles';
 import { Avatar } from './Avatar';
+import { useMemberDirectory } from './MemberDirectory';
 
 interface TimeTrackingSectionProps {
   timeLogs: TimeLog[];
@@ -33,6 +34,7 @@ export function TimeTrackingSection({ timeLogs, onAdd, onDelete }: TimeTrackingS
   const [mins, setMins] = useState('');
   const [note, setNote] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const { lookup: lookupMember } = useMemberDirectory();
 
   const totalMinutes = timeLogs.reduce((sum, tl) => sum + tl.minutes, 0);
 
@@ -63,7 +65,7 @@ export function TimeTrackingSection({ timeLogs, onAdd, onDelete }: TimeTrackingS
       {timeLogs.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginBottom: adding ? 10 : 0, maxHeight: 180, overflowY: 'auto' }}>
           {timeLogs.slice().reverse().map(tl => {
-            const member = TEAM.find(m => m.id === tl.userId);
+            const member = lookupMember(tl.userId);
             return (
               <div key={tl.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px', borderBottom: `1px solid ${COLORS.lineLight}` }}>
                 <Avatar id={tl.userId} size={22} />

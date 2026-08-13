@@ -1,20 +1,26 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { COLORS, PRIORITY_META, TEAM, type Task } from '@/features/flowdeck/model';
+import { COLORS, PRIORITY_META, type Task, type MemberInfo } from '@/features/flowdeck/model';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Card, SectionHeader, FF } from '../ui';
+import { Card, SectionHeader, FF, useProjectMembers } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 
 function isDefined<T>(value: T | null): value is T {
   return value !== null;
 }
 
-export function ReportsView({ tasks }: { tasks: Task[] }) {
+export function ReportsView({ tasks, projectId }: { tasks: Task[]; projectId?: string | null }) {
   const { isMobile } = useViewport();
+  // Real project members — used to bucket completion stats per assignee.
+  // Falls back to an empty list when no project is selected (the page is
+  // rendered at portfolio scope), in which case the per-assignee chart is
+  // simply empty.
+  const { members } = useProjectMembers(projectId ?? null);
+  const memberList: MemberInfo[] = useMemo(() => members, [members]);
   const byPriority = ['urgent', 'high', 'medium', 'low'].map(p => ({ name: PRIORITY_META[p].label, value: tasks.filter(t => t.priority === p).length, color: PRIORITY_META[p].color }));
   const avgProgress = tasks.length ? Math.round(tasks.reduce((a, t) => a + t.progress, 0) / tasks.length) : 0;
-  const completionByAssignee = TEAM.map(m => {
+  const completionByAssignee = memberList.map(m => {
     const mine = tasks.filter(t => t.assignee === m.id);
     if (!mine.length) return null;
     const done = mine.filter(t => t.status === 'done').length;
@@ -45,14 +51,14 @@ export function ReportsView({ tasks }: { tasks: Task[] }) {
 
   // Points by assignee
   const pointsByAssignee = useMemo(() => {
-    return TEAM.map(m => {
+    return memberList.map(m => {
       const mine = tasksWithPoints.filter(t => t.assignee === m.id);
       if (!mine.length) return null;
       const completed = mine.filter(t => t.status === 'done').reduce((a, t) => a + (t.storyPoints || 0), 0);
       const total = mine.reduce((a, t) => a + (t.storyPoints || 0), 0);
-      return { name: m.name.split(' ')[0], completed, total, color: m.color };
+      return { name: m.name.split(' ')[0], completed, total, color: m.color ?? COLORS.accent };
     }).filter(isDefined);
-  }, [tasksWithPoints]);
+  }, [tasksWithPoints, memberList]);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);

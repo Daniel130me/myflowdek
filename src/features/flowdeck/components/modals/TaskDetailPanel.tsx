@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { X, ArrowLeft, Calendar, Link2, Diamond, Repeat, Tag as TagIcon, Plus, Trash2, Eye, Download, Upload, Copy, FolderInput, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { COLORS, STATUS_META, PRIORITY_META, TAG_COLORS, fmtRange, fmtDueDate, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, TODAY, type Task, type FileItem, type Tag, type Comment, type ActivityEntry, type TimeLog, type CustomColumn, type TaskStatus, type TaskPriority, type MemberInfo } from '@/features/flowdeck/model';
 import { useViewport } from '../../hooks/useViewport';
 import { StatusPill } from '../ui/StatusPill';
@@ -259,7 +260,12 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
     <TimeTrackingSection timeLogs={timeLogs} onAdd={(mins, note) => onAddTimeLog(task.id, mins, note)} onDelete={onDeleteTimeLog || (() => {})} />
   ) : null;
 
-  /* Shared: story points field */
+  /* Shared: story points field.
+   *
+   * Story points have no backend API yet — clicking a value would just be
+   * dropped by `taskToApiPayload` (it only persists fields that have a
+   * corresponding column on the Task table). Surface an info toast instead
+   * of silently no-op'ing so the user knows the click didn't persist. */
   const STORY_POINT_OPTIONS = [1, 2, 3, 5, 8, 13, 21];
   const storyPointsSection = (
     <Field label="Story Points">
@@ -267,7 +273,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
         {STORY_POINT_OPTIONS.map(sp => (
           <button
             key={sp}
-            onClick={() => onUpdate({ storyPoints: task.storyPoints === sp ? undefined : sp })}
+            onClick={() => toast.info('Story points are not yet available')}
             style={{
               width: 38, height: 38, borderRadius: 10,
               border: `2px solid ${task.storyPoints === sp ? COLORS.accent : COLORS.line}`,

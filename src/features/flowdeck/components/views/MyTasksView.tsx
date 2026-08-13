@@ -3,13 +3,12 @@
 import React, { useMemo } from 'react';
 import { Calendar, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
 import {
-  COLORS, STATUS_META, TODAY, CURRENT_USER_ID,
-  teamById, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel,
+  COLORS, STATUS_META, TODAY,
+  getDueDateStatus, DUE_STATUS, dueDateOffsetLabel,
   type Task, type Tag,
 } from '@/features/flowdeck/model';
-import { TaskCheckbox, TagPills, Avatar, SectionHeader, FF } from '../ui';
+import { TaskCheckbox, TagPills, Avatar, SectionHeader, FF, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
-import { useMemberDirectory } from '../ui/MemberDirectory';
 import type { MyTaskItem } from '../../hooks/useMyTasks';
 
 export interface MyTasksViewProps {
@@ -84,12 +83,11 @@ export function MyTasksView({
           {items.map(t => {
             const dueStatus = getDueDateStatus(t.dueDate, t.status);
             const dueMeta = DUE_STATUS[dueStatus];
-            // Resolve the assignee via the MemberDirectory; fall back to the
-            // mock seed (teamById) and finally to the demo current user
-            // constant so legacy data still renders before the directory
-            // hydrates.
-            const assigneeId = t.assignee || CURRENT_USER_ID;
-            const member = lookup(assigneeId) ?? teamById[assigneeId];
+            // Resolve the assignee via the MemberDirectory (populated by
+            // `useProjectMembers` for every opened project). Falls back to
+            // undefined when the id is not yet registered.
+            const assigneeId = t.assignee || '';
+            const member = lookup(assigneeId);
             const projectName = t.project?.name ?? t.projectId ?? '';
             const projectColor = t.project?.color ?? COLORS.accent;
             return (

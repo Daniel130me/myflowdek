@@ -113,6 +113,10 @@ export interface Task {
   storyPoints?: number;
   createdAt?: string;
   sectionId?: string | null;
+  /** Backend-managed ordering column. Mirrors `Task.sortOrder` in the
+   *  Prisma schema; surfaced to the client so the task list can be
+   *  re-sorted without an extra fetch after a reorder. */
+  sortOrder?: number;
 }
 
 export interface CreateTaskInput {
@@ -151,6 +155,7 @@ export interface UpdateTaskInput {
   sectionId?: string | null;
   customFields?: Record<string, string>;
   storyPoints?: number;
+  sortOrder?: number;
 }
 
 /* ---------------------------------- Files ---------------------------------- */

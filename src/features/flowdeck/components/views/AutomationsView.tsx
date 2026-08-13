@@ -24,15 +24,13 @@ import {
   FF,
   STATUS_META,
   PRIORITY_META,
-  TEAM,
-  teamById,
   type Project,
   type Tag,
   type AutomationRule,
   type AutomationTrigger,
   type AutomationAction,
 } from '@/features/flowdeck/model';
-import { SectionHeader } from '../ui';
+import { SectionHeader, useMemberDirectory, useProjectMembers } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 import { toast } from 'sonner';
 
@@ -152,14 +150,14 @@ function getTriggerLabel(trigger: AutomationTrigger): string {
   }
 }
 
-function getActionLabel(action: AutomationAction): string {
+function getActionLabel(action: AutomationAction, resolveMember?: (id: string) => { name: string } | undefined): string {
   switch (action.type) {
     case 'set_status':
       return `Set status → ${STATUS_META[action.value || '']?.label || action.value || '…'}`;
     case 'set_priority':
       return `Set priority → ${PRIORITY_META[action.value || '']?.label || action.value || '…'}`;
     case 'set_assignee': {
-      const member = teamById[action.value || ''];
+      const member = resolveMember?.(action.value || '');
       return `Set assignee → ${member?.name || action.value || '…'}`;
     }
     case 'add_tag':
@@ -248,11 +246,13 @@ function AutomationCard({
   onToggle,
   onEdit,
   onDelete,
+  resolveMember,
 }: {
   rule: AutomationRule;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  resolveMember?: (id: string) => { name: string } | undefined;
 }) {
   const { isMobile } = useViewport();
 
@@ -420,7 +420,7 @@ function AutomationCard({
                 whiteSpace: 'nowrap',
               }}
             >
-              {getActionLabel(action)}
+              {getActionLabel(action, resolveMember)}
             </div>
           ))}
         </div>
@@ -441,11 +441,13 @@ interface DraftAction {
 function AutomationForm({
   initial,
   allTags,
+  members,
   onSave,
   onCancel,
 }: {
   initial?: AutomationRule;
   allTags: Tag[];
+  members: { id: string; name: string }[];
   onSave: (rule: AutomationRule) => void;
   onCancel: () => void;
 }) {
@@ -779,7 +781,7 @@ function AutomationForm({
                       style={selectInputStyle}
                     >
                       <option value="">Select…</option>
-                      {TEAM.map((m) => (
+                      {members.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name}
                         </option>
@@ -912,6 +914,11 @@ export function AutomationsView({
   onDelete,
 }: AutomationsViewProps) {
   const { isMobile } = useViewport();
+  // Real project members — populates the assignee picker in the rule form
+  // and the assignee label resolver used by AutomationCard. Falls back to
+  // an empty list when no project is selected.
+  const { members } = useProjectMembers(currentProjectId ?? null);
+  const { lookup: lookupMember } = useMemberDirectory();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -1001,6 +1008,7 @@ export function AutomationsView({
         <AutomationForm
           initial={editingRule}
           allTags={allTags}
+          members={members}
           onSave={editingRule ? handleUpdate : handleAdd}
           onCancel={handleCancel}
         />
@@ -1022,6 +1030,7 @@ export function AutomationsView({
               <AutomationCard
                 key={rule.id}
                 rule={rule}
+                resolveMember={lookupMember}
                 onToggle={() => handleToggle(rule.id)}
                 onEdit={() => handleStartEdit(rule.id)}
                 onDelete={() => handleDelete(rule.id)}
