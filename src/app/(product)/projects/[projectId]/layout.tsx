@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { useParams, notFound } from 'next/navigation';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useProject } from '@/features/flowdeck/hooks/useProject';
+import { useProjectCustomFields } from '@/features/flowdeck/hooks/useProjectCustomFields';
 import { FONT_FAMILY as FF } from '@/features/flowdeck/model';
 
 /**
@@ -14,12 +15,17 @@ import { FONT_FAMILY as FF } from '@/features/flowdeck/model';
  * navigation (e.g. opening a project URL from an email). Instead we fetch the
  * project from the API via `useProject(projectId)`, upsert it into the store,
  * and only call `notFound()` on a real API 404/403.
+ *
+ * Item 4: hydrate the project's custom-field definitions from the server on
+ * layout mount so the Sheet view / TaskDetailPanel custom-field controls have
+ * canonical server-side ids (required for value persistence).
  */
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const projectId = typeof params.projectId === 'string' ? params.projectId : Array.isArray(params.projectId) ? params.projectId[0] : '';
   const state = useFlowDeck();
   const { project, loading, error } = useProject(projectId || null);
+  useProjectCustomFields(projectId || null);
 
   const projectExistsInStore = Boolean(projectId && state.projects[projectId]);
 

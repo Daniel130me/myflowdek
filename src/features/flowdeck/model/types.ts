@@ -211,6 +211,15 @@ export interface CustomColumn {
   label: string;
   type: 'text' | 'number' | 'date' | 'select';
   options?: string[]; // for select type
+  /**
+   * Server-side `CustomField.id`. Populated when the column has been synced
+   * to the backend (POST /api/projects/:id/custom-fields). May be undefined
+   * for locally-created columns that haven't been persisted yet, or for
+   * columns loaded from a project template before the template's fields are
+   * created on the server. The store reconciles this id once the server
+   * responds.
+   */
+  id?: string;
 }
 
 /* ---------------------------------- Section ---------------------------------- */

@@ -210,14 +210,34 @@ describe('Tag persistence (item 7)', () => {
 });
 
 describe('Task reorder persistence (item 7)', () => {
-  test('store reorderTask calls apiUpdateTask with sortOrder', () => {
+  test('store reorderTask calls apiReorderTasks with batch sortOrder', () => {
     const source = readSrc('src/features/flowdeck/store/useFlowDeck.ts');
     const fnStart = source.indexOf('const reorderTask');
     assert.ok(fnStart > 0, 'reorderTask must exist');
-    const fnBody = source.slice(fnStart, fnStart + 1500);
+    const fnBody = source.slice(fnStart, fnStart + 2000);
     assert.ok(
-      fnBody.includes('apiUpdateTask') && fnBody.includes('sortOrder'),
-      'reorderTask must persist sortOrder via apiUpdateTask',
+      fnBody.includes('apiReorderTasks'),
+      'reorderTask must call apiReorderTasks (batch endpoint, not single-task PATCH)',
+    );
+    assert.ok(
+      fnBody.includes('sortOrder'),
+      'reorderTask must persist sortOrder',
+    );
+  });
+
+  test('reorder API route exists with transactional update', () => {
+    const source = readSrc('src/app/api/projects/[projectId]/tasks/reorder/route.ts');
+    assert.ok(
+      source.includes('EDIT_TASK'),
+      'reorder route must require EDIT_TASK capability',
+    );
+    assert.ok(
+      source.includes('$transaction'),
+      'reorder route must use a transaction for atomic batch update',
+    );
+    assert.ok(
+      source.includes('do not belong to this project'),
+      'reorder route must verify all task IDs belong to the project',
     );
   });
 
@@ -226,6 +246,107 @@ describe('Task reorder persistence (item 7)', () => {
     assert.ok(
       source.includes('sortOrder'),
       'updateTaskSchema must accept sortOrder so the API persists it',
+    );
+  });
+});
+
+describe('Bulk duplicate persistence (item 2)', () => {
+  test('store duplicateTasksBulk calls apiCreateTask', () => {
+    const source = readSrc('src/features/flowdeck/store/useFlowDeck.ts');
+    const fnStart = source.indexOf('const duplicateTasksBulk');
+    assert.ok(fnStart > 0, 'duplicateTasksBulk must exist');
+    const fnBody = source.slice(fnStart, fnStart + 3000);
+    assert.ok(
+      fnBody.includes('apiCreateTask'),
+      'duplicateTasksBulk must call apiCreateTask for each duplicate (server-persisted)',
+    );
+  });
+});
+
+describe('Task relationship hydration (item 3)', () => {
+  test('listTasks includes dependencies, tags, and followers', () => {
+    const source = readSrc('src/server/tasks/task.service.ts');
+    const fnStart = source.indexOf('export function listTasks');
+    assert.ok(fnStart > 0, 'listTasks must exist');
+    const fnBody = source.slice(fnStart, fnStart + 800);
+    assert.ok(
+      fnBody.includes('dependencies') && fnBody.includes('dependsOnId'),
+      'listTasks must include dependencies relation',
+    );
+    assert.ok(
+      fnBody.includes('tags') && fnBody.includes('tagId'),
+      'listTasks must include tags relation',
+    );
+    assert.ok(
+      fnBody.includes('followers') && fnBody.includes('userId'),
+      'listTasks must include followers relation',
+    );
+  });
+
+  test('frontend mapTask populates deps, tags, and followers from API', () => {
+    const source = readSrc('src/features/flowdeck/hooks/useTasks.ts');
+    assert.ok(
+      source.includes('api.dependencies') && source.includes('dependsOnId'),
+      'mapTask must populate deps from api.dependencies',
+    );
+    assert.ok(
+      source.includes('api.tags') && source.includes('tagId'),
+      'mapTask must populate tags from api.tags',
+    );
+    assert.ok(
+      source.includes('api.followers') && source.includes('userId'),
+      'mapTask must populate followers from api.followers',
+    );
+  });
+});
+
+describe('Custom field value persistence (item 4)', () => {
+  test('custom-field value API routes exist', () => {
+    const routeSrc = readSrc('src/app/api/tasks/[taskId]/custom-fields/route.ts');
+    assert.ok(
+      routeSrc.includes('POST') && routeSrc.includes('EDIT_TASK'),
+      'custom-field value POST route must exist and require EDIT_TASK',
+    );
+    const deleteRoute = readSrc('src/app/api/tasks/[taskId]/custom-fields/[fieldId]/route.ts');
+    assert.ok(
+      deleteRoute.includes('DELETE'),
+      'custom-field value DELETE route must exist',
+    );
+  });
+
+  test('task select includes customFieldValues', () => {
+    const source = readSrc('src/server/tasks/task.service.ts');
+    const selectStart = source.indexOf('const taskSelect');
+    assert.ok(selectStart > 0, 'taskSelect must exist');
+    const selectBody = source.slice(selectStart, selectStart + 800);
+    assert.ok(
+      selectBody.includes('customFieldValues'),
+      'taskSelect must include customFieldValues so the API returns them',
+    );
+  });
+
+  test('store updateTask persists customFields via apiSetTaskCustomField', () => {
+    const source = readSrc('src/features/flowdeck/store/useFlowDeck.ts');
+    assert.ok(
+      source.includes('apiSetTaskCustomField'),
+      'store must call apiSetTaskCustomField when customFields are updated',
+    );
+  });
+});
+
+describe('Task tag rollback (item 5)', () => {
+  test('toggleTaskTag restores snapshot on add failure', () => {
+    const source = readSrc('src/features/flowdeck/store/useFlowDeck.ts');
+    const fnStart = source.indexOf('const toggleTaskTag');
+    assert.ok(fnStart > 0, 'toggleTaskTag must exist');
+    const fnBody = source.slice(fnStart, fnStart + 2000);
+    assert.ok(
+      fnBody.includes('snapshot'),
+      'toggleTaskTag must capture a snapshot before mutation',
+    );
+    assert.ok(
+      fnBody.includes('setTasksByProject') && fnBody.includes('snapshot'),
+      'toggleTaskTag must restore snapshot on API failure',
     );
   });
 });

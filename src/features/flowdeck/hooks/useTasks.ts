@@ -23,10 +23,34 @@ interface ApiTask {
   sectionId: string | null;
   completedAt: string | null;
   createdAt?: string;
+  /** Relationship collections — hydrated by `listTasks` via Prisma relations. */
+  dependencies?: { dependsOnId: string }[];
+  tags?: { tagId: string }[];
+  followers?: { userId: string }[];
+  /** Per-task custom-field values joined with the field's `key`. (item 4) */
+  customFieldValues?: {
+    fieldId: string;
+    value: string | null;
+    field: { key: string };
+  }[];
 }
 
-/** Map the API task shape to the frontend Task type. */
+/**
+ * Map the API task shape to the frontend Task type.
+ *
+ * Custom-field values are joined onto the task as `customFields: Record<key,
+ * value>` so the existing UI (SheetView, TaskDetailPanel) can read/write them
+ * without changes. Empty/null values are skipped so the record only contains
+ * actually-populated fields.
+ */
 function mapTask(api: ApiTask): Task {
+  const customFields: Record<string, string> | undefined =
+    api.customFieldValues && api.customFieldValues.length > 0
+      ? api.customFieldValues.reduce<Record<string, string>>((acc, v) => {
+          if (v.value !== null && v.value !== '') acc[v.field.key] = v.value;
+          return acc;
+        }, {})
+      : undefined;
   return {
     id: api.id,
     projectId: api.projectId,
@@ -39,12 +63,15 @@ function mapTask(api: ApiTask): Task {
     dueDate: api.dueDate ?? undefined,
     progress: api.progress,
     priority: api.priority as TaskPriority,
-    deps: [],
+    deps: (api.dependencies ?? []).map(d => d.dependsOnId),
+    tags: (api.tags ?? []).map(t => t.tagId),
+    followers: (api.followers ?? []).map(f => f.userId),
     parentId: api.parentId ?? null,
     sectionId: api.sectionId ?? null,
     milestone: api.isMilestone,
     recurrence: api.recurrence ?? null,
     createdAt: api.createdAt ?? undefined,
+    ...(customFields ? { customFields } : {}),
   };
 }
 

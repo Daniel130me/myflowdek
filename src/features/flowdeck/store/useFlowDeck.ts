@@ -32,6 +32,9 @@ import {
   apiUpdateProject, apiToggleProjectFavorite, apiArchiveProject, apiRestoreProject,
   apiAddProjectMember, apiRemoveProjectMember,
   apiCreateProjectStatusUpdate, apiDeleteProjectStatusUpdate,
+  apiReorderTasks,
+  apiSetTaskCustomField,
+  apiCreateCustomField, apiDeleteCustomField,
   taskToApiPayload,
 } from '@/lib/api-client';
 
@@ -135,6 +138,8 @@ export interface FlowDeckState {
   syncProjectTasks: (projectId: string, tasks: Task[]) => void;
   /** Replace a project's tags with API data. */
   syncProjectTags: (projectId: string, tags: Tag[]) => void;
+  /** Replace a project's custom-field column definitions with API data. */
+  syncProjectCustomCols: (projectId: string, cols: CustomColumn[]) => void;
   /** Replace a project's comments with API data. */
   syncProjectComments: (projectId: string, comments: Comment[]) => void;
   /** Replace a project's files with API data. */
@@ -581,6 +586,19 @@ export function useFlowDeckStore(): FlowDeckState {
     setTagsByProject(prev => ({ ...prev, [projectId]: tags }));
   }, []);
 
+  /**
+   * One-way sync: replace a project's local custom-column definitions with
+   * API data. The server is the source of truth for `CustomField` records, so
+   * on project load we replace any local-only columns (which would otherwise
+   * lack a server-side `id` and would 404 when the user tries to set a value)
+   * with the canonical server list. Each `CustomColumn` carries the
+   * server-side `id` so `updateTask` can resolve the field by id when
+   * persisting values.
+   */
+  const syncProjectCustomCols = useCallback((projectId: string, cols: CustomColumn[]) => {
+    setCustomColsByProject(prev => ({ ...prev, [projectId]: cols }));
+  }, []);
+
   const syncProjectComments = useCallback((projectId: string, comments: Comment[]) => {
     setCommentsByProject(prev => ({ ...prev, [projectId]: comments }));
   }, []);
@@ -727,6 +745,10 @@ export function useFlowDeckStore(): FlowDeckState {
     // Snapshot for rollback — captures the pre-update task list for this
     // project so we can restore it if the API rejects the change.
     const snapshot = projectTasks;
+    // Capture the task's pre-update customFields so we can roll back the
+    // customFields portion of the optimistic update independently if the
+    // value-set endpoint rejects a specific key.
+    const customFieldsBefore = task?.customFields ? { ...task.customFields } : undefined;
     // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === id ? { ...t, ...patch } : t));
     if (task && patch.status && patch.status !== task.status) {
@@ -749,12 +771,52 @@ export function useFlowDeckStore(): FlowDeckState {
     // names (`assignee`, `start`) are translated to the API's
     // (`assigneeId`, `startDate`) and unsupported fields (`tags`,
     // `followers`, `customFields`, `storyPoints`) are dropped before they
-    // reach the wire — those have dedicated endpoints or no API yet.
-    apiUpdateTask(id, taskToApiPayload(patch)).then((res) => {
-      if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
-      toast.error('Failed to save task change', { description: res.error });
-    });
+    // reach the wire — those have dedicated endpoints.
+    const apiPatch = taskToApiPayload(patch);
+    if (Object.keys(apiPatch).length > 0) {
+      apiUpdateTask(id, apiPatch).then((res) => {
+        if (res.ok) return;
+        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        toast.error('Failed to save task change', { description: res.error });
+      });
+    }
+
+    // Persist custom-field value changes via the dedicated value-set
+    // endpoint. `taskToApiPayload` strips `customFields`, so without this
+    // branch the UI would appear to save a custom-field value but refresh
+    // would lose it (item 4). We diff the new record against the task's
+    // pre-update record so we only hit the network for keys that actually
+    // changed; each key is upserted independently so a single failure rolls
+    // back only that key.
+    if (patch.customFields !== undefined) {
+      const before = customFieldsBefore || {};
+      const after = patch.customFields || {};
+      const changedKeys = Object.keys(after).filter(k => after[k] !== before[k]);
+      if (changedKeys.length > 0) {
+        void Promise.allSettled(
+          changedKeys.map((key) =>
+            apiSetTaskCustomField(id, { key, value: after[key] ?? null }).then((res) => {
+              if (res.ok) return;
+              // Roll back just this key in the task's customFields record.
+              setTasksByProject(prev => {
+                const list = prev[projectId] || [];
+                return {
+                  ...prev,
+                  [projectId]: list.map(t => {
+                    if (t.id !== id) return t;
+                    const restored = { ...(t.customFields || {}) };
+                    if (before[key] === undefined) delete restored[key];
+                    else restored[key] = before[key];
+                    return { ...t, customFields: restored };
+                  }),
+                };
+              });
+              toast.error('Failed to save custom field', { description: `${key} — ${res.error}` });
+            }),
+          ),
+        );
+      }
+    }
   }, [tasksByProject, commit, logActivity, resolveMemberName]);
 
   const toggleComplete = useCallback((projectId: string, id: string) => {
@@ -1355,13 +1417,53 @@ export function useFlowDeckStore(): FlowDeckState {
 
   const addColumn = useCallback((projectId: string, def: CustomColumn) => {
     if (!projectId) return;
+    // Optimistic local insert. The server-side `CustomField.id` is reconciled
+    // after the POST succeeds — without that id the value-set endpoint can
+    // still resolve the field by (projectId, key), but having it lets us
+    // DELETE the definition when the column is removed.
     setCustomColsByProject(prev => ({ ...prev, [projectId]: [...(prev[projectId] || []), def] }));
+    apiCreateCustomField(projectId, {
+      key: def.key,
+      label: def.label,
+      type: def.type,
+      options: def.options,
+    }).then((res) => {
+      if (!res.ok) {
+        toast.error('Failed to save custom field on server', { description: res.error });
+        // Roll back the optimistic insert.
+        setCustomColsByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).filter(c => c.key !== def.key) }));
+        return;
+      }
+      const serverFieldId = res.data?.field?.id;
+      if (!serverFieldId) return;
+      // Patch the locally-stored column with the canonical server id.
+      setCustomColsByProject(prev => ({
+        ...prev,
+        [projectId]: (prev[projectId] || []).map(c => c.key === def.key ? { ...c, id: serverFieldId } : c),
+      }));
+    });
   }, []);
 
   const removeColumn = useCallback((projectId: string, key: string) => {
     if (!projectId) return;
+    // Snapshot for rollback — restore the column if the server delete fails.
+    const snapshot = customColsByProject[projectId] || [];
+    const col = snapshot.find(c => c.key === key);
     setCustomColsByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).filter(c => c.key !== key) }));
-  }, []);
+    if (!col) return;
+    // If we never synced this column to the server (no server-side id), the
+    // local removal above is the whole story — there's nothing to delete
+    // server-side. (Cascade-clean of any TaskCustomFieldValue rows that may
+    // have been created via the value-set endpoint will happen on the next
+    // task-list refresh, since the value-set endpoint 404s when the field
+    // definition is missing.)
+    if (!col.id) return;
+    apiDeleteCustomField(projectId, col.id).then((res) => {
+      if (res.ok) return;
+      setCustomColsByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to delete custom field on server', { description: res.error });
+    });
+  }, [customColsByProject]);
 
   const addFiles = useCallback((projectId: string, newFiles: FileItem[]) => {
     if (!projectId) return;
@@ -1444,6 +1546,8 @@ export function useFlowDeckStore(): FlowDeckState {
     const projectTasks = tasksByProject[projectId] || [];
     const task = projectTasks.find(t => t.id === taskId);
     if (!task) return;
+    // Snapshot for rollback — captured BEFORE the optimistic mutation.
+    const snapshot = projectTasks;
     const currentTags = task.tags || [];
     const isAdding = !currentTags.includes(tagId);
     const newTags = isAdding
@@ -1454,14 +1558,18 @@ export function useFlowDeckStore(): FlowDeckState {
     const tagList = tagsByProject[projectId] || [];
     const tag = tagList.find(tg => tg.id === tagId);
     if (tag) logActivity(projectId, taskId, isAdding ? 'tag_added' : 'tag_removed', `Tag "${tag.name}" ${isAdding ? 'added to' : 'removed from'} task`);
-    // Persist to PostgreSQL.
+    // Persist to PostgreSQL. Roll back the optimistic mutation on failure.
     if (isAdding) {
       apiAddTaskTag(taskId, tagId).then((res) => {
-        if (!res.ok) toast.error('Failed to add tag', { description: res.error });
+        if (res.ok) return;
+        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        toast.error('Failed to add tag', { description: res.error });
       });
     } else {
       apiRemoveTaskTag(taskId, tagId).then((res) => {
-        if (!res.ok) toast.error('Failed to remove tag', { description: res.error });
+        if (res.ok) return;
+        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        toast.error('Failed to remove tag', { description: res.error });
       });
     }
   }, [tasksByProject, tagsByProject, commit, logActivity]);
@@ -1479,16 +1587,19 @@ export function useFlowDeckStore(): FlowDeckState {
     // Optimistic local update — reassign sortOrder based on new positions.
     const reordered = arr.map((t, i) => ({ ...t, sortOrder: i }));
     commit(projectId, reordered);
-    // Persist sortOrder changes via PATCH /api/tasks/:id for the moved task.
-    // Only persist if this isn't a temp ID (temp IDs haven't been POSTed yet).
-    if (!taskId.startsWith('t_') && !taskId.startsWith('t-')) {
-      apiUpdateTask(taskId, { sortOrder: toIndex }).then((res) => {
-        if (res.ok) return;
-        // Roll back on failure.
-        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
-        toast.error('Failed to save task order');
-      });
-    }
+    // Persist sortOrder changes via the project-scoped reorder endpoint so
+    // the server stores the full, normalized ordering — not just the moved
+    // task's new index (which would leave stale/duplicate sortOrder values
+    // for the other tasks). Skip temp IDs (they haven't been POSTed yet).
+    const payload = reordered.map(t => ({ id: t.id, sortOrder: t.sortOrder! }));
+    const serverPayload = payload.filter(t => !t.id.startsWith('t_') && !t.id.startsWith('t-'));
+    if (serverPayload.length === 0) return;
+    apiReorderTasks(projectId, serverPayload).then((res) => {
+      if (res.ok) return;
+      // Roll back on failure.
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save task order', { description: res.error });
+    });
   }, [tasksByProject, commit]);
 
   /* ---- Quick Add ---- */
@@ -2021,10 +2132,21 @@ export function useFlowDeckStore(): FlowDeckState {
   /* Keep simple duplicateTask as a thin wrapper */
   const duplicateTask = useCallback((projectId: string, id: string) => duplicateTaskWithOptions(projectId, id), [duplicateTaskWithOptions]);
 
-  /* Bulk duplicate selected tasks */
+  /* Bulk duplicate selected tasks.
+   *
+   * Optimistically inserts local copies (one per selected task) with temp ids,
+   * then creates each duplicate on the server in parallel via POST
+   * /api/projects/:id/tasks. On success the temp id is swapped for the
+   * canonical server id; on failure the corresponding temp copy is removed
+   * and an error toast is shown for that specific copy. Each duplicate is
+   * handled independently so a single server rejection never rolls back the
+   * whole batch. After refresh the duplicates persist because they live in
+   * PostgreSQL. Subtasks/comments/attachments are intentionally not copied
+   * in bulk — callers wanting deep clones should use `duplicateTaskWithOptions`
+   * per task. */
   const duplicateTasksBulk = useCallback((projectId: string, ids: Set<string>) => {
     const projectTasks = tasksByProject[projectId] || [];
-    let newTasks: Task[] = [];
+    const newTasks: Task[] = [];
     for (const id of ids) {
       const task = projectTasks.find(t => t.id === id);
       if (!task) continue;
@@ -2040,10 +2162,62 @@ export function useFlowDeckStore(): FlowDeckState {
         createdAt: new Date().toISOString(),
       });
     }
-    if (newTasks.length) {
-      commit(projectId, [...projectTasks, ...newTasks]);
-      toast.success(`${newTasks.length} task${newTasks.length > 1 ? 's' : ''} duplicated`);
-    }
+    if (!newTasks.length) return;
+    // Snapshot for per-task rollback. We capture the full pre-duplicate task
+    // list so a single failure can remove only its own temp copy without
+    // touching the others.
+    const snapshot = projectTasks;
+    commit(projectId, [...projectTasks, ...newTasks]);
+    toast.success(`${newTasks.length} task${newTasks.length > 1 ? 's' : ''} duplicated`);
+
+    // Persist each duplicate independently. We do NOT use Promise.all — a
+    // single rejection would short-circuit the chain. Promise.allSettled
+    // ensures every copy gets a chance to succeed/fail on its own.
+    void Promise.allSettled(
+      newTasks.map((clone) =>
+        apiCreateTask(projectId, taskToApiPayload({
+          name: clone.name,
+          description: clone.description,
+          status: 'backlog',
+          priority: clone.priority,
+          assignee: clone.assignee,
+          parentId: null,
+          sectionId: clone.sectionId,
+          dueDate: clone.dueDate,
+          start: clone.start,
+          duration: clone.duration,
+        })).then((res) => {
+          if (!res.ok) {
+            // Roll back ONLY this temp copy. Restore everything else.
+            setTasksByProject(prev => {
+              const list = prev[projectId] || [];
+              return { ...prev, [projectId]: list.filter(t => t.id !== clone.id) };
+            });
+            toast.error('Failed to duplicate task on server', { description: `${clone.name} — ${res.error}` });
+            return null;
+          }
+          const serverId = res.data?.task?.id;
+          if (!serverId || serverId === clone.id) return serverId ?? clone.id;
+          // Swap temp id → canonical server id so subsequent edits hit the
+          // right row.
+          setTasksByProject(prev => {
+            const list = prev[projectId] || [];
+            return { ...prev, [projectId]: list.map(t => t.id === clone.id ? { ...t, id: serverId } : t) };
+          });
+          return serverId;
+        }),
+      ),
+    ).then((results) => {
+      // If every duplicate failed, restore the pre-duplicate snapshot so the
+      // UI doesn't show ghost tasks. (When at least one succeeded we keep the
+      // successful swaps; the per-task rollback above already removed the
+      // failures.)
+      const succeeded = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
+      const failed = results.length - succeeded;
+      if (succeeded === 0 && failed > 0) {
+        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      }
+    });
   }, [tasksByProject, commit]);
 
   /* ---- #32: Move task to another project ---- */
@@ -2742,7 +2916,7 @@ export function useFlowDeckStore(): FlowDeckState {
     searchFilters, setSearchFilters, activeFilterCount, clearFilters,
     timeLogs, taskTimeLogs,
     gridActions,
-    openProject, syncProjectFromRoute, syncProjectTasks, syncProjectTags, syncProjectComments, syncProjectFiles, syncProjectMembers, syncProjectStatusUpdates, syncProjects, upsertProject, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
+    openProject, syncProjectFromRoute, syncProjectTasks, syncProjectTags, syncProjectCustomCols, syncProjectComments, syncProjectFiles, syncProjectMembers, syncProjectStatusUpdates, syncProjects, upsertProject, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
     updateTask, addTask, removeTask, removeTasksBulk, moveStatus, toggleComplete,
     duplicateTask, duplicateTaskWithOptions, duplicateTasksBulk,
     moveTaskToProject, moveTasksToProjectBulk,

@@ -136,6 +136,17 @@ export function apiBulkAction(projectId: string, action: string, taskIds: string
   return apiCall(`/api/projects/${projectId}/tasks/bulk`, json('POST', { action, taskIds, ...extra }));
 }
 
+/**
+ * POST /api/projects/:projectId/tasks/reorder
+ * Transactionally updates sortOrder for multiple tasks.
+ */
+export function apiReorderTasks(
+  projectId: string,
+  tasks: Array<{ id: string; sortOrder: number }>,
+) {
+  return apiCall(`/api/projects/${projectId}/tasks/reorder`, json('POST', { tasks }));
+}
+
 /* -------------------------- Dependency mutations ------------------------- */
 
 /** POST /api/tasks/:taskId/dependencies — add a blocking dependency. */
@@ -397,6 +408,78 @@ export async function apiListFormSubmissions(projectId: string, formId: string) 
     if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
     const data = (await res.json()) as { submissions: unknown[] };
     return { ok: true as const, submissions: data.submissions };
+  } catch {
+    return { ok: false as const, error: 'Network error' };
+  }
+}
+
+/* -------------------- Custom-field value mutations -------------------- */
+
+/**
+ * POST /api/tasks/:taskId/custom-fields — set a custom-field value on a task.
+ *
+ * Accepts either `{ fieldId, value }` (server-side field id) or `{ key, value }`
+ * (the project-unique key that the frontend `CustomColumn` carries). The
+ * server resolves the field and verifies it belongs to the same project as
+ * the task.
+ */
+export function apiSetTaskCustomField(
+  taskId: string,
+  input: { fieldId?: string; key?: string; value: string | null },
+) {
+  return apiCall(`/api/tasks/${taskId}/custom-fields`, json('POST', input));
+}
+
+/** DELETE /api/tasks/:taskId/custom-fields/:fieldId — clear a custom-field value. */
+export function apiDeleteTaskCustomField(taskId: string, fieldId: string) {
+  return apiCall(`/api/tasks/${taskId}/custom-fields/${fieldId}`, { method: 'DELETE' });
+}
+
+/** GET /api/tasks/:taskId/custom-fields — list custom-field values for a task. */
+export async function apiListTaskCustomFields(taskId: string) {
+  try {
+    const res = await fetch(`/api/tasks/${taskId}/custom-fields`);
+    if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+    const data = (await res.json()) as {
+      values: { fieldId: string; value: string | null; field: { key: string } }[];
+    };
+    return { ok: true as const, values: data.values };
+  } catch {
+    return { ok: false as const, error: 'Network error' };
+  }
+}
+
+/* -------------------- Custom-field definition mutations ------------------ */
+
+/**
+ * POST /api/projects/:projectId/custom-fields — create a project custom-field
+ * definition. Returns the server-created field so the store can keep the
+ * local `CustomColumn` in sync with the server-side `fieldId`.
+ */
+export function apiCreateCustomField(
+  projectId: string,
+  input: { key: string; label: string; type: 'text' | 'number' | 'date' | 'select'; options?: string[] },
+) {
+  return apiCallWithData<{ field: { id: string; [key: string]: unknown } }>(
+    `/api/projects/${projectId}/custom-fields`,
+    json('POST', input),
+  );
+}
+
+/** DELETE /api/projects/:projectId/custom-fields/:fieldId — delete a field definition. */
+export function apiDeleteCustomField(projectId: string, fieldId: string) {
+  return apiCall(`/api/projects/${projectId}/custom-fields/${fieldId}`, { method: 'DELETE' });
+}
+
+/** GET /api/projects/:projectId/custom-fields — list field definitions. */
+export async function apiListCustomFields(projectId: string) {
+  try {
+    const res = await fetch(`/api/projects/${projectId}/custom-fields`);
+    if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+    const data = (await res.json()) as {
+      fields: { id: string; key: string; label: string; type: string; options?: string[] }[];
+    };
+    return { ok: true as const, fields: data.fields };
   } catch {
     return { ok: false as const, error: 'Network error' };
   }

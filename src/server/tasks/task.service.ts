@@ -54,13 +54,35 @@ const taskSelect = {
   completedAt: true,
   createdAt: true,
   updatedAt: true,
+  // Include each task's custom-field values joined with the field's `key` so
+  // the frontend can hydrate `task.customFields: Record<key, value>` without
+  // a separate round-trip to the custom-fields definition endpoint. (item 4)
+  customFieldValues: {
+    select: {
+      fieldId: true,
+      value: true,
+      field: { select: { key: true } },
+    },
+  },
 } as const;
 
-/** List all tasks in a project. Single query — no N+1. */
+/**
+ * List all tasks in a project. Single query — no N+1.
+ *
+ * Includes the three relationship collections (dependencies, tags, followers)
+ * so the frontend can hydrate `deps`/`tags`/`followers` on task refresh
+ * without issuing N+1 follow-up requests. Each relation is projected down to
+ * just the foreign-key column the client needs.
+ */
 export function listTasks(projectId: string) {
   return db.task.findMany({
     where: { projectId },
-    select: taskSelect,
+    select: {
+      ...taskSelect,
+      dependencies: { select: { dependsOnId: true } },
+      tags: { select: { tagId: true } },
+      followers: { select: { userId: true } },
+    },
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   });
 }
