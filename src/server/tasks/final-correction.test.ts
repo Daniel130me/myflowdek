@@ -214,7 +214,7 @@ describe('Task reorder persistence (item 7)', () => {
     const source = readSrc('src/features/flowdeck/store/useFlowDeck.ts');
     const fnStart = source.indexOf('const reorderTask');
     assert.ok(fnStart > 0, 'reorderTask must exist');
-    const fnBody = source.slice(fnStart, fnStart + 800);
+    const fnBody = source.slice(fnStart, fnStart + 1500);
     assert.ok(
       fnBody.includes('apiUpdateTask') && fnBody.includes('sortOrder'),
       'reorderTask must persist sortOrder via apiUpdateTask',

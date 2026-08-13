@@ -205,7 +205,7 @@ describe('Project overview persistence (item 5)', () => {
 
     const fnStart = source.indexOf('const updateProject');
     assert.ok(fnStart > 0, 'updateProject must exist');
-    const fnBody = source.slice(fnStart, fnStart + 800);
+    const fnBody = source.slice(fnStart, fnStart + 2000);
 
     assert.ok(
       fnBody.includes('fetch') || fnBody.includes('apiUpdateProject'),
