@@ -427,18 +427,24 @@ describe('session version', () => {
     // Simulate a password reset by calling the service directly.
     const { resetPassword } = await import('@/server/auth/password-reset.service');
 
-    // Create a reset token.
-    const token = 'test-reset-token-' + RUN_ID;
+    // Production stores hashToken(rawToken) — never the raw token itself.
+    // The test must mirror that: store the SHA-256 hash so resetPassword's
+    // internal hashToken(rawToken) lookup matches.
+    const rawToken = 'test-reset-token-' + RUN_ID;
+    const { createHash } = await import('node:crypto');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+
     await prisma.verificationToken.create({
       data: {
         userId: user.id,
-        token,
+        token: tokenHash,
         type: 'password_reset',
         expiresAt: new Date(Date.now() + 60 * 60 * 1000),
       },
     });
 
-    await resetPassword(token, 'NewStr0ng!Pass');
+    // resetPassword receives the RAW token and hashes it internally.
+    await resetPassword(rawToken, 'NewStr0ng!Pass');
 
     const after = await prisma.user.findUniqueOrThrow({
       where: { id: user.id },
