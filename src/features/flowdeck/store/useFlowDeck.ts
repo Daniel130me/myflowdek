@@ -29,7 +29,7 @@ import {
   apiCreateTag, apiDeleteTag,
   apiAddDependency, apiRemoveDependency,
   apiAddTimeLog, apiDeleteTimeLog,
-  apiUpdateProject, apiToggleProjectFavorite, apiArchiveProject, apiRestoreProject,
+  apiUpdateProject, apiSetProjectFavorite, apiArchiveProject, apiRestoreProject,
   apiAddProjectMember, apiRemoveProjectMember,
   apiCreateProjectStatusUpdate, apiDeleteProjectStatusUpdate,
   apiReorderTasks,
@@ -169,6 +169,8 @@ export interface FlowDeckState {
    * project that should appear in the sidebar/portfolio.
    */
   upsertProject: (project: Project) => void;
+  /** Remove a server-deleted project from shared client state. */
+  removeProjectFromCache: (projectId: string) => void;
   goToPortfolio: () => void;
   createProject: (p: { name: string; color: string; start: string; end: string }) => void;
   createProjectFromTemplate: (templateId: string, name: string, color: string, start: string, end: string) => void;
@@ -636,6 +638,14 @@ export function useFlowDeckStore(): FlowDeckState {
   /** Upsert a single project (real or optimistic) into the projects map. */
   const upsertProject = useCallback((project: Project) => {
     setProjects(prev => ({ ...prev, [project.id]: project }));
+  }, []);
+
+  const removeProjectFromCache = useCallback((projectId: string) => {
+    setProjects((previous) => {
+      const next = { ...previous };
+      delete next[projectId];
+      return next;
+    });
   }, []);
 
   const goToPortfolio = useCallback(() => {
@@ -2599,7 +2609,7 @@ export function useFlowDeckStore(): FlowDeckState {
     }));
     // The server treats `{ favorite: boolean }` as a toggle trigger — any
     // boolean will do, and the server flips the per-user flag.
-    apiToggleProjectFavorite(projectId).then((res) => {
+    apiSetProjectFavorite(projectId, !prevProject.isFavorite).then((res) => {
       if (res.ok) return;
       setProjects(prev => ({ ...prev, [projectId]: snapshot }));
       toast.error('Failed to toggle favorite', { description: res.error });
@@ -2916,7 +2926,7 @@ export function useFlowDeckStore(): FlowDeckState {
     searchFilters, setSearchFilters, activeFilterCount, clearFilters,
     timeLogs, taskTimeLogs,
     gridActions,
-    openProject, syncProjectFromRoute, syncProjectTasks, syncProjectTags, syncProjectCustomCols, syncProjectComments, syncProjectFiles, syncProjectMembers, syncProjectStatusUpdates, syncProjects, upsertProject, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
+    openProject, syncProjectFromRoute, syncProjectTasks, syncProjectTags, syncProjectCustomCols, syncProjectComments, syncProjectFiles, syncProjectMembers, syncProjectStatusUpdates, syncProjects, upsertProject, removeProjectFromCache, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
     updateTask, addTask, removeTask, removeTasksBulk, moveStatus, toggleComplete,
     duplicateTask, duplicateTaskWithOptions, duplicateTasksBulk,
     moveTaskToProject, moveTasksToProjectBulk,

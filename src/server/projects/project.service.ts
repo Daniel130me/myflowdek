@@ -196,16 +196,69 @@ export async function listProjectsForUser(
     select: {
       role: true,
       isFavorite: true,
-      project: { select: projectSelect },
+      project: {
+        select: {
+          ...projectSelect,
+          members: { select: { userId: true } },
+        },
+      },
     },
     orderBy: { project: { updatedAt: 'desc' } },
   });
 
-  return memberships.map((m) => ({
-    ...m.project,
-    role: m.role,
-    isFavorite: m.isFavorite,
-  }));
+  const projectIds = memberships.map(({ project }) => project.id);
+  if (projectIds.length === 0) return [];
+
+  // These grouped queries have constant query count and return aggregate rows
+  // only; task bodies never cross the database boundary for portfolio cards.
+  const [taskTotals, completedTotals, overdueTotals] = await Promise.all([
+    db.task.groupBy({
+      by: ['projectId'],
+      where: { projectId: { in: projectIds } },
+      _count: { _all: true },
+      _avg: { progress: true },
+    }),
+    db.task.groupBy({
+      by: ['projectId'],
+      where: { projectId: { in: projectIds }, status: 'done' },
+      _count: { _all: true },
+    }),
+    db.task.groupBy({
+      by: ['projectId'],
+      where: {
+        projectId: { in: projectIds },
+        status: { not: 'done' },
+        dueDate: { lt: new Date() },
+      },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const taskStats = new Map(taskTotals.map((row) => [row.projectId, row]));
+  const completedByProject = new Map(
+    completedTotals.map((row) => [row.projectId, row._count._all]),
+  );
+  const overdueByProject = new Map(
+    overdueTotals.map((row) => [row.projectId, row._count._all]),
+  );
+
+  return memberships.map(({ project, role, isFavorite }) => {
+    const { members, ...publicProject } = project;
+    const totals = taskStats.get(project.id);
+    return {
+      ...publicProject,
+      members: members.map(({ userId: memberId }) => memberId),
+      role,
+      isFavorite,
+      portfolio: {
+        taskCount: totals?._count._all ?? 0,
+        completedTaskCount: completedByProject.get(project.id) ?? 0,
+        averageProgress: Math.round(totals?._avg.progress ?? 0),
+        overdueTaskCount: overdueByProject.get(project.id) ?? 0,
+        memberCount: members.length,
+      },
+    };
+  });
 }
 
 /** Get a single project's details. Assumes membership was already verified. */
@@ -295,16 +348,16 @@ export async function deleteProject(projectId: string) {
   }
 }
 
-/** Toggle the per-user favourite flag on a project membership. */
-export async function toggleProjectFavorite(projectId: string, userId: string) {
+/** Set the per-user favourite flag idempotently in a single query. */
+export async function setProjectFavorite(
+  projectId: string,
+  userId: string,
+  isFavorite: boolean,
+) {
   try {
-    const membership = await db.projectMember.findUniqueOrThrow({
+    return await db.projectMember.update({
       where: { projectId_userId: { projectId, userId } },
-      select: { isFavorite: true },
-    });
-    return db.projectMember.update({
-      where: { projectId_userId: { projectId, userId } },
-      data: { isFavorite: !membership.isFavorite },
+      data: { isFavorite },
       select: { isFavorite: true },
     });
   } catch (err) {

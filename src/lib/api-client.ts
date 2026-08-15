@@ -333,9 +333,14 @@ export function apiUpdateProject(projectId: string, patch: Record<string, unknow
   return apiCall(`/api/projects/${projectId}`, json('PATCH', patch));
 }
 
-/** PATCH /api/projects/:projectId with `{ favorite: true }` — toggles the per-user favourite flag. */
-export function apiToggleProjectFavorite(projectId: string) {
-  return apiCall(`/api/projects/${projectId}`, json('PATCH', { favorite: true }));
+/** Set a user's per-project favourite preference idempotently. */
+export function apiSetProjectFavorite(projectId: string, favorite: boolean) {
+  return apiCall(`/api/projects/${projectId}`, json('PATCH', { favorite }));
+}
+
+/** DELETE /api/projects/:projectId — permanently remove a project. */
+export function apiDeleteProject(projectId: string) {
+  return apiCall(`/api/projects/${projectId}`, { method: 'DELETE' });
 }
 
 /** POST /api/projects/:projectId/archive — soft-delete (archive) a project. */

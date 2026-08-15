@@ -20,7 +20,15 @@ export default function ProjectsPortfolioPage() {
   const router = useRouter();
   const state = useFlowDeck();
   const wsHook = useWorkspaces();
-  const { projects, loading, createProject } = useProjects(wsHook.selectedWorkspaceId);
+  const {
+    projects,
+    loading,
+    createProject,
+    deleteProject,
+    setFavorite,
+    archiveProject,
+    restoreProject,
+  } = useProjects(wsHook.selectedWorkspaceId);
   const [creating, setCreating] = useState(false);
 
   /** Open a project — set it as active and navigate to its overview. */
@@ -60,33 +68,41 @@ export default function ProjectsPortfolioPage() {
   return (
     <PortfolioView
       projects={projects}
-      tasksByProject={state.tasksByProject}
       searchQuery={state.searchQuery}
       onOpen={handleOpen}
-      onDelete={(id) => {
-        // Optimistic: remove from local state, then call the API.
-        fetch(`/api/projects/${id}`, { method: 'DELETE' })
-          .then(() => toast.success('Project deleted'))
-          .catch(() => toast.error('Failed to delete project'));
+      onDelete={async (id) => {
+        const project = projects[id];
+        if (!project || !confirm(`Delete ${project.name} permanently?`)) return;
+        try {
+          await deleteProject(id);
+          toast.success('Project deleted');
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'Failed to delete project');
+        }
       }}
       onNew={handleNew}
-      onToggleFavorite={(id) => {
-        // Per-user favourite toggle via PATCH.
-        fetch(`/api/projects/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ favorite: true }),
-        }).catch(() => {});
+      onToggleFavorite={async (id) => {
+        try {
+          await setFavorite(id, !projects[id]?.isFavorite);
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'Failed to update favorite');
+        }
       }}
-      onArchive={(id) => {
-        fetch(`/api/projects/${id}/archive`, { method: 'POST' })
-          .then(() => toast.success('Project archived'))
-          .catch(() => toast.error('Failed to archive project'));
+      onArchive={async (id) => {
+        try {
+          await archiveProject(id);
+          toast.success('Project archived');
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'Failed to archive project');
+        }
       }}
-      onRestore={(id) => {
-        fetch(`/api/projects/${id}/restore`, { method: 'POST' })
-          .then(() => toast.success('Project restored'))
-          .catch(() => toast.error('Failed to restore project'));
+      onRestore={async (id) => {
+        try {
+          await restoreProject(id);
+          toast.success('Project restored');
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'Failed to restore project');
+        }
       }}
     />
   );

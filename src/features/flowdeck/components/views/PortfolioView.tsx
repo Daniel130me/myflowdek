@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import { COLORS, TODAY, dayMs, fmtDate, addDays, type Task, type Project } from '@/features/flowdeck/model';
+import { COLORS, TODAY, dayMs, fmtDate, type Project } from '@/features/flowdeck/model';
 import { Plus, Trash2, Star, Archive, RotateCcw, Users, Grid3X3, List, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Avatar, SectionHeader, FF } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 
 type SortDir = 'asc' | 'desc';
 
-export function PortfolioView({ projects, tasksByProject, searchQuery, onOpen, onDelete, onNew, onToggleFavorite, onArchive, onRestore }: {
-  projects: Record<string, Project>; tasksByProject: Record<string, Task[]>; searchQuery: string;
+export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, onToggleFavorite, onArchive, onRestore }: {
+  projects: Record<string, Project>; searchQuery: string;
   onOpen: (id: string) => void; onDelete: (id: string) => void; onNew: () => void;
   onToggleFavorite?: (id: string) => void;
   onArchive?: (id: string) => void;
@@ -25,12 +25,13 @@ export function PortfolioView({ projects, tasksByProject, searchQuery, onOpen, o
   const archivedProjects = Object.values(projects).filter(p => p.isArchived && p.name.toLowerCase().includes((searchQuery || '').toLowerCase()));
 
   function statsFor(id: string) {
-    const tasks = tasksByProject[id] || [];
-    const total = tasks.length;
-    const done = tasks.filter(t => t.status === 'done').length;
-    const progress = total ? Math.round(tasks.reduce((a, t) => a + t.progress, 0) / total) : 0;
-    const overdue = tasks.filter(t => t.status !== 'done' && addDays(t.start, t.duration) < TODAY).length;
-    return { total, done, progress, overdue };
+    const stats = projects[id]?.portfolio;
+    return {
+      total: stats?.taskCount ?? 0,
+      done: stats?.completedTaskCount ?? 0,
+      progress: stats?.averageProgress ?? 0,
+      overdue: stats?.overdueTaskCount ?? 0,
+    };
   }
 
   /* ---- sort ---- */

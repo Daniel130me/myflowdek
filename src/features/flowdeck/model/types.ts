@@ -32,6 +32,14 @@ export interface Project {
   /* #37 */ members?: string[];
   /* #38 */ isFavorite?: boolean;
   /* #39 */ isArchived?: boolean;
+  /** Server-derived portfolio rollup. Never calculate this from partial browser caches. */
+  portfolio?: {
+    taskCount: number;
+    completedTaskCount: number;
+    averageProgress: number;
+    overdueTaskCount: number;
+    memberCount: number;
+  };
 }
 
 /* ---------------------------------- Tag ---------------------------------- */

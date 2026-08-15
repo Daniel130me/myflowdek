@@ -3,6 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Project } from '@/features/flowdeck/model';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import {
+  apiArchiveProject,
+  apiDeleteProject,
+  apiRestoreProject,
+  apiSetProjectFavorite,
+} from '@/lib/api-client';
 
 /** Shape returned by GET /api/workspaces/:id/projects. */
 export interface ApiProject {
@@ -18,6 +24,8 @@ export interface ApiProject {
   _count: { members: number; tasks: number };
   role: string;
   isFavorite: boolean;
+  members?: string[];
+  portfolio?: NonNullable<Project['portfolio']>;
 }
 
 /** Map the API project shape to the frontend Project type. */
@@ -31,6 +39,8 @@ export function mapProject(api: ApiProject): Project {
     description: api.description ?? undefined,
     isFavorite: api.isFavorite,
     isArchived: api.isArchived,
+    members: api.members ?? [],
+    portfolio: api.portfolio,
   };
 }
 
@@ -47,14 +57,14 @@ export function useProjects(workspaceId: string | null) {
   const [projects, setProjects] = useState<Record<string, Project>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { syncProjects, upsertProject } = useFlowDeck();
+  const { syncProjects, upsertProject, removeProjectFromCache } = useFlowDeck();
 
   const refetch = useCallback(async () => {
     if (!workspaceId) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/projects`);
+      const res = await fetch(`/api/workspaces/${workspaceId}/projects?includeArchived=true`);
       if (!res.ok) throw new Error('Failed to load projects');
       const data = await res.json();
       const mapped: Record<string, Project> = {};
@@ -98,5 +108,52 @@ export function useProjects(workspaceId: string | null) {
     [workspaceId, upsertProject],
   );
 
-  return { projects, loading, error, refetch, createProject };
+  const patchCachedProject = useCallback((projectId: string, patch: Partial<Project>) => {
+    const current = projects[projectId];
+    if (!current) return;
+    const next = { ...current, ...patch };
+    setProjects((previous) => ({ ...previous, [projectId]: next }));
+    upsertProject(next);
+  }, [projects, upsertProject]);
+
+  const deleteProject = useCallback(async (projectId: string) => {
+    const result = await apiDeleteProject(projectId);
+    if (!result.ok) throw new Error(result.error ?? 'Failed to delete project');
+    setProjects((previous) => {
+      const next = { ...previous };
+      delete next[projectId];
+      return next;
+    });
+    removeProjectFromCache(projectId);
+  }, [removeProjectFromCache]);
+
+  const setFavorite = useCallback(async (projectId: string, favorite: boolean) => {
+    const result = await apiSetProjectFavorite(projectId, favorite);
+    if (!result.ok) throw new Error(result.error ?? 'Failed to update favorite');
+    patchCachedProject(projectId, { isFavorite: favorite });
+  }, [patchCachedProject]);
+
+  const archiveProject = useCallback(async (projectId: string) => {
+    const result = await apiArchiveProject(projectId);
+    if (!result.ok) throw new Error(result.error ?? 'Failed to archive project');
+    patchCachedProject(projectId, { isArchived: true });
+  }, [patchCachedProject]);
+
+  const restoreProject = useCallback(async (projectId: string) => {
+    const result = await apiRestoreProject(projectId);
+    if (!result.ok) throw new Error(result.error ?? 'Failed to restore project');
+    patchCachedProject(projectId, { isArchived: false });
+  }, [patchCachedProject]);
+
+  return {
+    projects,
+    loading,
+    error,
+    refetch,
+    createProject,
+    deleteProject,
+    setFavorite,
+    archiveProject,
+    restoreProject,
+  };
 }

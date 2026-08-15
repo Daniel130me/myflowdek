@@ -29,6 +29,8 @@ import { PROJECT_PERMISSIONS, WORKSPACE_PERMISSIONS } from '@/server/auth/capabi
 import {
   createProject,
   createProjectFromTemplate,
+  listProjectsForUser,
+  setProjectFavorite,
 } from '@/server/projects/project.service';
 
 const prisma = new PrismaClient();
@@ -115,6 +117,45 @@ describe('project creation persistence', () => {
     assert.ok(dependencies.length > 0, 'template dependency edges must persist');
     assert.equal(tags.length, 3);
     assert.equal(fields.length, 2);
+  });
+});
+
+describe('project portfolio persistence', () => {
+  test('returns server aggregates and sets favorites idempotently', async () => {
+    const owner = await prisma.user.create({
+      data: { email: testEmail('portfolio'), name: 'Portfolio Owner', passwordHash: 'hash' },
+    });
+    const onboarding = await completeOnboarding(owner.id, { projectName: 'Initial Project' });
+    const project = await createProject(onboarding.workspace.id, owner.id, {
+      name: 'Portfolio Project',
+    });
+
+    await prisma.task.createMany({
+      data: [
+        { projectId: project.id, createdById: owner.id, name: 'Done', status: 'done', progress: 100 },
+        {
+          projectId: project.id,
+          createdById: owner.id,
+          name: 'Overdue',
+          status: 'in-progress',
+          progress: 50,
+          dueDate: new Date('2020-01-01'),
+        },
+        { projectId: project.id, createdById: owner.id, name: 'Backlog', progress: 0 },
+      ],
+    });
+
+    await setProjectFavorite(project.id, owner.id, true);
+    await setProjectFavorite(project.id, owner.id, true);
+    const listed = await listProjectsForUser(onboarding.workspace.id, owner.id, true);
+    const portfolioProject = listed.find(({ id }) => id === project.id);
+
+    assert.equal(portfolioProject?.isFavorite, true);
+    assert.equal(portfolioProject?.portfolio.taskCount, 3);
+    assert.equal(portfolioProject?.portfolio.completedTaskCount, 1);
+    assert.equal(portfolioProject?.portfolio.averageProgress, 50);
+    assert.equal(portfolioProject?.portfolio.overdueTaskCount, 1);
+    assert.equal(portfolioProject?.portfolio.memberCount, 1);
   });
 });
 

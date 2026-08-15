@@ -8,7 +8,7 @@ import {
   getProject,
   updateProject,
   deleteProject,
-  toggleProjectFavorite,
+  setProjectFavorite,
 } from '@/server/projects/project.service';
 import { updateProjectSchema } from '@/server/projects/schemas';
 
@@ -39,7 +39,7 @@ export async function GET(
  * Update a project (name, description, color, dates). Only OWNER/ADMIN.
  *
  * Special case: if the body contains `{ favorite: true/false }`, any member
- * can toggle their own per-user favourite flag (not a project-wide setting).
+ * can set their own per-user favourite flag (not a project-wide setting).
  */
 export async function PATCH(
   request: Request,
@@ -51,10 +51,10 @@ export async function PATCH(
 
     const body = await request.json().catch(() => null);
 
-    // Favourite toggle — any member can do this for themselves.
+    // Favourite preference — any member can set this for themselves.
     if (body && typeof body.favorite === 'boolean') {
       await requireProjectCapability(user.id, projectId, 'VIEW_PROJECT');
-      const result = await toggleProjectFavorite(projectId, user.id);
+      const result = await setProjectFavorite(projectId, user.id, body.favorite);
       return NextResponse.json(result);
     }
 
