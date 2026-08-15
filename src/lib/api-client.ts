@@ -301,6 +301,33 @@ export function apiDeleteTimeLog(taskId: string, logId: string) {
 
 /* ------------------------- Project mutations ------------------------- */
 
+interface CreateProjectPayload {
+  name: string;
+  description?: string;
+  color?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+/** POST /api/workspaces/:workspaceId/projects — create a blank project. */
+export function apiCreateProject(workspaceId: string, input: CreateProjectPayload) {
+  return apiCallWithData<{ project: Record<string, unknown> }>(
+    `/api/workspaces/${workspaceId}/projects`,
+    json('POST', input),
+  );
+}
+
+/** Create a project and its template contents atomically. */
+export function apiCreateProjectFromTemplate(
+  workspaceId: string,
+  input: CreateProjectPayload & { templateId: string; startDate: string; endDate: string },
+) {
+  return apiCallWithData<{ project: Record<string, unknown> }>(
+    `/api/workspaces/${workspaceId}/projects/from-template`,
+    json('POST', input),
+  );
+}
+
 /** PATCH /api/projects/:projectId — update project fields (name, description, color, dates). */
 export function apiUpdateProject(projectId: string, patch: Record<string, unknown>) {
   return apiCall(`/api/projects/${projectId}`, json('PATCH', patch));

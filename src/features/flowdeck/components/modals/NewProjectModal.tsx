@@ -12,10 +12,12 @@ export function NewProjectModal({
   onClose,
   onCreate,
   onCreateFromTemplate,
+  submitting = false,
 }: {
   onClose: () => void;
   onCreate: (p: { name: string; color: string; start: string; end: string }) => void;
   onCreateFromTemplate?: (templateId: string, name: string, color: string, start: string, end: string) => void;
+  submitting?: boolean;
 }) {
   const [mode, setMode] = useState<'blank' | 'template'>('blank');
   const [name, setName] = useState('');
@@ -28,12 +30,12 @@ export function NewProjectModal({
   const tplValid = name.trim() && new Date(end) > new Date(start) && selectedTemplate;
 
   function submitBlank() {
-    if (!valid) return;
+    if (!valid || submitting) return;
     onCreate({ name: name.trim(), color, start, end });
   }
 
   function submitTemplate() {
-    if (!tplValid || !onCreateFromTemplate || !selectedTemplate) return;
+    if (!tplValid || !onCreateFromTemplate || !selectedTemplate || submitting) return;
     onCreateFromTemplate(selectedTemplate, name.trim(), color, start, end);
   }
 

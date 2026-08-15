@@ -26,6 +26,10 @@ import {
   addDependency,
 } from '@/server/tasks/task-relationships.service';
 import { PROJECT_PERMISSIONS, WORKSPACE_PERMISSIONS } from '@/server/auth/capabilities';
+import {
+  createProject,
+  createProjectFromTemplate,
+} from '@/server/projects/project.service';
 
 const prisma = new PrismaClient();
 
@@ -57,6 +61,62 @@ async function cleanupRun(): Promise<void> {
 
 before(async () => { await cleanupRun(); });
 after(async () => { await cleanupRun(); await prisma.$disconnect(); });
+
+/* ===================== PROJECT CREATION ===================== */
+
+describe('project creation persistence', () => {
+  test('blank creation persists dates and owner membership', async () => {
+    const owner = await prisma.user.create({
+      data: { email: testEmail('blank-project'), name: 'Blank Owner', passwordHash: 'hash' },
+    });
+    const onboarding = await completeOnboarding(owner.id, { projectName: 'Initial Project' });
+
+    const project = await createProject(onboarding.workspace.id, owner.id, {
+      name: 'Persisted Blank',
+      color: '#123456',
+      startDate: '2026-08-15',
+      endDate: '2026-09-15',
+    });
+
+    const persisted = await prisma.project.findUnique({
+      where: { id: project.id },
+      include: { members: true },
+    });
+    assert.equal(persisted?.name, 'Persisted Blank');
+    assert.equal(persisted?.startDate?.toISOString().slice(0, 10), '2026-08-15');
+    assert.equal(persisted?.members[0]?.userId, owner.id);
+    assert.equal(persisted?.members[0]?.role, 'OWNER');
+  });
+
+  test('template creation persists content with canonical IDs and dependencies', async () => {
+    const owner = await prisma.user.create({
+      data: { email: testEmail('template-project'), name: 'Template Owner', passwordHash: 'hash' },
+    });
+    const onboarding = await completeOnboarding(owner.id, { projectName: 'Initial Project' });
+
+    const project = await createProjectFromTemplate(onboarding.workspace.id, owner.id, {
+      templateId: 'tpl-sprint',
+      name: 'Persisted Sprint',
+      color: '#0891B2',
+      startDate: '2026-08-15',
+      endDate: '2026-08-29',
+    });
+
+    const [tasks, dependencies, tags, fields] = await Promise.all([
+      prisma.task.findMany({ where: { projectId: project.id }, orderBy: { sortOrder: 'asc' } }),
+      prisma.taskDependency.findMany({ where: { task: { projectId: project.id } } }),
+      prisma.tag.findMany({ where: { projectId: project.id } }),
+      prisma.customField.findMany({ where: { projectId: project.id } }),
+    ]);
+
+    assert.equal(tasks.length, 8);
+    assert.ok(tasks.every((task) => task.assigneeId === null), 'mock assignees must not persist');
+    assert.ok(tasks.every((task) => !task.id.startsWith('t')), 'database IDs replace template IDs');
+    assert.ok(dependencies.length > 0, 'template dependency edges must persist');
+    assert.equal(tags.length, 3);
+    assert.equal(fields.length, 2);
+  });
+});
 
 /* ===================== ONBOARDING IDEMPOTENCY ===================== */
 

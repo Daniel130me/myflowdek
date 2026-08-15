@@ -6,8 +6,9 @@ import {
   DEFAULT_PROJECT_COLOR,
 } from './constants';
 
-/** Optional date — accepts an ISO string or null. */
-const optionalDate = z.iso.datetime().optional().nullable();
+/** Optional calendar date or ISO timestamp accepted by project forms/APIs. */
+const projectDate = z.union([z.iso.date(), z.iso.datetime()]);
+const optionalDate = projectDate.optional().nullable();
 
 /** Validation for creating a project. ownerId is NOT accepted from the
  *  browser — it always comes from the authenticated session. */
@@ -18,6 +19,16 @@ export const createProjectSchema = z.object({
   startDate: optionalDate,
   endDate: optionalDate,
 });
+
+/** Template creation uses the same project fields plus a server-known template. */
+export const createProjectFromTemplateSchema = createProjectSchema.extend({
+  templateId: z.string().trim().min(1, 'Template is required').max(100),
+  startDate: projectDate,
+  endDate: projectDate,
+}).refine(
+  ({ startDate, endDate }) => new Date(endDate).getTime() > new Date(startDate).getTime(),
+  { message: 'End date must be after start date', path: ['endDate'] },
+);
 
 /** Validation for updating a project (all fields optional). */
 export const updateProjectSchema = z.object({
@@ -39,4 +50,5 @@ export const PROJECT_DEFAULTS = {
 } as const;
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+export type CreateProjectFromTemplateInput = z.infer<typeof createProjectFromTemplateSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;

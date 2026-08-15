@@ -1,8 +1,14 @@
 import { db } from '@/server/db/client';
 import { Prisma } from '@prisma/client';
 import { AuthError } from '@/server/auth/authorization';
+import { PROJECT_TEMPLATES } from '@/features/flowdeck/model/templates';
+import { randomUUID } from 'node:crypto';
 import { DEFAULT_PROJECT_COLOR } from './constants';
-import type { CreateProjectInput, UpdateProjectInput } from './schemas';
+import type {
+  CreateProjectFromTemplateInput,
+  CreateProjectInput,
+  UpdateProjectInput,
+} from './schemas';
 
 /**
  * Project service — all project business logic lives here.
@@ -43,7 +49,7 @@ export async function createProject(
   ownerId: string,
   input: CreateProjectInput,
 ) {
-  return db.$transaction(async (tx) => {
+  const project = await db.$transaction(async (tx) => {
     const project = await tx.project.create({
       data: {
         name: input.name,
@@ -68,6 +74,104 @@ export async function createProject(
 
     return project;
   });
+
+  return { ...project, role: 'OWNER' as const, isFavorite: false };
+}
+
+/**
+ * Create a project and all template-owned records atomically.
+ *
+ * Template task IDs only describe dependency edges. The database receives
+ * fresh server-generated IDs, and dependency rows are remapped after every
+ * new task ID is known. Legacy demo assignees are deliberately omitted
+ * because IDs such as `u1`/`u5` are not real project memberships.
+ */
+export async function createProjectFromTemplate(
+  workspaceId: string,
+  ownerId: string,
+  input: CreateProjectFromTemplateInput,
+) {
+  const template = PROJECT_TEMPLATES.find((candidate) => candidate.id === input.templateId);
+  if (!template) throw new AuthError('Project template not found', 404);
+
+  const project = await db.$transaction(async (tx) => {
+    const createdProject = await tx.project.create({
+      data: {
+        name: input.name,
+        description: input.description ?? template.description,
+        color: input.color ?? template.color ?? DEFAULT_PROJECT_COLOR,
+        startDate: new Date(input.startDate),
+        endDate: new Date(input.endDate),
+        ownerId,
+        workspaceId,
+      },
+      select: projectSelect,
+    });
+
+    await tx.projectMember.create({
+      data: { projectId: createdProject.id, userId: ownerId, role: 'OWNER' },
+    });
+
+    if (template.tags.length > 0) {
+      await tx.tag.createMany({
+        data: template.tags.map((tag) => ({
+          projectId: createdProject.id,
+          name: tag.name,
+          color: tag.color,
+        })),
+      });
+    }
+
+    if (template.customCols.length > 0) {
+      await tx.customField.createMany({
+        data: template.customCols.map((field) => ({
+          projectId: createdProject.id,
+          key: field.key,
+          label: field.label,
+          type: field.type,
+          options: field.options ?? undefined,
+        })),
+      });
+    }
+
+    const templateTasks = template.generateTasks(createdProject.id, input.startDate);
+    const taskIds = new Map(templateTasks.map((task) => [task.id, randomUUID()]));
+
+    if (templateTasks.length > 0) {
+      await tx.task.createMany({
+        data: templateTasks.map((task, index) => ({
+          id: taskIds.get(task.id)!,
+          projectId: createdProject.id,
+          name: task.name,
+          description: task.description ?? null,
+          status: task.status,
+          priority: task.priority,
+          startDate: task.start ? new Date(task.start) : null,
+          dueDate: task.dueDate ? new Date(task.dueDate) : null,
+          duration: task.duration,
+          progress: task.progress,
+          sortOrder: index,
+          isMilestone: task.milestone ?? false,
+          createdById: ownerId,
+          assigneeId: null,
+        })),
+      });
+
+      const dependencies = templateTasks.flatMap((task) =>
+        task.deps.map((dependencyId) => ({
+          taskId: taskIds.get(task.id)!,
+          dependsOnId: taskIds.get(dependencyId)!,
+        })),
+      );
+      if (dependencies.length > 0) {
+        await tx.taskDependency.createMany({ data: dependencies });
+      }
+    }
+
+    return createdProject;
+  });
+
+  return { ...project, role: 'OWNER' as const, isFavorite: false };
 }
 
 /**

@@ -5,7 +5,7 @@ import type { Project } from '@/features/flowdeck/model';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 
 /** Shape returned by GET /api/workspaces/:id/projects. */
-interface ApiProject {
+export interface ApiProject {
   id: string;
   name: string;
   description: string | null;
