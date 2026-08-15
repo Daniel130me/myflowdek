@@ -8,12 +8,12 @@ can be extended without coupling persistence to the UI.
 
 Use Node.js 20.9 or newer.
 
-1. Copy `.env.example` to `.env`.
+1. Copy `.env.example` to `.env.local`.
 2. Install the locked dependencies with `npm ci`.
 3. Create the local database with `npm run db:migrate`.
 4. Start the app with `npm run dev`.
 
-The app runs at `http://localhost:3000`. `GET /api/health` checks both the web service
+The app runs at `http://localhost:3004`. `GET /api/health` checks both the web service
 and its database connection.
 
 ## Backend API
@@ -57,4 +57,6 @@ services/                  Isolated backend service packages
 legacy/                    Preserved pre-cleanup runtime artifacts
 ```
 
-See `docs/ARCHITECTURE.md` for backend extension guidelines.
+See `docs/ARCHITECTURE.md` for the target architecture and backend extension
+guidelines. See `docs/PROJECT_REQUIREMENTS.md` for owner-supplied credentials,
+provider registrations, deployment decisions, and acceptance-test inputs.
