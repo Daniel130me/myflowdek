@@ -39,7 +39,7 @@ interface TaskDetailPanelProps {
   customCols?: CustomColumn[];
   onViewFile?: (fileId: string) => void;
   onRemoveFile?: (fileId: string) => void;
-  onAddFiles?: (files: FileItem[]) => void;
+  onAddFiles?: (files: File[]) => void;
   /* #30: Duplicate with options */
   onDuplicateTaskWithOptions?: (id: string, opts: { includeSubtasks: boolean; includeComments: boolean; includeAttachments: boolean }) => void;
   /* #32: Move to project */
@@ -164,15 +164,9 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
 
   /* Shared: files section — interactive with view, download, remove, upload */
   function handlePanelUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files || []);
+    const picked = Array.from(e.target.files ?? []);
     if (!picked.length || !onAddFiles) return;
-    const now = TODAY.toISOString().slice(0, 10);
-    const newFiles: FileItem[] = picked.map(f => ({
-      id: 'f' + Math.random().toString(36).slice(2, 8),
-      name: f.name, size: f.size, uploadedBy: currentUserId, uploadedAt: now,
-      linkedTaskId: task.id, url: URL.createObjectURL(f),
-    }));
-    onAddFiles(newFiles);
+    onAddFiles(picked);
     e.target.value = '';
   }
 

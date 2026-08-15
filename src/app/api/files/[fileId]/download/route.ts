@@ -6,6 +6,7 @@ import {
 } from '@/server/auth/authorization';
 import { db } from '@/server/db/client';
 import { generatePresignedDownloadUrl } from '@/server/files/r2.service';
+import { downloadFromConnection } from '@/server/storage/storage.service';
 
 /**
  * GET /api/files/:fileId/download
@@ -24,7 +25,16 @@ export async function GET(
 
     const file = await db.file.findUnique({
       where: { id: fileId },
-      select: { id: true, name: true, r2Key: true, projectId: true, mimeType: true },
+      select: {
+        id: true,
+        name: true,
+        r2Key: true,
+        projectId: true,
+        mimeType: true,
+        providerFileId: true,
+        providerPath: true,
+        storageConnection: true,
+      },
     });
 
     if (!file) {
@@ -34,6 +44,21 @@ export async function GET(
     // Verify the caller is a member of the file's project.
     await requireProjectCapability(user.id, file.projectId, 'VIEW_PROJECT');
 
+    if (file.storageConnection && file.providerFileId) {
+      const providerResponse = await downloadFromConnection(
+        file.storageConnection,
+        file.providerFileId,
+        file.providerPath,
+      );
+      if (!providerResponse.ok || !providerResponse.body) {
+        return NextResponse.json({ error: 'Storage provider could not download the file' }, { status: 502 });
+      }
+      return new Response(providerResponse.body, {
+        headers: { 'Content-Type': file.mimeType ?? 'application/octet-stream' },
+      });
+    }
+
+    // Compatibility-only fallback for files uploaded before connected storage.
     if (!file.r2Key) {
       return NextResponse.json(
         { error: 'File has no R2 key — it may be a legacy mock file' },

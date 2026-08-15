@@ -63,6 +63,15 @@ enum PlatformRole {
 }
 
 /**
+ * User-owned cloud storage providers supported by Flowdek.
+ */
+enum StorageProvider {
+  GOOGLE_DRIVE
+  ONEDRIVE
+  DROPBOX
+}
+
+/**
  * ------------------------------- user ---------------------------------
  */
 
@@ -108,6 +117,7 @@ model User {
   comments             Comment[]
   commentReactions     CommentReaction[]
   files                File[]
+  storageConnections   StorageConnection[]
   raidItems            RaidItem[]
   timeLogs             TimeLog[]
   activity             ActivityEntry[]
@@ -439,27 +449,56 @@ model CommentReaction {
 }
 
 model File {
-  id           String   @id @default(cuid())
-  projectId    String
-  taskId       String?
-  name         String
-  size         Int      @default(0)
-  mimeType     String?
+  id                  String             @id @default(cuid())
+  projectId           String
+  taskId              String?
+  name                String
+  size                Int                @default(0)
+  mimeType            String?
   /**
-   * R2 object key (the storage path, not a public URL).
+   * Deprecated legacy metadata. New uploads use the connected fields below.
    */
-  r2Key        String?
-  uploadedById String?
-  uploadedAt   DateTime @default(now())
-  url          String?
-  thumbnailUrl String?
-  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  task         Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  r2Key               String?
+  storageProvider     StorageProvider?
+  storageConnectionId String?
+  providerFileId      String?
+  providerPath        String?
+  providerWebUrl      String?
+  uploadedById        String?
+  uploadedAt          DateTime           @default(now())
+  url                 String?
+  thumbnailUrl        String?
+  project             Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task                Task?              @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  uploadedBy          User?              @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  storageConnection   StorageConnection? @relation(fields: [storageConnectionId], references: [id], onDelete: SetNull)
 
   @@index([projectId])
   @@index([taskId])
   @@index([uploadedById])
+  @@index([storageConnectionId])
+}
+
+/**
+ * OAuth credentials for a cloud drive connected by one Flowdek user.
+ */
+model StorageConnection {
+  id                    String          @id @default(cuid())
+  userId                String
+  provider              StorageProvider
+  providerAccountId     String?
+  providerEmail         String?
+  encryptedAccessToken  String
+  encryptedRefreshToken String?
+  accessTokenExpiresAt  DateTime?
+  scope                 String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  user                  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  files                 File[]
+
+  @@unique([userId, provider])
+  @@index([userId])
 }
 
 model RaidItem {

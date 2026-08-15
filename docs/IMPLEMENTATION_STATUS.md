@@ -73,10 +73,10 @@
 | Feature | Schema | API | Frontend | Production Verified |
 |---------|--------|-----|----------|-------------------|
 | File metadata CRUD | ✅ | ✅ | ✅ (read) | ✅ (tested) |
-| R2 presigned upload | ✅ | ✅ | ✅ (wired to R2 flow) | ❌ |
-| R2 presigned download | ✅ | ✅ | ❌ | ❌ |
-| R2 key validation | ✅ | ✅ | N/A | ✅ |
-| File deletion (R2 + DB) | ✅ | ✅ | ❌ | ❌ |
+| Per-user Google Drive / OneDrive / Dropbox OAuth | ✅ | ✅ | ✅ (settings) | OAuth state + encrypted tokens |
+| Connected-provider upload | ✅ | ✅ | ✅ | Provider adapters + 50 MB guard |
+| Authenticated provider download | ✅ | ✅ | ✅ | Legacy R2 download compatibility retained |
+| Provider file deletion + DB cleanup | ✅ | ✅ | ✅ | Uploader or project manager |
 
 ## Advanced Features
 

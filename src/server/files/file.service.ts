@@ -1,41 +1,8 @@
+import type { StorageProvider } from '@prisma/client';
 import { db } from '@/server/db/client';
-import { Prisma } from '@prisma/client';
 import { AuthError } from '@/server/auth/authorization';
 import { z } from 'zod';
-import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
-
-/** Prefix that all R2 keys must have for a given project. Used to
- *  validate that a confirm request isn't claiming another project's file. */
-function buildExpectedKeyPrefix(projectId: string): string {
-  return `projects/${projectId}/`;
-}
-
-/** Delete an R2 object by its key. Non-fatal — if the R2 delete fails,
- *  the DB record is still removed (the orphaned object can be cleaned up
- *  by a background job later). */
-async function deleteR2Object(r2Key: string): Promise<void> {
-  try {
-    const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-    if (!accessKeyId || !secretAccessKey) return; // R2 not configured (dev mode)
-
-    const endpoint = process.env.R2_ENDPOINT
-      ?? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`;
-    const bucket = process.env.R2_BUCKET_NAME ?? process.env.R2_BUCKET;
-    if (!bucket) return;
-
-    const client = new S3Client({
-      region: 'auto',
-      endpoint,
-      credentials: { accessKeyId, secretAccessKey },
-    });
-
-    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: r2Key }));
-  } catch (err) {
-    // Log but don't throw — DB record is still removed.
-    console.error('[files] R2 object deletion failed for', r2Key, err);
-  }
-}
+import { deleteFromConnection } from '@/server/storage/storage.service';
 
 export const createFileSchema = z.object({
   name: z.string().trim().min(1, 'File name is required').max(255),
@@ -47,19 +14,34 @@ export const createFileSchema = z.object({
 
 export type CreateFileInput = z.infer<typeof createFileSchema>;
 
+interface CreateProviderFileInput {
+  name: string;
+  size: number;
+  mimeType: string;
+  taskId?: string | null;
+  storageProvider: StorageProvider;
+  storageConnectionId: string;
+  providerFileId: string;
+  providerPath: string;
+  providerWebUrl?: string;
+}
+
 const fileSelect = {
   id: true,
   projectId: true,
   taskId: true,
   name: true,
   size: true,
+  mimeType: true,
+  storageProvider: true,
+  providerWebUrl: true,
   uploadedById: true,
   uploadedAt: true,
   url: true,
   thumbnailUrl: true,
 } as const;
 
-/** List files for a project. */
+/** List provider metadata only; file bytes stay in the user's cloud drive. */
 export function listFiles(projectId: string) {
   return db.file.findMany({
     where: { projectId },
@@ -68,12 +50,8 @@ export function listFiles(projectId: string) {
   });
 }
 
-/** Create a file record. uploadedById always from the session. */
-export async function createFile(
-  projectId: string,
-  uploadedById: string,
-  input: CreateFileInput,
-) {
+/** Create a legacy external-link record. Binary uploads use createProviderFile. */
+export async function createFile(projectId: string, uploadedById: string, input: CreateFileInput) {
   return db.file.create({
     data: {
       projectId,
@@ -88,32 +66,52 @@ export async function createFile(
   });
 }
 
-/** Delete a file — removes both the DB record AND the R2 object.
- *  Only the uploader or a project manager can delete.
- *  Strategy: delete DB record first (so the file is immediately gone from
- *  the UI), then delete the R2 object (non-fatal if it fails). */
+export function createProviderFile(
+  projectId: string,
+  uploadedById: string,
+  input: CreateProviderFileInput,
+) {
+  return db.file.create({
+    data: {
+      projectId,
+      uploadedById,
+      taskId: input.taskId ?? null,
+      name: input.name,
+      size: input.size,
+      mimeType: input.mimeType,
+      storageProvider: input.storageProvider,
+      storageConnectionId: input.storageConnectionId,
+      providerFileId: input.providerFileId,
+      providerPath: input.providerPath,
+      providerWebUrl: input.providerWebUrl ?? null,
+    },
+    select: { ...fileSelect, uploadedBy: { select: { id: true, name: true, avatarColor: true } } },
+  });
+}
+
+/** Delete from the user's provider first, then remove Flowdek metadata. */
 export async function deleteFile(fileId: string, userId: string, isManager: boolean) {
   const file = await db.file.findUnique({
     where: { id: fileId },
-    select: { uploadedById: true, r2Key: true },
+    select: {
+      uploadedById: true,
+      providerFileId: true,
+      providerPath: true,
+      storageConnection: true,
+    },
   });
   if (!file) throw new AuthError('File not found', 404);
-
   if (file.uploadedById !== userId && !isManager) {
     throw new AuthError('You can only delete files you uploaded', 403);
   }
 
-  // Delete the DB record first.
-  await db.file.delete({ where: { id: fileId } });
-
-  // Then delete the R2 object (if it exists). Non-fatal on failure.
-  if (file.r2Key) {
-    await deleteR2Object(file.r2Key);
+  if (file.storageConnection && file.providerFileId) {
+    await deleteFromConnection(file.storageConnection, file.providerFileId, file.providerPath);
   }
+  await db.file.delete({ where: { id: fileId } });
 }
 
-/** Validate that an r2Key belongs to the specified project.
- *  This prevents users from claiming R2 objects from other projects. */
+/** Compatibility guard used only by the legacy R2 confirmation endpoint. */
 export function validateR2KeyForProject(r2Key: string, projectId: string): boolean {
-  return r2Key.startsWith(buildExpectedKeyPrefix(projectId));
+  return r2Key.startsWith(`projects/${projectId}/`);
 }

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Building2, Users, Mail, Settings, Trash2, Crown, Shield, UserMinus, Send } from 'lucide-react';
+import { Building2, Users, Mail, Settings, Trash2, Crown, Shield, UserMinus, Send, HardDrive } from 'lucide-react';
 import { useWorkspaces } from '@/features/flowdeck/hooks/useWorkspaces';
 import { useAuth } from '@/features/flowdeck/components/auth';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
@@ -24,6 +24,20 @@ interface Invitation {
   createdAt: string;
 }
 
+type StorageProvider = 'GOOGLE_DRIVE' | 'ONEDRIVE' | 'DROPBOX';
+
+interface StorageConnection {
+  id: string;
+  provider: StorageProvider;
+  providerEmail: string | null;
+}
+
+const storageProviders = [
+  { provider: 'GOOGLE_DRIVE' as const, slug: 'google-drive', label: 'Google Drive' },
+  { provider: 'ONEDRIVE' as const, slug: 'onedrive', label: 'OneDrive' },
+  { provider: 'DROPBOX' as const, slug: 'dropbox', label: 'Dropbox' },
+];
+
 /**
  * Workspace Settings page — accessible from the sidebar.
  *
@@ -44,6 +58,7 @@ export default function WorkspaceSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [storageConnections, setStorageConnections] = useState<StorageConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('MEMBER');
@@ -57,12 +72,14 @@ export default function WorkspaceSettingsPage() {
     if (!workspaceId) return;
     setLoading(true);
     try {
-      const [memRes, invRes] = await Promise.all([
+      const [memRes, invRes, storageRes] = await Promise.all([
         fetch(`/api/workspaces/${workspaceId}/members`),
         fetch(`/api/workspaces/${workspaceId}/invitations`),
+        fetch('/api/storage/connections'),
       ]);
       if (memRes.ok) setMembers((await memRes.json()).members ?? []);
       if (invRes.ok) setInvitations((await invRes.json()).invitations ?? []);
+      if (storageRes.ok) setStorageConnections((await storageRes.json()).connections ?? []);
     } catch { /* network error */ }
     finally { setLoading(false); }
   }, [workspaceId]);
@@ -79,7 +96,6 @@ export default function WorkspaceSettingsPage() {
       });
       if (!res.ok) throw new Error();
       toast.success('Workspace renamed');
-      ws.workspaces; // trigger refresh
     } catch { toast.error('Failed to rename workspace'); }
     finally { setSaving(false); }
   };
@@ -143,6 +159,18 @@ export default function WorkspaceSettingsPage() {
     } catch { toast.error('Failed to delete workspace'); }
   };
 
+  const handleDisconnectStorage = async (slug: string) => {
+    try {
+      const response = await fetch('/api/storage/connections/' + slug, { method: 'DELETE' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? 'Could not disconnect storage');
+      toast.success('Storage disconnected');
+      fetchAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not disconnect storage');
+    }
+  };
+
   if (!workspaceId) {
     return <div style={{ padding: 40, color: COLORS.gray, fontFamily: FF }}>No workspace selected.</div>;
   }
@@ -175,6 +203,38 @@ export default function WorkspaceSettingsPage() {
             </button>
           </div>
           <div style={metaStyle}>Slug: {selectedWs?.slug}</div>
+        </Section>
+
+        {/* Personal connected storage */}
+        <Section title={'Your Connected Storage'} icon={HardDrive}>
+          <div style={{ fontSize: 12, color: COLORS.gray, lineHeight: 1.5, marginBottom: 12 }}>
+            Files you upload are saved in your own cloud account. Flowdek stores file metadata and encrypted access credentials, not file bytes.
+          </div>
+          {storageProviders.map(({ provider, slug, label }) => {
+            const connection = storageConnections.find((item) => item.provider === provider);
+            return (
+              <div key={provider} style={rowStyle}>
+                <div style={{ ...avatarStyle(connection ? '#16A34A' : '#9CA3AF'), borderRadius: 8 }}>
+                  <HardDrive size={15} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
+                  <div style={{ fontSize: 11, color: COLORS.gray }}>
+                    {connection ? connection.providerEmail ?? 'Connected' : 'Not connected'}
+                  </div>
+                </div>
+                {connection ? (
+                  <button onClick={() => handleDisconnectStorage(slug)} style={{ ...btnPrimary, background: '#6B7280' }}>
+                    Disconnect
+                  </button>
+                ) : (
+                  <a href={'/api/storage/connections/' + slug + '/authorize'} style={{ ...btnPrimary, textDecoration: 'none' }}>
+                    Connect
+                  </a>
+                )}
+              </div>
+            );
+          })}
         </Section>
 
         {/* Members */}

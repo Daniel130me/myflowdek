@@ -54,8 +54,12 @@ All endpoints (except auth routes and public invitation view) require a valid Ne
 | `/api/projects/:id/tags` | GET/POST | Member | List/create tags |
 | `/api/projects/:id/comments` | GET/POST | Member | List/create comments |
 | `/api/projects/:id/files` | GET/POST | Member | List files / create metadata |
-| `/api/projects/:id/files/presign` | POST | Member | Get R2 presigned upload URL |
-| `/api/projects/:id/files/confirm` | POST | Member | Confirm upload + store metadata |
+| `/api/storage/connections` | GET | Authenticated | List the user's connected storage accounts |
+| `/api/storage/connections/:provider/authorize` | GET | Authenticated | Start Google Drive, OneDrive, or Dropbox OAuth |
+| `/api/storage/connections/:provider` | DELETE | Authenticated | Disconnect an unused storage account |
+| `/api/projects/:id/files/upload` | POST | Member | Upload to the user's selected connected provider |
+| `/api/files/:id/download` | GET | Member | Stream a provider file through authenticated access |
+| `/api/files/:id` | DELETE | Uploader/Manager | Delete provider file and Flowdek metadata |
 | `/api/projects/:id/files/:budgetId` | GET/POST/DELETE | VIEW/MANAGE | Expenses + delete budget |
 | `/api/projects/:id/budgets` | GET/POST | VIEW/MANAGE | List/create budgets |
 | `/api/projects/:id/forms` | GET/POST | VIEW/MANAGE | List/create forms |
@@ -89,7 +93,7 @@ All endpoints (except auth routes and public invitation view) require a valid Ne
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/api/files/:fileId/download` | GET | Project member | Get presigned download URL |
+| `/api/files/:fileId/download` | GET | Project member | Stream from connected storage (legacy R2 fallback) |
 
 ## Invitations
 

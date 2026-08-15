@@ -1417,12 +1417,57 @@ export function useFlowDeckStore(): FlowDeckState {
     URL.revokeObjectURL(url);
   }, [tasksByProject, projects, resolveMemberName]);
 
-  const attachFilesToSelected = useCallback((projectId: string, fileList: FileList) => {
+  const attachFilesToSelected = useCallback(async (projectId: string, fileList: FileList) => {
     if (!selectedIds.size || !projectId) return;
     const targetId = [...selectedIds][0];
-    const now = TODAY.toISOString().slice(0, 10);
-    const newFiles = Array.from(fileList).map(f => ({ id: defaultIdGenerator.generate('f'), name: f.name, size: f.size, uploadedBy: userIdRef.current, uploadedAt: now, linkedTaskId: targetId, url: URL.createObjectURL(f) }));
-    setFilesByProject(prev => ({ ...prev, [projectId]: [...newFiles, ...(prev[projectId] || [])] }));
+    try {
+      const connectionResponse = await fetch('/api/storage/connections');
+      const connectionData = await connectionResponse.json() as {
+        connections?: { provider: 'GOOGLE_DRIVE' | 'ONEDRIVE' | 'DROPBOX' }[];
+      };
+      const provider = connectionData.connections?.[0]?.provider;
+      if (!connectionResponse.ok || !provider) {
+        toast.error('Connect a storage provider in Settings before attaching files');
+        return;
+      }
+      const providerSlug = provider === 'GOOGLE_DRIVE' ? 'google-drive'
+        : provider === 'ONEDRIVE' ? 'onedrive' : 'dropbox';
+      const uploadedFiles: FileItem[] = [];
+      for (const file of Array.from(fileList)) {
+        const form = new FormData();
+        form.set('provider', providerSlug);
+        form.set('taskId', targetId);
+        form.set('file', file);
+        const response = await fetch('/api/projects/' + projectId + '/files/upload', {
+          method: 'POST',
+          body: form,
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error ?? 'Upload failed');
+        if (data.file) {
+          uploadedFiles.push({
+            id: data.file.id,
+            projectId: data.file.projectId,
+            name: data.file.name,
+            size: data.file.size,
+            uploadedBy: data.file.uploadedById ?? '',
+            uploadedAt: data.file.uploadedAt,
+            linkedTaskId: data.file.taskId,
+            url: '/api/files/' + data.file.id + '/download',
+            thumbnailUrl: data.file.thumbnailUrl ?? undefined,
+          });
+        }
+      }
+      setFilesByProject((previous) => ({
+        ...previous,
+        [projectId]: [...uploadedFiles, ...(previous[projectId] ?? [])],
+      }));
+      toast.success('Files attached in connected storage');
+    } catch (error) {
+      toast.error('Failed to attach files', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   }, [selectedIds]);
 
   const addColumn = useCallback((projectId: string, def: CustomColumn) => {

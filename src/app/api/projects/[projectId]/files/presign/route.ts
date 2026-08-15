@@ -30,6 +30,12 @@ export async function POST(
   { params }: { params: Promise<{ projectId: string }> },
 ) {
   try {
+    if (process.env.ENABLE_LEGACY_R2_UPLOADS !== 'true') {
+      return NextResponse.json(
+        { error: 'R2 uploads are retired; connect Google Drive, OneDrive, or Dropbox' },
+        { status: 410 },
+      );
+    }
     const user = await requireAuthenticatedUser();
     const { projectId } = await params;
     await requireProjectCapability(user.id, projectId, 'UPLOAD_FILES');

@@ -14,6 +14,7 @@ interface ApiFile {
   uploadedAt: string;
   url: string | null;
   thumbnailUrl: string | null;
+  storageProvider: 'GOOGLE_DRIVE' | 'ONEDRIVE' | 'DROPBOX' | null;
 }
 
 /** Map the API file shape to the frontend FileItem type. */
@@ -26,7 +27,7 @@ function mapFile(api: ApiFile): FileItem {
     uploadedBy: api.uploadedById ?? '',
     uploadedAt: api.uploadedAt,
     linkedTaskId: api.taskId,
-    url: api.url ?? undefined,
+    url: api.storageProvider ? `/api/files/${api.id}/download` : api.url ?? undefined,
     thumbnailUrl: api.thumbnailUrl ?? undefined,
   };
 }

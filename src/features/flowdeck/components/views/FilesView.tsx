@@ -2,18 +2,13 @@
 
 import React, { useRef, useState, useCallback } from 'react';
 import { Upload, Trash2, Paperclip, Eye, Download } from 'lucide-react';
-import { COLORS, TODAY, fmtSize, fmtDate, extOf, type Task, type FileItem } from '@/features/flowdeck/model';
+import { COLORS, fmtSize, fmtDate, extOf, type Task, type FileItem } from '@/features/flowdeck/model';
 import { Avatar, SectionHeader, FileThumbnail, FF, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
-import { useAuth } from '../auth';
 
-export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }: { files: FileItem[]; tasks: Task[]; onAdd: (files: FileItem[]) => void; onRemove: (id: string) => void; onLink: (id: string, taskId: string | null) => void; onViewFile: (id: string) => void }) {
+export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }: { files: FileItem[]; tasks: Task[]; onAdd: (files: File[]) => void; onRemove: (id: string) => void; onLink: (id: string, taskId: string | null) => void; onViewFile: (id: string) => void }) {
   const { isMobile } = useViewport();
   const inputRef = useRef<HTMLInputElement>(null);
-  // Real authenticated user identity — replaces the hard-coded
-  // CURRENT_USER_ID fallback for newly-uploaded files.
-  const auth = useAuth();
-  const myUserId = auth.user?.id ?? '';
   // Resolve uploader ids to display names via the global MemberDirectory
   // (populated by `useProjectMembers` for every opened project). Falls back
   // to undefined for unknown ids — the label renders empty in that case.
@@ -25,15 +20,9 @@ export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }:
   const handleMouseLeave = useCallback(() => setHoveredId(null), []);
 
   function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files || []);
+    const picked = Array.from(e.target.files ?? []);
     if (!picked.length) return;
-    const now = TODAY.toISOString().slice(0, 10);
-    const newFiles: FileItem[] = picked.map(f => ({
-      id: 'f' + Math.random().toString(36).slice(2, 8),
-      name: f.name, size: f.size, uploadedBy: myUserId, uploadedAt: now,
-      linkedTaskId: null, url: URL.createObjectURL(f),
-    }));
-    onAdd(newFiles);
+    onAdd(picked);
     e.target.value = '';
   }
 

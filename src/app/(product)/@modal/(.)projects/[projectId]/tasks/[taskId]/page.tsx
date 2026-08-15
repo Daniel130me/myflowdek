@@ -8,6 +8,7 @@ import { useProjectMembers } from '@/features/flowdeck/components/ui';
 import { getTaskForProject } from '@/features/tasks/selectors/getTaskForProject';
 import { useCloseOverlay } from '@/shared/navigation/useCloseOverlay';
 import { routes } from '@/shared/navigation/routes';
+import { useConnectedFileMutations } from '@/features/flowdeck/hooks/useConnectedFileMutations';
 
 export default function InterceptedTaskDetailPage() {
   const params = useParams();
@@ -15,6 +16,7 @@ export default function InterceptedTaskDetailPage() {
   const projectId = typeof params.projectId === 'string' ? params.projectId : '';
   const taskId = typeof params.taskId === 'string' ? params.taskId : '';
   const state = useFlowDeck();
+  const fileMutations = useConnectedFileMutations(projectId);
   const close = useCloseOverlay(routes.projectTasks(projectId));
 
   const { members } = useProjectMembers(projectId);
@@ -71,8 +73,8 @@ export default function InterceptedTaskDetailPage() {
       currentUserId={state.currentUserId}
       customCols={projectCustomFields}
       onViewFile={fileId => router.push(routes.file(projectId, fileId))}
-      onRemoveFile={(fileId) => state.removeFile(projectId, fileId)}
-      onAddFiles={(files) => state.addFiles(projectId, files)}
+      onRemoveFile={fileMutations.removeFile}
+      onAddFiles={(files) => fileMutations.uploadFiles(files, taskId)}
       onDuplicateTaskWithOptions={(taskId, opts) => state.duplicateTaskWithOptions(projectId, taskId, opts)}
       onMoveToProject={(taskId, targetProjectId) => state.moveTaskToProject(projectId, taskId, targetProjectId)}
       members={members}
