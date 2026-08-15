@@ -125,7 +125,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: #F7F7F7;
   color: #1F2124;
-  overflow: hidden;
+  /* Standalone routes scroll at the document level. The authenticated
+     product shell keeps its intentional internal scroll container. */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Custom scrollbar - minimal & elegant */
