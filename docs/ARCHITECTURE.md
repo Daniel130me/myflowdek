@@ -189,8 +189,8 @@ direct endpoint because transaction pooling changes session behavior. Neon
 documents both modes in its
 [connection-pooling guide](https://neon.com/docs/connect/connection-pooling).
 
-Before connecting Neon, `prisma/schema.prisma` must declare
-`directUrl = env("DIRECT_URL")` on the PostgreSQL datasource.
+The Prisma datasource declares `directUrl = env("DIRECT_URL")`, keeping migration
+traffic off the pooled runtime connection.
 
 ### Environment layout
 

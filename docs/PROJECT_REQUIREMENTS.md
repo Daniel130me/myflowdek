@@ -2,19 +2,19 @@
 
 This checklist records what the product owner must provide or decide before each
 part of Flowdek can be completed and verified. Secret values belong in
-`.env.local` or the deployment platform's secret manager. Never paste them into
+`.env` or the deployment platform's secret manager. Never paste them into
 documentation or commit them to Git.
 
 ## Required now: Neon development database
 
 - [ ] Neon project created near the intended application-hosting region.
 - [ ] A `development` branch or database is available.
-- [ ] Pooled Neon connection string placed in `DATABASE_URL` in `.env.local`.
-- [ ] Direct Neon connection string placed in `DIRECT_URL` in `.env.local`.
+- [ ] Pooled Neon connection string placed in `DATABASE_URL` in `.env`.
+- [ ] Direct Neon connection string placed in `DIRECT_URL` in `.env`.
 - [ ] Confirmation that destructive demo seed data may run only in development.
 
 The pooled hostname contains `-pooler`; the direct hostname does not. Supply
-credentials through `.env.local`, not chat or Git.
+credentials through `.env`, not chat or Git.
 
 Once available, connect the development database with:
 

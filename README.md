@@ -8,7 +8,7 @@ can be extended without coupling persistence to the UI.
 
 Use Node.js 20.9 or newer.
 
-1. Copy `.env.example` to `.env.local`.
+1. Copy `.env.example` to `.env`.
 2. Install the locked dependencies with `npm ci`.
 3. Create the local database with `npm run db:migrate`.
 4. Start the app with `npm run dev`.
