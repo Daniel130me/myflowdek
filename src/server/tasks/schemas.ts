@@ -1,7 +1,17 @@
 import { z } from 'zod';
 import { TASK_NAME_MAX_LENGTH, TASK_NAME_MIN_LENGTH, TASK_DESCRIPTION_MAX_LENGTH, TASK_STATUSES, TASK_PRIORITIES } from './constants';
 
-const optionalDate = z.iso.datetime().optional().nullable();
+/**
+ * Task dates come from HTML date inputs as `YYYY-MM-DD`, while API clients
+ * may send a complete ISO timestamp. Normalize date-only values to UTC
+ * midnight so the service can persist one consistent DateTime representation.
+ */
+const taskDate = z.union([
+  z.iso.datetime(),
+  z.iso.date().transform((date) => `${date}T00:00:00.000Z`),
+]);
+
+const optionalDate = taskDate.optional().nullable();
 
 export const createTaskSchema = z.object({
   name: z.string().trim().min(TASK_NAME_MIN_LENGTH, 'Task name is required').max(TASK_NAME_MAX_LENGTH),

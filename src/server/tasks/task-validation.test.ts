@@ -34,6 +34,20 @@ describe('createTaskSchema', () => {
     assert.equal(res.success, true);
   });
 
+  test('accepts and normalizes dates from HTML date inputs', () => {
+    const res = createTaskSchema.safeParse({
+      name: 'Date-only task',
+      startDate: '2026-08-01',
+      dueDate: '2026-08-15',
+    });
+
+    assert.equal(res.success, true);
+    if (res.success) {
+      assert.equal(res.data.startDate, '2026-08-01T00:00:00.000Z');
+      assert.equal(res.data.dueDate, '2026-08-15T00:00:00.000Z');
+    }
+  });
+
   test('rejects an empty name', () => {
     const res = createTaskSchema.safeParse({ name: '' });
     assert.equal(res.success, false);
@@ -185,8 +199,16 @@ describe('updateTaskSchema', () => {
     }
   });
 
-  test('rejects an invalid ISO date for startDate on update', () => {
-    const res = updateTaskSchema.safeParse({ startDate: '2026-08-01' }); // date-only is NOT a datetime
+  test('accepts and normalizes a date-only startDate on update', () => {
+    const res = updateTaskSchema.safeParse({ startDate: '2026-08-01' });
+    assert.equal(res.success, true);
+    if (res.success) {
+      assert.equal(res.data.startDate, '2026-08-01T00:00:00.000Z');
+    }
+  });
+
+  test('rejects an impossible calendar date on update', () => {
+    const res = updateTaskSchema.safeParse({ startDate: '2026-02-30' });
     assert.equal(res.success, false);
   });
 
