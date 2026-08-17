@@ -1,4 +1,5 @@
 import { db } from '@/server/db/client';
+import type { Prisma } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { AuthError } from '@/server/auth/authorization';
 import { sendInvitationEmail } from '@/server/email/service';
@@ -18,6 +19,8 @@ export interface OnboardingInput {
 
 /** Invitation TTL in hours (same as the invitation system). */
 const ONBOARDING_INVITATION_TTL_HOURS = 24;
+const ONBOARDING_TRANSACTION_MAX_WAIT_MS = 10_000;
+const ONBOARDING_TRANSACTION_TIMEOUT_MS = 20_000;
 
 /**
  * Slugify a workspace name into a URL-safe slug.
@@ -33,9 +36,13 @@ function slugify(name: string): string {
 }
 
 /** Ensure slug uniqueness by appending a short suffix if needed. */
-async function uniqueSlug(base: string, userId: string): Promise<string> {
+async function uniqueSlug(
+  tx: Prisma.TransactionClient,
+  base: string,
+  userId: string,
+): Promise<string> {
   const candidate = `${base}-${userId.slice(-4)}`;
-  const existing = await db.workspace.findUnique({
+  const existing = await tx.workspace.findUnique({
     where: { slug: candidate },
     select: { id: true },
   });
@@ -66,7 +73,7 @@ function generateToken(): string {
  * All-or-nothing: if any step fails the transaction rolls back.
  */
 export async function completeOnboarding(userId: string, input: OnboardingInput) {
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     // 0. Idempotency check — fetch the user INSIDE the transaction.
     const user = await tx.user.findUniqueOrThrow({
       where: { id: userId },
@@ -80,7 +87,7 @@ export async function completeOnboarding(userId: string, input: OnboardingInput)
     // 1. Create the workspace (tenant).
     const workspaceName = input.projectName?.trim() || `${user.name ?? user.email}'s Workspace`;
     const baseSlug = slugify(workspaceName);
-    const slug = await uniqueSlug(baseSlug, userId);
+    const slug = await uniqueSlug(tx, baseSlug, userId);
 
     const workspace = await tx.workspace.create({
       data: { name: workspaceName, slug },
@@ -130,19 +137,21 @@ export async function completeOnboarding(userId: string, input: OnboardingInput)
         const cleanEmail = email.trim().toLowerCase();
         if (!cleanEmail) continue;
 
-        const token = generateToken();
-        await tx.invitation.create({
-          data: {
+        invitations.push({ email: cleanEmail, token: generateToken() });
+      }
+
+      if (invitations.length > 0) {
+        await tx.invitation.createMany({
+          data: invitations.map(({ email, token }) => ({
             workspaceId: workspace.id,
-            email: cleanEmail,
+            email,
             role: 'MEMBER',
             token,
             status: 'PENDING',
             invitedById: userId,
             expiresAt,
-          },
+          })),
         });
-        invitations.push({ email: cleanEmail, token });
       }
     }
 
@@ -152,17 +161,27 @@ export async function completeOnboarding(userId: string, input: OnboardingInput)
       data: { onboardedAt: new Date() },
     });
 
-    // Send invitation emails outside the transaction (non-blocking).
-    // The invitations are already persisted; email delivery is a side-effect.
-    const { APP_BASE_URL } = await import('@/server/email/constants');
-    for (const inv of invitations) {
-      sendInvitationEmail(inv.email, inv.token, workspace.name, APP_BASE_URL).catch((err) => {
-        console.error('[onboarding] invitation email failed for', inv.email, err);
-      });
-    }
-
-    return { workspace, project };
+    return { workspace, project, invitations };
+  }, {
+    maxWait: ONBOARDING_TRANSACTION_MAX_WAIT_MS,
+    timeout: ONBOARDING_TRANSACTION_TIMEOUT_MS,
   });
+
+  // Email is an external side effect and must never keep a database transaction
+  // open. The invitation rows are committed before delivery is attempted.
+  const { APP_BASE_URL } = await import('@/server/email/constants');
+  for (const invitation of result.invitations) {
+    sendInvitationEmail(
+      invitation.email,
+      invitation.token,
+      result.workspace.name,
+      APP_BASE_URL,
+    ).catch((error) => {
+      console.error('[onboarding] invitation email failed for', invitation.email, error);
+    });
+  }
+
+  return { workspace: result.workspace, project: result.project };
 }
 
 /** Type guard for parsing the onboarding request body. Throws on invalid shape. */
