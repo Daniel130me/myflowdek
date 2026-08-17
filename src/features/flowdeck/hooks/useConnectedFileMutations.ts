@@ -5,13 +5,11 @@ import { toast } from 'sonner';
 import { useProjectFiles } from './useProjectFiles';
 
 interface StorageConnection {
-  provider: 'GOOGLE_DRIVE' | 'ONEDRIVE' | 'DROPBOX';
+  provider: 'GOOGLE_DRIVE';
 }
 
 const providerSlug = {
   GOOGLE_DRIVE: 'google-drive',
-  ONEDRIVE: 'onedrive',
-  DROPBOX: 'dropbox',
 } as const;
 
 /** Provider-backed attachment mutations shared by full and intercepted task views. */

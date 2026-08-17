@@ -30,8 +30,8 @@ npm run dev
 - [ ] Public/local application URL.
 - [ ] Securely generated `NEXTAUTH_SECRET`.
 - [ ] `NEXTAUTH_URL` and `APP_BASE_URL` set to the same origin.
-- [ ] SendGrid key or another transactional-email provider decision.
-- [ ] Verified sender address and product email address.
+- [ ] Gmail address with 2-Step Verification enabled.
+- [ ] Gmail app password stored in GMAIL_SMTP_APP_PASSWORD.
 - [ ] Decision on whether email verification is required before login.
 
 The current local origin is `http://localhost:3004`.
@@ -51,18 +51,11 @@ The current local origin is `http://localhost:3004`.
 - [ ] Client ID and client secret.
 - [ ] Callback path: `/api/storage/oauth/google-drive/callback`.
 
-### Microsoft OneDrive
+### Deferred providers
 
-- [ ] Microsoft Entra application registration.
-- [ ] Supported account type: organization-only, or personal and work accounts.
-- [ ] Client ID and client secret.
-- [ ] Callback path: `/api/storage/oauth/onedrive/callback`.
-
-### Dropbox
-
-- [ ] Dropbox application with app-folder access.
-- [ ] Client ID and client secret.
-- [ ] Callback path: `/api/storage/oauth/dropbox/callback`.
+Microsoft OneDrive and Dropbox are intentionally disabled for the current release.
+Their provider boundary and database enum values remain available for later
+implementation, but they require no credentials now.
 
 Prefix every callback path with the exact origin. For example:
 
@@ -105,7 +98,7 @@ Production OAuth applications must use the production HTTPS origin.
 - [ ] Two ordinary users in the same workspace.
 - [ ] One workspace administrator.
 - [ ] One invited external collaborator.
-- [ ] Test Google Drive, OneDrive, and Dropbox accounts.
+- [ ] Test Google Drive account.
 - [ ] Representative projects, tasks, files, comments, budgets, and timesheets.
 - [ ] Expected results for main journeys and permission-denied cases.
 

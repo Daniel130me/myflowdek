@@ -24,7 +24,7 @@ interface Invitation {
   createdAt: string;
 }
 
-type StorageProvider = 'GOOGLE_DRIVE' | 'ONEDRIVE' | 'DROPBOX';
+type StorageProvider = 'GOOGLE_DRIVE';
 
 interface StorageConnection {
   id: string;
@@ -34,8 +34,6 @@ interface StorageConnection {
 
 const storageProviders = [
   { provider: 'GOOGLE_DRIVE' as const, slug: 'google-drive', label: 'Google Drive' },
-  { provider: 'ONEDRIVE' as const, slug: 'onedrive', label: 'OneDrive' },
-  { provider: 'DROPBOX' as const, slug: 'dropbox', label: 'Dropbox' },
 ];
 
 /**

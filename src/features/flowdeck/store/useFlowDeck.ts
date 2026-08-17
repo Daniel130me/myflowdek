@@ -1423,15 +1423,14 @@ export function useFlowDeckStore(): FlowDeckState {
     try {
       const connectionResponse = await fetch('/api/storage/connections');
       const connectionData = await connectionResponse.json() as {
-        connections?: { provider: 'GOOGLE_DRIVE' | 'ONEDRIVE' | 'DROPBOX' }[];
+        connections?: { provider: 'GOOGLE_DRIVE' }[];
       };
       const provider = connectionData.connections?.[0]?.provider;
       if (!connectionResponse.ok || !provider) {
         toast.error('Connect a storage provider in Settings before attaching files');
         return;
       }
-      const providerSlug = provider === 'GOOGLE_DRIVE' ? 'google-drive'
-        : provider === 'ONEDRIVE' ? 'onedrive' : 'dropbox';
+      const providerSlug = 'google-drive';
       const uploadedFiles: FileItem[] = [];
       for (const file of Array.from(fileList)) {
         const form = new FormData();

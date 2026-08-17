@@ -6,12 +6,12 @@
     "node": ">=20.9.0"
   },
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "next dev -p 3004",
     "build": "next build",
     "start": "next start -H 0.0.0.0",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/shared/navigation/routes.test.ts src/providers/FlowdekDataProvider.test.ts src/data/local-storage/storageAdapter.test.ts src/features/tasks/selectors/getTaskForProject.test.ts src/features/files/selectors/getFileForProject.test.ts src/features/flowdeck/corrections.test.ts src/server/auth/tests/auth.test.ts src/server/auth/tests/integration.test.ts src/server/auth/tests/integration-frontend.test.ts src/server/auth/capabilities.test.ts src/server/tasks/task-validation.test.ts src/server/tasks/task-relationships.branching.test.ts src/server/state/reconciliation-rollback.spec.test.ts src/app/api/cron/cron-security.test.ts src/server/tasks/pass4-integrity.test.ts src/server/tasks/final-correction.test.ts",
+    "test": "tsx --test src/shared/navigation/routes.test.ts src/providers/FlowdekDataProvider.test.ts src/data/local-storage/storageAdapter.test.ts src/features/tasks/selectors/getTaskForProject.test.ts src/features/files/selectors/getFileForProject.test.ts src/features/flowdeck/corrections.test.ts src/server/auth/tests/auth.test.ts src/server/auth/tests/integration.test.ts src/server/auth/tests/integration-frontend.test.ts src/server/auth/capabilities.test.ts src/server/email/smtp.test.ts src/server/storage/storage.service.test.ts src/server/tasks/task-validation.test.ts src/server/tasks/task-relationships.branching.test.ts src/server/state/reconciliation-rollback.spec.test.ts src/app/api/cron/cron-security.test.ts src/server/tasks/pass4-integrity.test.ts src/server/tasks/final-correction.test.ts",
     "check": "npm run lint && npm run typecheck && npm run test",
     "verify": "npm run db:generate && npm run check && npm run build",
     "db:generate": "prisma generate",
@@ -57,7 +57,6 @@
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@reactuses/core": "^6.0.5",
-    "@sendgrid/mail": "^8.1.6",
     "@tanstack/react-query": "^5.82.0",
     "@tanstack/react-table": "^8.21.3",
     "bcryptjs": "^3.0.3",
@@ -73,6 +72,7 @@
     "next-auth": "^4.24.11",
     "next-intl": "^4.3.4",
     "next-themes": "^0.4.6",
+    "nodemailer": "^7.0.13",
     "papaparse": "^5.5.4",
     "prisma": "^6.11.1",
     "react": "^19.0.0",
@@ -96,6 +96,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^3.0.0",
+    "@types/nodemailer": "^8.0.1",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",

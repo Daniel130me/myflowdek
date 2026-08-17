@@ -1,27 +1,21 @@
-import sgMail from '@sendgrid/mail';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { EMAIL_FROM, EMAIL_FROM_NAME } from './constants';
+import { gmailSmtpConfiguration } from './smtp';
 
 /**
- * Email service — sends transactional emails via Twilio SendGrid.
+ * Transactional email service backed by Gmail SMTP.
  *
- * The sender address (kosokodaniel@gmail.com) is configured in SendGrid as a
- * verified sender. The API key is read from the SENDGRID_API_KEY env var.
- *
- * If SendGrid is not configured (no API key), emails are logged to the
- * console instead of being sent — this keeps development flowing without
- * a SendGrid account.
+ * Callers depend only on sendEmail and the purpose-specific helpers below, so
+ * Gmail can later be replaced by Resend without changing authentication,
+ * invitation, or workspace services.
  */
+let transporter: Transporter | null = null;
 
-let initialized = false;
-
-/** Initialise the SendGrid client once (idempotent). */
-function ensureInitialized(): boolean {
-  if (initialized) return true;
-  const apiKey = process.env.SENDGRID_API_KEY;
-  if (!apiKey) return false;
-  sgMail.setApiKey(apiKey);
-  initialized = true;
-  return true;
+function gmailTransport(): Transporter | null {
+  const configuration = gmailSmtpConfiguration();
+  if (!configuration) return null;
+  transporter ??= nodemailer.createTransport(configuration);
+  return transporter;
 }
 
 export interface EmailParams {
@@ -34,57 +28,46 @@ export interface EmailParams {
 }
 
 /**
- * Send an email. Returns true on success, false on failure.
+ * Send an email. Returns true on success and false on provider failure.
  *
- * Behavior:
- *   - Production + no SendGrid API key: THROWS — transactional emails
- *     (password reset, verification, invitations) must not be silently
- *     logged in production, as that would leak security tokens into logs.
- *   - Development + no SendGrid API key: logs the email to the console
- *     (minus sensitive tokens — the full body is NOT logged; only To,
- *     From, Subject, and a truncated preview).
- *   - SendGrid configured: sends via the API.
- *
- * Never throws for SendGrid API errors (returns false) — but DOES throw
- * if production email is not configured, as that's a deployment blocker.
+ * Production fails closed when Gmail SMTP credentials are absent. Development
+ * logs only envelope metadata so verification and reset tokens never reach
+ * logs. SMTP delivery errors are reported without exposing credentials.
  */
 export async function sendEmail(params: EmailParams): Promise<boolean> {
-  const isConfigured = ensureInitialized();
+  const emailTransport = gmailTransport();
 
-  if (!isConfigured) {
+  if (!emailTransport) {
     if (process.env.NODE_ENV === 'production') {
-      // CRITICAL: do not log security tokens in production.
       throw new Error(
-        'Transactional email provider (SendGrid) is not configured. ' +
-        'Set SENDGRID_API_KEY in production environment.'
+        'Transactional email provider (Gmail SMTP) is not configured. '
+        + 'Set GMAIL_SMTP_USER and GMAIL_SMTP_APP_PASSWORD in production.',
       );
     }
-    // Development mode: log a safe preview (no full token-bearing body).
-    console.log('[email] (dev mode — SendGrid not configured)');
+
+    // Development fallback intentionally excludes token-bearing message bodies.
+    console.log('[email] (dev mode — Gmail SMTP not configured)');
     console.log('  To:      ', params.to);
-    console.log('  From:    ', `${EMAIL_FROM_NAME} <${EMAIL_FROM}>`);
+    console.log('  From:    ', EMAIL_FROM_NAME + ' <' + EMAIL_FROM + '>');
     console.log('  Subject: ', params.subject);
-    // Log only the first 80 chars — enough to identify the email type
-    // without exposing the full token link.
-    console.log('  Preview: ', params.text.slice(0, 80));
     return true;
   }
 
   try {
-    await sgMail.send({
+    await emailTransport.sendMail({
       to: params.to,
-      from: { email: EMAIL_FROM, name: EMAIL_FROM_NAME },
+      from: { address: EMAIL_FROM, name: EMAIL_FROM_NAME },
       subject: params.subject,
       text: params.text,
       html: params.html ?? params.text,
     });
     return true;
-  } catch (err) {
-    console.error('[email] SendGrid send failed:', err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown SMTP error';
+    console.error('[email] Gmail SMTP send failed:', message);
     return false;
   }
 }
-
 /**
  * Send a verification email with a token link.
  *

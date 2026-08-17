@@ -73,9 +73,9 @@
 | Feature | Schema | API | Frontend | Production Verified |
 |---------|--------|-----|----------|-------------------|
 | File metadata CRUD | ✅ | ✅ | ✅ (read) | ✅ (tested) |
-| Per-user Google Drive / OneDrive / Dropbox OAuth | ✅ | ✅ | ✅ (settings) | OAuth state + encrypted tokens |
-| Connected-provider upload | ✅ | ✅ | ✅ | Provider adapters + 50 MB guard |
-| Authenticated provider download | ✅ | ✅ | ✅ | Legacy R2 download compatibility retained |
+| Per-user Google Drive OAuth | ✅ | ✅ | ✅ (settings) | OAuth state + encrypted tokens; credentials required |
+| Google Drive upload | ✅ | ✅ | ✅ | Resumable upload + 50 MB guard; credentials required |
+| Authenticated Google Drive download | ✅ | ✅ | ✅ | Legacy R2 download compatibility retained |
 | Provider file deletion + DB cleanup | ✅ | ✅ | ✅ | Uploader or project manager |
 
 ## Advanced Features

@@ -1,3 +1,5 @@
+import { normalizeSenderAddress } from './smtp';
+
 /**
  * Email-related constants.
  *
@@ -5,9 +7,12 @@
  * TTLs.
  */
 
-/** The "from" address for all FlowDeck emails. Uses the configured Gmail
- *  sender via Twilio SendGrid. */
-export const EMAIL_FROM = process.env.EMAIL_FROM ?? 'kosokodaniel@gmail.com';
+/** Gmail normally requires the From address to match the authenticated user. */
+export const EMAIL_FROM = normalizeSenderAddress(
+  process.env.EMAIL_FROM
+    ?? process.env.GMAIL_SMTP_USER
+    ?? 'kosokodaniel@gmail.com',
+);
 
 /** The display name shown next to the sender address. */
 export const EMAIL_FROM_NAME = 'FlowDeck';

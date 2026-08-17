@@ -6,10 +6,10 @@ import { credentialKey, decryptCredential, encryptCredential } from './crypto';
 
 export type StorageProviderSlug = 'google-drive' | 'onedrive' | 'dropbox';
 
-const PROVIDERS: Record<StorageProviderSlug, StorageProvider> = {
+/** Providers currently enabled in the product. Keep the slug type broader so
+ * deferred providers can be re-enabled without changing stored metadata. */
+const PROVIDERS: Partial<Record<StorageProviderSlug, StorageProvider>> = {
   'google-drive': 'GOOGLE_DRIVE',
-  onedrive: 'ONEDRIVE',
-  dropbox: 'DROPBOX',
 };
 
 const SLUGS: Record<StorageProvider, StorageProviderSlug> = {
@@ -220,7 +220,7 @@ export async function completeAuthorization(
 
 export function listStorageConnections(userId: string) {
   return db.storageConnection.findMany({
-    where: { userId },
+    where: { userId, provider: 'GOOGLE_DRIVE' },
     select: { id: true, provider: true, providerEmail: true, createdAt: true, updatedAt: true },
     orderBy: { createdAt: 'asc' },
   });

@@ -12,14 +12,12 @@ import { COLORS, FONT_FAMILY as FF } from '@/features/flowdeck/model';
 import { toast } from 'sonner';
 
 interface StorageConnection {
-  provider: 'GOOGLE_DRIVE' | 'ONEDRIVE' | 'DROPBOX';
+  provider: 'GOOGLE_DRIVE';
   providerEmail: string | null;
 }
 
 const providerDetails = {
   GOOGLE_DRIVE: { slug: 'google-drive', label: 'Google Drive' },
-  ONEDRIVE: { slug: 'onedrive', label: 'OneDrive' },
-  DROPBOX: { slug: 'dropbox', label: 'Dropbox' },
 } as const;
 
 /** Project files backed exclusively by the uploader's connected cloud account. */

@@ -23,8 +23,9 @@ forms, automations, and activity records.
 | Database access | Prisma ORM with repositories for shared queries | Implemented |
 | Runtime connection | Neon pooled connection | Pending environment setup |
 | Migration connection | Neon direct connection | Pending Prisma configuration |
-| File contents | Each user's Google Drive, OneDrive, or Dropbox | Implemented, pending credentials |
+| File contents | Each user's Google Drive | Implemented, pending credentials |
 | File metadata | PostgreSQL | Implemented |
+| Transactional email | Gmail SMTP (temporary; Resend planned) | Implemented, pending credentials |
 | Realtime collaboration | Separate authenticated Socket.IO service | Prototype |
 | Background work | Separate durable worker and queue | Planned |
 | Cache, queue, presence | Redis-compatible service | Planned |
@@ -35,7 +36,7 @@ forms, automations, and activity records.
 flowchart LR
     Browser["Browser client"] --> Web["Next.js application"]
     Web --> Neon["Neon PostgreSQL"]
-    Web --> Providers["Google Drive / OneDrive / Dropbox"]
+    Web --> Providers["Google Drive"]
     Web --> Email["Transactional email provider"]
     Web --> AI["AI provider"]
     Browser -. "WebSocket" .-> Realtime["Realtime service"]
@@ -83,15 +84,26 @@ provider object owned by the user's connected storage account.
 
 ### User-connected storage
 
-Every user connects Google Drive, Microsoft OneDrive, or Dropbox. Flowdek stores
-encrypted OAuth credentials and provider object identifiers in PostgreSQL. File
-contents remain in the user's cloud account.
+Every user connects Google Drive. Flowdek stores encrypted OAuth credentials and
+provider object identifiers in PostgreSQL, while file contents remain in the
+user's cloud account. The active integration uses Google's narrow drive.file
+scope, so Flowdek can access files it creates without requesting broad Drive
+access. OneDrive and Dropbox remain deferred behind the provider boundary.
 
 A provider failure must fail only the affected file operation. It must not make
 projects, tasks, or authentication unavailable.
 
 Legacy R2 support is read-only compatibility for old records.
 `ENABLE_LEGACY_R2_UPLOADS` remains disabled and new files must never use R2.
+
+### Transactional email
+
+The email domain uses Gmail SMTP with a Google app password for the current
+development stage. Authentication, invitation, and workspace code call the
+provider-neutral sendEmail service; replacing Gmail with Resend later is
+therefore isolated to the transport boundary. Production fails closed when SMTP
+credentials are missing, and development logs metadata without token-bearing
+message bodies.
 
 ### Realtime service
 
