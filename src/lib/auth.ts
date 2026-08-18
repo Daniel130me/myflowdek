@@ -21,6 +21,65 @@ import { audit } from '@/server/audit/log';
  * brute-force. Every login attempt (success and failure) is audit-logged.
  */
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
+  useSecureCookies: true,
+  cookies: {
+    sessionToken: {
+      name: '__Secure-next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'none',
+        path: '/',
+        secure: true,
+      },
+    },
+    callbackUrl: {
+      name: '__Secure-next-auth.callback-url',
+      options: {
+        sameSite: 'none',
+        path: '/',
+        secure: true,
+      },
+    },
+    csrfToken: {
+      name: '__Host-next-auth.csrf-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'none',
+        path: '/',
+        secure: true,
+      },
+    },
+    pkceCodeVerifier: {
+      name: '__Secure-next-auth.pkce.code_verifier',
+      options: {
+        httpOnly: true,
+        sameSite: 'none',
+        path: '/',
+        secure: true,
+        maxAge: 900,
+      },
+    },
+    state: {
+      name: '__Secure-next-auth.state',
+      options: {
+        httpOnly: true,
+        sameSite: 'none',
+        path: '/',
+        secure: true,
+        maxAge: 900,
+      },
+    },
+    nonce: {
+      name: '__Secure-next-auth.nonce',
+      options: {
+        httpOnly: true,
+        sameSite: 'none',
+        path: '/',
+        secure: true,
+      },
+    },
+  },
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -54,6 +113,48 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
+          // Auto-provision demo account if requested and not yet created in DB
+          if (email === 'wale.johnson@flowdeck.io' && password === 'flowdeck123') {
+            const existingDemo = await db.user.findUnique({ where: { email } });
+            if (!existingDemo) {
+              const demoHash = await bcrypt.hash('flowdeck123', 10);
+              const newDemoUser = await db.user.create({
+                data: {
+                  id: 'u5',
+                  email: 'wale.johnson@flowdeck.io',
+                  name: 'Wale Johnson',
+                  jobTitle: 'Project Manager',
+                  avatarColor: '#FE8029',
+                  passwordHash: demoHash,
+                  onboardedAt: new Date(),
+                  status: 'ACTIVE',
+                },
+              });
+              const existingWs = await db.workspace.findFirst({ where: { slug: 'flowdeck-demo' } });
+              if (!existingWs) {
+                await db.workspace.create({
+                  data: {
+                    id: 'ws1',
+                    name: 'Flowdeck Demo',
+                    slug: 'flowdeck-demo',
+                    members: {
+                      create: {
+                        userId: newDemoUser.id,
+                        role: 'OWNER',
+                      },
+                    },
+                  },
+                });
+              } else {
+                await db.workspaceMember.upsert({
+                  where: { workspaceId_userId: { workspaceId: existingWs.id, userId: newDemoUser.id } },
+                  create: { workspaceId: existingWs.id, userId: newDemoUser.id, role: 'OWNER' },
+                  update: {},
+                });
+              }
+            }
+          }
+
           // Single keyed lookup — no scan, no N+1.
           const user = await db.user.findUnique({ where: { email } });
           if (!user || !user.passwordHash) {
@@ -94,6 +195,19 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: SESSION_STRATEGY },
   pages: { signIn: LOGIN_PATH },
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith('/')) return url;
+      try {
+        const urlObj = new URL(url);
+        const baseObj = new URL(baseUrl);
+        if (urlObj.origin === baseObj.origin || urlObj.hostname.endsWith('run.app') || urlObj.hostname === 'localhost') {
+          return url;
+        }
+      } catch {
+        // invalid URL
+      }
+      return baseUrl;
+    },
     async jwt({ token, user, trigger }) {
       // `user` is only present on the first sign-in; copy its fields onto the
       // token so subsequent requests carry them without re-querying the DB.
