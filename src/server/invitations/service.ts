@@ -5,6 +5,10 @@ import { AuthError } from '@/server/auth/authorization';
 import { audit } from '@/server/audit/log';
 import { INVITATION_TTL_HOURS, INVITATION_TOKEN_LENGTH } from './constants';
 import type { CreateInvitationInput } from './schemas';
+import { sendInvitationEmail } from '@/server/email/service';
+import { APP_BASE_URL } from '@/server/email/constants';
+
+type InvitationEmailSender = typeof sendInvitationEmail;
 
 /** Hash a token using SHA-256 for secure storage.
  *  The raw token is emailed to the user; only the hash is stored in the DB. */
@@ -65,6 +69,7 @@ export async function createInvitation(
   workspaceId: string,
   invitedById: string,
   input: CreateInvitationInput,
+  emailSender: InvitationEmailSender = sendInvitationEmail,
 ) {
   // Check if the email is already a member.
   const existingMember = await db.workspaceMember.findFirst({
@@ -113,27 +118,43 @@ export async function createInvitation(
 
   // Send the invitation email with the raw token (the hash is stored in DB,
   // the raw token is only in the email — never in the API response).
-  const { sendInvitationEmail } = await import('@/server/email/service');
-  const { APP_BASE_URL } = await import('@/server/email/constants');
-  const workspace = await db.workspace.findUniqueOrThrow({
-    where: { id: workspaceId },
-    select: { name: true },
-  });
-  await sendInvitationEmail(input.email, rawToken, workspace.name, APP_BASE_URL).catch((err) => {
-    console.error('[invitations] email failed for', input.email, err);
-  });
+  let emailSent = false;
+  try {
+    emailSent = await emailSender(
+      input.email,
+      rawToken,
+      invitation.workspace.name,
+      APP_BASE_URL,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown email error';
+    console.error('[invitations] email delivery failed:', message);
+  }
+
+  if (!emailSent) {
+    // The raw token is intentionally not persisted. Revoke the unusable row so
+    // the workspace owner can retry immediately after correcting email setup.
+    await db.invitation.updateMany({
+      where: { id: invitation.id, status: 'PENDING' },
+      data: { status: 'REVOKED' },
+    });
+    throw new AuthError(
+      'Invitation email could not be sent. Check the email configuration and try again.',
+      502,
+    );
+  }
 
   // Return the invitation WITHOUT the raw token — the caller never sees it.
   return invitation;
 }
 
 /**
- * List all invitations for a workspace (any status). Single query with the
- * workspace name joined — no N+1.
+ * List pending invitations for workspace management. Historical statuses stay
+ * in PostgreSQL for audit but are not sent to the settings page.
  */
 export async function listInvitations(workspaceId: string) {
   return db.invitation.findMany({
-    where: { workspaceId },
+    where: { workspaceId, status: 'PENDING' },
     select: invitationSelect,
     orderBy: { createdAt: 'desc' },
   });
@@ -144,6 +165,15 @@ export async function listInvitations(workspaceId: string) {
  * The caller must be a workspace manager (OWNER/ADMIN) — verified in the route.
  */
 export async function revokeInvitation(workspaceId: string, invitationId: string) {
+  // The common success path is one atomic query, which also prevents two
+  // concurrent revoke requests from both reporting success.
+  const revoked = await db.invitation.updateMany({
+    where: { id: invitationId, workspaceId, status: 'PENDING' },
+    data: { status: 'REVOKED' },
+  });
+  if (revoked.count === 1) return;
+
+  // Only query again on failure so callers still receive a useful 404 or 409.
   const invitation = await db.invitation.findUnique({
     where: { id: invitationId },
     select: { status: true, workspaceId: true },
@@ -151,15 +181,7 @@ export async function revokeInvitation(workspaceId: string, invitationId: string
   if (!invitation || invitation.workspaceId !== workspaceId) {
     throw new AuthError('Invitation not found', 404);
   }
-  if (invitation.status !== 'PENDING') {
-    throw new AuthError('Only pending invitations can be revoked', 409);
-  }
-
-  // Mark as REVOKED (keep the row for audit) rather than hard-deleting.
-  await db.invitation.update({
-    where: { id: invitationId },
-    data: { status: 'REVOKED' },
-  });
+  throw new AuthError('Only pending invitations can be revoked', 409);
 }
 
 /**

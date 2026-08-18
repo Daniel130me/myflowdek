@@ -17,7 +17,7 @@ describe('gmailSmtpConfiguration', () => {
     assert.equal(gmailSmtpConfiguration({}), null);
   });
 
-  test('builds the secure Gmail SMTP configuration', () => {
+  test('defaults to Gmail STARTTLS on port 587', () => {
     const configuration = gmailSmtpConfiguration({
       GMAIL_SMTP_USER: ' sender@example.com ',
       GMAIL_SMTP_APP_PASSWORD: 'abcd efgh ijkl mnop',
@@ -25,13 +25,35 @@ describe('gmailSmtpConfiguration', () => {
 
     assert.deepEqual(configuration, {
       host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
+      port: 587,
+      secure: false,
       auth: {
         user: 'sender@example.com',
         pass: 'abcdefghijklmnop',
       },
     });
+  });
+
+  test('supports Gmail implicit TLS on port 465', () => {
+    const configuration = gmailSmtpConfiguration({
+      GMAIL_SMTP_USER: 'sender@example.com',
+      GMAIL_SMTP_APP_PASSWORD: 'abcdefghijklmnop',
+      GMAIL_SMTP_PORT: '465',
+    });
+
+    assert.equal(configuration?.port, 465);
+    assert.equal(configuration?.secure, true);
+  });
+
+  test('rejects unsupported SMTP ports', () => {
+    assert.throws(
+      () => gmailSmtpConfiguration({
+        GMAIL_SMTP_USER: 'sender@example.com',
+        GMAIL_SMTP_APP_PASSWORD: 'abcdefghijklmnop',
+        GMAIL_SMTP_PORT: '25',
+      }),
+      /must be either 465 or 587/,
+    );
   });
 
   test('rejects a partial Gmail SMTP configuration', () => {

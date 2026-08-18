@@ -44,7 +44,11 @@ Google account password.
 
    GMAIL_SMTP_USER=your-address@gmail.com
    GMAIL_SMTP_APP_PASSWORD=your-16-character-app-password
+   GMAIL_SMTP_PORT=587
    EMAIL_FROM=your-address@gmail.com
+
+Port 587 with STARTTLS is the default and is recommended for networks that
+block port 465. Set `GMAIL_SMTP_PORT=465` only when implicit TLS is required.
 
 4. Restart the Next.js development server after changing environment variables.
 5. Test registration verification, password reset, and workspace invitation

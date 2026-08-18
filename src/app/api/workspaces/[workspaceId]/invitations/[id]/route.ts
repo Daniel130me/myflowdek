@@ -5,7 +5,6 @@ import {
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { revokeInvitation } from '@/server/invitations/service';
-import { db } from '@/server/db/client';
 
 /**
  * DELETE /api/workspaces/:workspaceId/invitations/:id
@@ -25,17 +24,6 @@ export async function DELETE(
     const { workspaceId, id } = await params;
 
     await requireWorkspaceCapability(user.id, workspaceId, 'INVITE_MEMBERS');
-
-    // IDOR guard: verify the invitation belongs to this workspace before
-    // revoking. (revokeInvitation also checks internally, but verifying at
-    // the route level gives us a clean 404 without leaking existence.)
-    const invitation = await db.invitation.findUnique({
-      where: { id },
-      select: { workspaceId: true },
-    });
-    if (!invitation || invitation.workspaceId !== workspaceId) {
-      return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
-    }
 
     await revokeInvitation(workspaceId, id);
     return NextResponse.json({ ok: true });

@@ -13,7 +13,7 @@ import { createInvitationSchema } from '@/server/invitations/schemas';
 /**
  * GET /api/workspaces/:workspaceId/invitations
  *
- * List all invitations for a workspace. OWNER/ADMIN only.
+ * List pending invitations for a workspace. OWNER/ADMIN only.
  */
 export async function GET(
   _request: Request,
@@ -35,9 +35,8 @@ export async function GET(
 /**
  * POST /api/workspaces/:workspaceId/invitations
  *
- * Create a new pending invitation. OWNER/ADMIN only. The invitation email
- * is sent to the recipient with a token URL (email sending is a TODO; the
- * token is returned in the response for now).
+ * Create a new pending invitation and deliver its token by email.
+ * OWNER/ADMIN only; raw tokens are never returned by the API.
  */
 export async function POST(
   request: Request,

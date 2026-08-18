@@ -61,6 +61,7 @@ export default function WorkspaceSettingsPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('MEMBER');
   const [inviting, setInviting] = useState(false);
+  const [revokingInvitationId, setRevokingInvitationId] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedWs) setName(selectedWs.name);
@@ -117,13 +118,28 @@ export default function WorkspaceSettingsPage() {
     finally { setInviting(false); }
   };
 
-  const handleRevokeInvitation = async (invId: string) => {
+  const handleRevokeInvitation = async (invitationId: string) => {
     if (!workspaceId) return;
+    setRevokingInvitationId(invitationId);
     try {
-      await fetch(`/api/workspaces/${workspaceId}/invitations/${invId}`, { method: 'DELETE' });
-      toast.success('Invitation revoked');
-      fetchAll();
-    } catch { toast.error('Failed to revoke invitation'); }
+      const response = await fetch(
+        '/api/workspaces/' + workspaceId + '/invitations/' + invitationId,
+        { method: 'DELETE' },
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error ?? 'Failed to revoke invitation');
+      }
+
+      setInvitations((current) => current.filter(({ id }) => id !== invitationId));
+      toast.success('Invitation removed. You can invite this email again.');
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to revoke invitation',
+      );
+    } finally {
+      setRevokingInvitationId(null);
+    }
   };
 
   const handleRemoveMember = async (userId: string) => {
@@ -174,6 +190,7 @@ export default function WorkspaceSettingsPage() {
   }
 
   const isOwner = selectedWs?.role === 'OWNER';
+  const canManageInvitations = isOwner || selectedWs?.role === 'ADMIN';
 
   return (
     <div style={{ minHeight: '100%', background: '#F7F7F7', fontFamily: FF, color: COLORS.ink, padding: '32px 28px' }}>
@@ -280,7 +297,7 @@ export default function WorkspaceSettingsPage() {
         {/* Invitations */}
         <Section title={`Pending Invitations (${invitations.filter(i => i.status === 'PENDING').length})`} icon={Mail}>
           {/* Invite form */}
-          {isOwner && (
+          {canManageInvitations && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
               <input
                 value={inviteEmail}
@@ -306,8 +323,17 @@ export default function WorkspaceSettingsPage() {
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{inv.email}</div>
                 <div style={{ fontSize: 11, color: COLORS.gray }}>Role: {inv.role} · Expires: {new Date(inv.expiresAt).toLocaleDateString()}</div>
               </div>
-              {isOwner && (
-                <button onClick={() => handleRevokeInvitation(inv.id)} style={iconBtnStyle} title="Revoke">
+              {canManageInvitations && (
+                <button
+                  onClick={() => handleRevokeInvitation(inv.id)}
+                  disabled={revokingInvitationId === inv.id}
+                  style={{
+                    ...iconBtnStyle,
+                    opacity: revokingInvitationId === inv.id ? 0.5 : 1,
+                  }}
+                  title="Remove pending invitation"
+                  aria-label={'Remove invitation for ' + inv.email}
+                >
                   <Trash2 size={14} color="#DC2626" />
                 </button>
               )}
