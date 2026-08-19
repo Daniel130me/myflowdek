@@ -37,10 +37,54 @@ function requestBody(bytes: Buffer): ArrayBuffer {
   return copy.buffer;
 }
 
-function baseUrl(): string {
-  const value = process.env.APP_BASE_URL ?? process.env.NEXTAUTH_URL;
-  if (!value) throw new Error('APP_BASE_URL or NEXTAUTH_URL is not configured');
-  return value.replace(/\/$/, '');
+export function baseUrl(req?: Request): string {
+  const configured =
+    process.env.APP_BASE_URL ??
+    process.env.NEXTAUTH_URL;
+
+  if (configured) {
+    const url = configured.replace(/\/+$/, '');
+
+    if (
+      process.env.NODE_ENV === 'production' &&
+      (url.includes('localhost') || url.includes('127.0.0.1'))
+    ) {
+      throw new Error(
+        'Production APP_BASE_URL/NEXTAUTH_URL cannot use localhost'
+      );
+    }
+
+    return url;
+  }
+
+  if (req) {
+    const host =
+      req.headers.get('x-forwarded-host') ||
+      req.headers.get('host');
+
+    const proto =
+      req.headers.get('x-forwarded-proto') ||
+      (host && !host.includes('localhost') ? 'https' : 'http');
+
+    if (host) {
+      const url = `${proto}://${host}`.replace(/\/+$/, '');
+
+      if (
+        process.env.NODE_ENV === 'production' &&
+        (url.includes('localhost') || url.includes('127.0.0.1'))
+      ) {
+        throw new Error(
+          'Production APP_BASE_URL/NEXTAUTH_URL cannot use localhost'
+        );
+      }
+
+      return url;
+    }
+  }
+
+  throw new Error(
+    'APP_BASE_URL or NEXTAUTH_URL is not configured'
+  );
 }
 
 export function parseStorageProvider(slug: string): StorageProvider {
@@ -62,8 +106,8 @@ function clientCredentials(provider: StorageProvider) {
   return { clientId, clientSecret };
 }
 
-function redirectUri(provider: StorageProvider): string {
-  return `${baseUrl()}/api/storage/oauth/${providerSlug(provider)}/callback`;
+export function redirectUri(provider: StorageProvider, req?: Request): string {
+  return `${baseUrl(req)}/api/storage/oauth/${providerSlug(provider)}/callback`;
 }
 
 function signState(payload: string): string {
@@ -96,14 +140,14 @@ function verifyOAuthState(state: string, userId: string, provider: StorageProvid
   }
 }
 
-export function authorizationUrl(provider: StorageProvider, userId: string): string {
+export function authorizationUrl(provider: StorageProvider, userId: string, req?: Request): string {
   const { clientId } = clientCredentials(provider);
   const state = createOAuthState(userId, provider);
   if (provider === 'GOOGLE_DRIVE') {
     const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     url.search = new URLSearchParams({
       client_id: clientId,
-      redirect_uri: redirectUri(provider),
+      redirect_uri: redirectUri(provider, req),
       response_type: 'code',
       scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
       access_type: 'offline',
@@ -116,7 +160,7 @@ export function authorizationUrl(provider: StorageProvider, userId: string): str
     const url = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
     url.search = new URLSearchParams({
       client_id: clientId,
-      redirect_uri: redirectUri(provider),
+      redirect_uri: redirectUri(provider, req),
       response_type: 'code',
       response_mode: 'query',
       scope: 'offline_access Files.ReadWrite.AppFolder User.Read',
@@ -127,7 +171,7 @@ export function authorizationUrl(provider: StorageProvider, userId: string): str
   const url = new URL('https://www.dropbox.com/oauth2/authorize');
   url.search = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: redirectUri(provider),
+    redirect_uri: redirectUri(provider, req),
     response_type: 'code',
     token_access_type: 'offline',
     state,
@@ -185,12 +229,13 @@ export async function completeAuthorization(
   userId: string,
   code: string,
   state: string,
+  req?: Request,
 ) {
   verifyOAuthState(state, userId, provider);
   const tokens = await requestTokens(provider, {
     grant_type: 'authorization_code',
     code,
-    redirect_uri: redirectUri(provider),
+    redirect_uri: redirectUri(provider, req),
   });
   const identity = await providerIdentity(provider, tokens.access_token);
   return db.storageConnection.upsert({

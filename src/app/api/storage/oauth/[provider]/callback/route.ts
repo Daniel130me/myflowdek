@@ -13,7 +13,7 @@ export async function GET(
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
     if (!code || !state) return NextResponse.json({ error: 'Missing OAuth response' }, { status: 400 });
-    await completeAuthorization(parseStorageProvider(slug), user.id, code, state);
+    await completeAuthorization(parseStorageProvider(slug), user.id, code, state, request);
     const destination = new URL('/settings?storage=connected', url.origin);
     return NextResponse.redirect(destination);
   } catch (error) {
