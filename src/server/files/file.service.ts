@@ -3,6 +3,7 @@ import { db } from '@/server/db/client';
 import { AuthError } from '@/server/auth/authorization';
 import { z } from 'zod';
 import { deleteFromConnection } from '@/server/storage/storage.service';
+import { getFileProviderAdapter } from '@/server/storage/providers';
 
 export const createFileSchema = z.object({
   name: z.string().trim().min(1, 'File name is required').max(255),
@@ -89,7 +90,69 @@ export function createProviderFile(
   });
 }
 
-/** Delete from the user's provider first, then remove Flowdek metadata. */
+export async function attachConnectedFile(
+  projectId: string,
+  userId: string,
+  input: { provider: StorageProvider; providerFileId: string; taskId?: string | null },
+) {
+  const connection = await db.storageConnection.findUnique({
+    where: { userId_provider: { userId, provider: input.provider } },
+  });
+  if (!connection) {
+    throw new AuthError(`Please connect your ${input.provider} account in Settings before attaching files.`, 409);
+  }
+
+  const adapter = getFileProviderAdapter(input.provider);
+  const metadata = await adapter.getFileMetadata(connection, input.providerFileId);
+
+  return db.file.create({
+    data: {
+      projectId,
+      uploadedById: userId,
+      taskId: input.taskId ?? null,
+      name: metadata.name,
+      size: metadata.size,
+      mimeType: metadata.mimeType,
+      storageProvider: input.provider,
+      storageConnectionId: connection.id,
+      providerFileId: metadata.id,
+      providerWebUrl: metadata.webUrl ?? null,
+      thumbnailUrl: metadata.thumbnailUrl ?? null,
+      url: metadata.webUrl ?? null,
+    },
+    select: { ...fileSelect, uploadedBy: { select: { id: true, name: true, avatarColor: true } } },
+  });
+}
+
+export async function shareFileWithTeammate(
+  fileId: string,
+  callerUserId: string,
+  targetEmail: string,
+  role: 'reader' | 'writer' = 'reader',
+) {
+  const file = await db.file.findUnique({
+    where: { id: fileId },
+    include: { storageConnection: true },
+  });
+  if (!file) throw new AuthError('File not found', 404);
+  if (!file.storageProvider || !file.providerFileId) {
+    throw new AuthError('Sharing is only supported for cloud provider files', 400);
+  }
+
+  // Find caller's connection or file owner's connection
+  const connection = file.storageConnection ?? await db.storageConnection.findUnique({
+    where: { userId_provider: { userId: callerUserId, provider: file.storageProvider } },
+  });
+
+  if (!connection) {
+    throw new AuthError('No storage connection available to apply provider permissions', 409);
+  }
+
+  const adapter = getFileProviderAdapter(file.storageProvider);
+  await adapter.shareFile(connection, file.providerFileId, { email: targetEmail, role });
+}
+
+/** Delete Flowdek file reference metadata. */
 export async function deleteFile(fileId: string, userId: string, isManager: boolean) {
   const file = await db.file.findUnique({
     where: { id: fileId },
@@ -102,12 +165,10 @@ export async function deleteFile(fileId: string, userId: string, isManager: bool
   });
   if (!file) throw new AuthError('File not found', 404);
   if (file.uploadedById !== userId && !isManager) {
-    throw new AuthError('You can only delete files you uploaded', 403);
+    throw new AuthError('You can only remove files you attached', 403);
   }
 
-  if (file.storageConnection && file.providerFileId) {
-    await deleteFromConnection(file.storageConnection, file.providerFileId, file.providerPath);
-  }
+  // Delete Flowdek attachment record
   await db.file.delete({ where: { id: fileId } });
 }
 

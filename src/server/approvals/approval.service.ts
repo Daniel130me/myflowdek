@@ -88,3 +88,25 @@ export async function resolveApproval(approvalId: string, userId: string, input:
     select: approvalSelect,
   });
 }
+
+export async function deleteApproval(approvalId: string, userId: string) {
+  const approval = await db.approvalRequest.findUnique({
+    where: { id: approvalId },
+    select: { id: true, projectId: true, requesterId: true, approverId: true },
+  });
+  if (!approval) throw new AuthError('Approval not found', 404);
+
+  const isRequesterOrApprover = approval.requesterId === userId || approval.approverId === userId;
+  if (!isRequesterOrApprover) {
+    const membership = await db.projectMember.findUnique({
+      where: { projectId_userId: { projectId: approval.projectId, userId } },
+      select: { role: true },
+    });
+    if (!membership || !['OWNER', 'ADMIN', 'EDITOR'].includes(membership.role)) {
+      throw new AuthError('Insufficient permissions to delete this approval', 403);
+    }
+  }
+
+  await db.approvalRequest.delete({ where: { id: approvalId } });
+  return { id: approvalId, deleted: true };
+}

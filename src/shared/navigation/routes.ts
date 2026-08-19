@@ -5,6 +5,7 @@
 export const routes = {
   // Auth routes
   login: () => '/login',
+  resetPassword: () => '/reset-password',
   onboarding: () => '/onboarding',
 
   // Top-level product routes
@@ -21,6 +22,7 @@ export const routes = {
   ai: () => '/ai',
   shortcuts: () => '/shortcuts',
   command: () => '/command',
+  settings: () => '/settings',
 
   // Project workspace routes
   projectOverview: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/overview`,
@@ -34,6 +36,10 @@ export const routes = {
   projectTeam: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/team`,
   projectReports: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/reports`,
   projectDependencies: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/dependencies`,
+  projectAutomations: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/automations`,
+  projectForms: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/forms`,
+  projectApprovals: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/approvals`,
+  projectBudgets: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/budgets`,
   projectShare: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/share`,
   projectCustomFields: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/settings/custom-fields`,
 
@@ -72,6 +78,8 @@ export function getRouteForView(viewId: string, projectId?: string): string {
       return routes.shortcuts();
     case 'command':
       return routes.command();
+    case 'settings':
+      return routes.settings();
     case 'dashboard':
     case 'overview':
       return projectId ? routes.projectOverview(projectId) : routes.projects();
@@ -111,6 +119,7 @@ export function getViewFromPathname(pathname: string): string {
   if (pathname.startsWith('/budgets')) return 'budget';
   if (pathname.startsWith('/timesheets')) return 'timesheets';
   if (pathname.startsWith('/ai')) return 'ai';
+  if (pathname.startsWith('/settings')) return 'settings';
   if (pathname.startsWith('/projects')) {
     const parts = pathname.split('/').filter(Boolean);
     if (parts.length === 1) return 'projects'; // /projects

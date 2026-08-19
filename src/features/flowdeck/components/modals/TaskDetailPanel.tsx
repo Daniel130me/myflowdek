@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { X, ArrowLeft, Calendar, Link2, Diamond, Repeat, Tag as TagIcon, Plus, Trash2, Eye, Download, Upload, Copy, FolderInput, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { X, ArrowLeft, Calendar, Link2, Diamond, Repeat, Tag as TagIcon, Plus, Trash2, Eye, ExternalLink, Cloud, Copy, FolderInput, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { COLORS, STATUS_META, PRIORITY_META, TAG_COLORS, fmtRange, fmtDueDate, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, TODAY, type Task, type FileItem, type Tag, type Comment, type ActivityEntry, type TimeLog, type CustomColumn, type TaskStatus, type TaskPriority, type MemberInfo } from '@/features/flowdeck/model';
 import { useViewport } from '../../hooks/useViewport';
@@ -11,6 +11,7 @@ import { Field } from '../ui/Field';
 import { SubtasksSection } from '../ui/SubtasksSection';
 import { TagPill, TagPills, CommentsSection, FollowersSection, TimeTrackingSection, DuplicateTaskDialog, MarkdownDescription } from '../ui';
 import { selectStyle, FF } from '../ui/styles';
+import { CloudFilePickerModal } from './CloudFilePickerModal';
 
 interface TaskDetailPanelProps {
   task: Task;
@@ -158,25 +159,19 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
   const [showMoveProject, setShowMoveProject] = useState(false);
   const [showDemotePicker, setShowDemotePicker] = useState(false);
   const [showSectionPicker, setShowSectionPicker] = useState(false);
+  const [cloudPickerOpen, setCloudPickerOpen] = useState(false);
   const hasSubtasks = allTasks.some(t => t.parentId === task.id);
   const topLevelTasks = allTasks.filter(t => !t.parentId && t.id !== task.id);
   const otherProjects = projects ? Object.values(projects).filter(p => p.id !== currentProjectId) : [];
 
-  /* Shared: files section — interactive with view, download, remove, upload */
-  function handlePanelUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files ?? []);
-    if (!picked.length || !onAddFiles) return;
-    onAddFiles(picked);
-    e.target.value = '';
-  }
-
-  function handlePanelDownload(f: FileItem, e?: React.MouseEvent) {
+  /* Shared: files section — interactive with view, open provider, remove, attach */
+  function handleOpenProviderFile(f: FileItem, e?: React.MouseEvent) {
     if (e) e.stopPropagation();
-    const url = f.url || '';
-    if (!url) return;
-    const a = document.createElement('a');
-    a.href = url; a.download = f.name;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    if (f.url) {
+      window.open(f.url, '_blank', 'noopener,noreferrer');
+    } else if (onViewFile) {
+      onViewFile(f.id);
+    }
   }
 
   const filesSection = (
@@ -191,9 +186,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
               title={f.name}
             >{f.name}</span>
             <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
-              {f.url && (
-                <button onClick={(e) => handlePanelDownload(f, e)} title="Download" style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Download size={14} /></button>
-              )}
+              <button onClick={(e) => handleOpenProviderFile(f, e)} title="Open in Cloud Drive" style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ExternalLink size={14} /></button>
               {onViewFile && (
                 <button onClick={() => onViewFile(f.id)} title="Preview" style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Eye size={14} /></button>
               )}
@@ -203,14 +196,27 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
             </div>
           </div>
         ))}
-        {onAddFiles && (
-          <>
-            <input ref={fileInputRef} type="file" multiple onChange={handlePanelUpload} style={{ display: 'none' }} />
-            <button onClick={() => fileInputRef.current?.click()} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, border: `1.5px dashed ${COLORS.line}`, background: 'transparent', cursor: 'pointer', fontFamily: FF, fontSize: 12.5, color: COLORS.gray, width: '100%' }}>
-              <Upload size={14} /> Upload attachment
-            </button>
-          </>
-        )}
+        <button
+          onClick={() => setCloudPickerOpen(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            padding: '8px 12px',
+            borderRadius: 10,
+            border: `1.5px dashed ${COLORS.accent}`,
+            background: COLORS.accentSoft,
+            cursor: 'pointer',
+            fontFamily: FF,
+            fontSize: 12.5,
+            fontWeight: 600,
+            color: COLORS.accent,
+            width: '100%',
+          }}
+        >
+          <Cloud size={14} /> Attach from Cloud Drive
+        </button>
       </div>
     </Field>
   );
@@ -549,6 +555,15 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
       </div>
     </div>
     {actionDialogs}
+    <CloudFilePickerModal
+      projectId={task.projectId}
+      taskId={task.id}
+      isOpen={cloudPickerOpen}
+      onClose={() => setCloudPickerOpen(false)}
+      onFileAttached={() => {
+        // Trigger parent state refresh if needed
+      }}
+    />
   </>
   );
 }

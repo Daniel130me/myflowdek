@@ -64,12 +64,20 @@ export async function executeAutomations(
     if (chain.has(rule.id)) continue;
     chain.add(rule.id);
 
-    const trigger = rule.trigger as { type: string; field?: string; value?: string };
+    const trigger = rule.trigger as { type: string; field?: string; value?: string; daysBefore?: number };
     if (trigger.type !== triggerType) continue;
 
     // Check trigger conditions.
     if (triggerType === 'status_change' && trigger.value && task.status !== trigger.value) continue;
     if (triggerType === 'priority_change' && trigger.value && task.priority !== trigger.value) continue;
+    if (triggerType === 'due_date_approaching') {
+      if (!task.dueDate) continue;
+      const daysBefore = typeof trigger.daysBefore === 'number' ? trigger.daysBefore : 1;
+      const now = new Date();
+      const targetTime = now.getTime() + (daysBefore + 1) * 24 * 60 * 60 * 1000;
+      const dueTime = new Date(task.dueDate).getTime();
+      if (dueTime > targetTime) continue;
+    }
 
     // Execute actions.
     const actions = rule.actions as Array<{ type: string; value?: string; field?: string }>;
@@ -77,6 +85,62 @@ export async function executeAutomations(
       await executeAction(projectId, task, action, depth, chainCtx);
     }
   }
+}
+
+/**
+ * Scheduled processor for approaching due dates.
+ * Queries non-completed tasks matching enabled due_date_approaching automation rules.
+ */
+export async function processDueDateAutomations(projectId?: string): Promise<number> {
+  const rules = await db.automationRule.findMany({
+    where: {
+      enabled: true,
+      ...(projectId ? { projectId } : {}),
+    },
+  });
+
+  const dueDateRules = rules.filter((r) => {
+    const t = r.trigger as { type?: string };
+    return t?.type === 'due_date_approaching';
+  });
+
+  if (dueDateRules.length === 0) return 0;
+
+  const now = new Date();
+  let executedCount = 0;
+
+  for (const rule of dueDateRules) {
+    const trigger = rule.trigger as { type: string; daysBefore?: number };
+    const daysBefore = typeof trigger.daysBefore === 'number' ? trigger.daysBefore : 1;
+    const windowEnd = new Date(now.getTime() + (daysBefore + 1) * 24 * 60 * 60 * 1000);
+
+    const tasks = await db.task.findMany({
+      where: {
+        projectId: rule.projectId,
+        status: { not: 'done' },
+        dueDate: {
+          not: null,
+          lte: windowEnd,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        priority: true,
+        assigneeId: true,
+        dueDate: true,
+        projectId: true,
+      },
+    });
+
+    for (const task of tasks) {
+      await executeAutomations(rule.projectId, 'due_date_approaching', task);
+      executedCount++;
+    }
+  }
+
+  return executedCount;
 }
 
 /** Execute a single automation action. */

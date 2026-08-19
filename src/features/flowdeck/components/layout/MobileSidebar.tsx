@@ -1,19 +1,51 @@
 'use client';
 
 import React from 'react';
-import { LayoutGrid, Menu, Sun, Moon } from 'lucide-react';
-import { FONT_FAMILY as FF } from '@/features/flowdeck/model';
+import { useRouter } from 'next/navigation';
+import { LayoutGrid, Menu, Sun, Moon, Settings, LogOut } from 'lucide-react';
+import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { Avatar } from '../ui';
 import { useTheme } from '../../hooks/useTheme';
+import { useAuth } from '../auth';
 import { NAV } from './navItems';
+import { WorkspaceSelector } from './WorkspaceSelector';
+import type { WorkspaceSummary } from '../../hooks/useWorkspaces';
 import type { Project } from '@/features/flowdeck/model';
 
-export function MobileSidebar({ project, activeView, open, onClose, onNavigate, goToPortfolio, bottomNavHeight }: {
-  project: Project | null; activeView: string; open: boolean; onClose: () => void;
-  onNavigate: (id: string) => void; goToPortfolio: () => void; bottomNavHeight: number;
+export function MobileSidebar({
+  project,
+  activeView,
+  open,
+  onClose,
+  onNavigate,
+  goToPortfolio,
+  bottomNavHeight,
+  workspaces,
+  selectedWorkspace,
+  onSelectWorkspace,
+  onLogout,
+}: {
+  project: Project | null;
+  activeView: string;
+  open: boolean;
+  onClose: () => void;
+  onNavigate: (id: string) => void;
+  goToPortfolio: () => void;
+  bottomNavHeight: number;
+  workspaces?: WorkspaceSummary[];
+  selectedWorkspace?: WorkspaceSummary | null;
+  onSelectWorkspace?: (id: string) => void;
+  onLogout?: () => void;
 }) {
+  const router = useRouter();
   const { isDark, toggle, colors, layout } = useTheme();
+  const auth = useAuth();
   const S = layout.sidebar;
+
+  const me = auth.user;
+  const myName = me?.name ?? 'User';
+  const myRole = me?.role ?? 'Member';
+  const myUserId = me?.id ?? '';
 
   return (
     <>
@@ -35,6 +67,18 @@ export function MobileSidebar({ project, activeView, open, onClose, onNavigate, 
           </div>
           <button onClick={onClose} style={{ border: 'none', background: 'none', color: S.textMuted, cursor: 'pointer', padding: 8, borderRadius: 10 }}><Menu size={18} /></button>
         </div>
+
+        {onSelectWorkspace && (
+          <WorkspaceSelector
+            workspaces={workspaces ?? []}
+            selectedWorkspace={selectedWorkspace ?? (workspaces && workspaces.length > 0 ? workspaces[0] : null)}
+            onSelect={(id) => {
+              onSelectWorkspace(id);
+              onClose();
+            }}
+            compact
+          />
+        )}
 
         <div style={{ padding: '0 12px 6px' }}>
           <button onClick={() => { goToPortfolio(); onClose(); }} style={{
@@ -76,24 +120,61 @@ export function MobileSidebar({ project, activeView, open, onClose, onNavigate, 
         <div style={{ padding: '12px 16px 16px', borderTop: `1px solid ${S.divider}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ border: '2px solid rgba(255,255,255,0.15)', borderRadius: '50%' }}>
-              <Avatar id="u5" size={32} />
+              {myUserId ? <Avatar id={myUserId} size={32} /> : (
+                <div style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  background: me?.avatarColor ?? COLORS.accent,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#FFFFFF', fontSize: 12, fontWeight: 700, fontFamily: FF,
+                }}>
+                  {myName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()}
+                </div>
+              )}
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 600 }}>Wale Johnson</div>
-              <div style={{ color: S.textDim, fontSize: 11.5 }}>Away this week</div>
+              <div style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{myName}</div>
+              <div style={{ color: S.textDim, fontSize: 11.5, fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{myRole}</div>
             </div>
-            <button
-              onClick={toggle}
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              style={{
-                border: 'none', background: S.hoverBg, cursor: 'pointer',
-                borderRadius: 10, width: 34, height: 34, flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: S.textMuted, transition: 'background 0.15s ease',
-              }}
-            >
-              {isDark ? <Sun size={16} strokeWidth={1.8} /> : <Moon size={16} strokeWidth={1.8} />}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                onClick={() => { onClose(); router.push('/settings'); }}
+                title="Workspace Settings"
+                style={{
+                  border: 'none', background: S.hoverBg, cursor: 'pointer',
+                  borderRadius: 10, width: 34, height: 34, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: S.textMuted, transition: 'background 0.15s ease',
+                }}
+              >
+                <Settings size={16} strokeWidth={1.8} />
+              </button>
+              <button
+                onClick={toggle}
+                title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                style={{
+                  border: 'none', background: S.hoverBg, cursor: 'pointer',
+                  borderRadius: 10, width: 34, height: 34, flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: S.textMuted, transition: 'background 0.15s ease',
+                }}
+              >
+                {isDark ? <Sun size={16} strokeWidth={1.8} /> : <Moon size={16} strokeWidth={1.8} />}
+              </button>
+              {onLogout && (
+                <button
+                  onClick={() => { onClose(); onLogout(); }}
+                  title="Sign out"
+                  style={{
+                    border: 'none', background: S.hoverBg, cursor: 'pointer',
+                    borderRadius: 10, width: 34, height: 34, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: S.textDim, transition: 'background 0.15s ease',
+                  }}
+                >
+                  <LogOut size={16} strokeWidth={1.8} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </aside>

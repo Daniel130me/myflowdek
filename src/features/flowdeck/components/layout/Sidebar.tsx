@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { LayoutGrid, Sun, Moon, Star, Archive, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { LayoutGrid, Sun, Moon, Star, Archive, LogOut, Settings } from 'lucide-react';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { Avatar } from '../ui';
 import { useTheme } from '../../hooks/useTheme';
@@ -25,6 +26,7 @@ export function Sidebar({ project, projects, activeView, onNavigate, goToPortfol
   selectedWorkspace?: WorkspaceSummary | null;
   onSelectWorkspace?: (id: string) => void;
 }) {
+  const router = useRouter();
   const { isDark, toggle, colors, layout } = useTheme();
   const auth = useAuth();
   const S = layout.sidebar;
@@ -54,10 +56,10 @@ export function Sidebar({ project, projects, activeView, onNavigate, goToPortfol
       </div>
 
       {/* Workspace selector — establishes the tenant context */}
-      {workspaces && selectedWorkspace && onSelectWorkspace && (
+      {onSelectWorkspace && (
         <WorkspaceSelector
-          workspaces={workspaces}
-          selectedWorkspace={selectedWorkspace}
+          workspaces={workspaces ?? []}
+          selectedWorkspace={selectedWorkspace ?? (workspaces && workspaces.length > 0 ? workspaces[0] : null)}
           onSelect={onSelectWorkspace}
         />
       )}
@@ -177,6 +179,18 @@ export function Sidebar({ project, projects, activeView, onNavigate, goToPortfol
             <div style={{ color: S.textDim, fontSize: 11.5, fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{myRole}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              onClick={() => { router.push('/settings'); }}
+              title="Workspace Settings"
+              style={{
+                border: 'none', background: S.hoverBg, cursor: 'pointer',
+                borderRadius: 10, width: 34, height: 34, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: S.textMuted, transition: 'background 0.15s ease',
+              }}
+            >
+              <Settings size={16} strokeWidth={1.8} />
+            </button>
             <button
               onClick={toggle}
               title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}

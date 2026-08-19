@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, ArrowLeft, Download as DownloadIcon, Paperclip, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ArrowLeft, ExternalLink, Paperclip, ChevronLeft, ChevronRight } from 'lucide-react';
 import { COLORS, fmtSize, fmtDate, extOf, type FileItem, type Task } from '@/features/flowdeck/model';
 import { FF } from '../ui/styles';
 import { Avatar } from '../ui/Avatar';
@@ -123,8 +123,8 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
           </button>
           <div style={{ width: 1, height: 20, background: COLORS.line, flexShrink: 0 }} />
           {file.url && (
-            <a href={file.url} download={file.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: COLORS.accent, textDecoration: 'none', fontFamily: FF, cursor: 'pointer', padding: '6px 12px', borderRadius: 8 }}>
-              <DownloadIcon size={15} /> Download
+            <a href={file.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: COLORS.accent, textDecoration: 'none', fontFamily: FF, cursor: 'pointer', padding: '6px 12px', borderRadius: 8 }}>
+              <ExternalLink size={15} /> Open in Cloud Drive
             </a>
           )}
           {linkedTask && (
@@ -195,8 +195,8 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
           </button>
           <div style={{ width: 1, height: 20, background: COLORS.line, flexShrink: 0 }} />
           {file.url && (
-            <a href={file.url} download={file.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: COLORS.accent, textDecoration: 'none', fontFamily: FF, cursor: 'pointer', padding: '6px 12px', borderRadius: 8 }}>
-              <DownloadIcon size={15} /> Download
+            <a href={file.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: COLORS.accent, textDecoration: 'none', fontFamily: FF, cursor: 'pointer', padding: '6px 12px', borderRadius: 8 }}>
+              <ExternalLink size={15} /> Open in Cloud Drive
             </a>
           )}
           {linkedTask && (

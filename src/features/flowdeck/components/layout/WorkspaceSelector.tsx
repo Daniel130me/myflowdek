@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Building2, Check } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ChevronDown, Building2, Check, Settings } from 'lucide-react';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaces';
 
@@ -25,6 +26,7 @@ export function WorkspaceSelector({
   onSelect,
   compact = false,
 }: WorkspaceSelectorProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -40,13 +42,8 @@ export function WorkspaceSelector({
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  if (workspaces.length === 0) {
-    return (
-      <div style={{ padding: compact ? '8px 12px' : '12px 20px', ...labelStyle }}>
-        No workspaces
-      </div>
-    );
-  }
+  const displayWorkspaces = workspaces.length > 0 ? workspaces : (selectedWorkspace ? [selectedWorkspace] : []);
+  const currentWorkspace = selectedWorkspace ?? (displayWorkspaces.length > 0 ? displayWorkspaces[0] : null);
 
   return (
     <div ref={ref} style={{ position: 'relative', padding: compact ? '8px 12px' : '8px 12px' }}>
@@ -71,14 +68,14 @@ export function WorkspaceSelector({
       >
         <Building2 size={15} style={{ opacity: 0.7, flexShrink: 0 }} />
         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {selectedWorkspace?.name ?? 'Select workspace'}
+          {currentWorkspace?.name ?? 'Workspace'}
         </span>
-        {selectedWorkspace && (
+        {currentWorkspace && (
           <span style={{
             fontSize: 10, fontWeight: 500, opacity: 0.5,
             textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0,
           }}>
-            {selectedWorkspace.role}
+            {currentWorkspace.role}
           </span>
         )}
         <ChevronDown size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
@@ -100,7 +97,7 @@ export function WorkspaceSelector({
           maxHeight: 280,
           overflowY: 'auto',
         }}>
-          {workspaces.map((ws) => (
+          {displayWorkspaces.map((ws) => (
             <button
               key={ws.id}
               onClick={() => {
@@ -114,7 +111,7 @@ export function WorkspaceSelector({
                 gap: 8,
                 padding: '10px 12px',
                 border: 'none',
-                background: ws.id === selectedWorkspace?.id ? 'rgba(254,128,41,0.12)' : 'transparent',
+                background: ws.id === currentWorkspace?.id ? 'rgba(254,128,41,0.12)' : 'transparent',
                 cursor: 'pointer',
                 textAlign: 'left',
                 fontFamily: FF,
@@ -130,11 +127,38 @@ export function WorkspaceSelector({
               <span style={{ fontSize: 10, opacity: 0.4, textTransform: 'uppercase' }}>
                 {ws.role}
               </span>
-              {ws.id === selectedWorkspace?.id && (
+              {ws.id === currentWorkspace?.id && (
                 <Check size={14} color="#FE8029" style={{ flexShrink: 0 }} />
               )}
             </button>
           ))}
+          {displayWorkspaces.length > 0 && (
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+          )}
+          <button
+            onClick={() => {
+              setOpen(false);
+              router.push('/settings');
+            }}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 12px',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              textAlign: 'left',
+              fontFamily: FF,
+              fontSize: 12.5,
+              fontWeight: 600,
+              color: '#FE8029',
+            }}
+          >
+            <Settings size={14} style={{ flexShrink: 0 }} />
+            Workspace Settings & Storage
+          </button>
         </div>
       )}
     </div>

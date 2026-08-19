@@ -82,6 +82,7 @@ export interface FlowDeckState {
 
   /* UI state */
   currentProjectId: string | null;
+  setCurrentProjectId: React.Dispatch<React.SetStateAction<string | null>>;
   activeView: string;
   selectedTaskId: string | null;
   selectedIds: Set<string>;
@@ -3012,7 +3013,7 @@ export function useFlowDeckStore(): FlowDeckState {
     /* Expose setters for layout components */
     setActiveView, setSelectedTaskId, setSearchQuery,
     setShowNewTask, setShowNewProject, setProjectMenuOpen, setShareOpen,
-    setSidebarOpen, setMoreMenuOpen, setSelectedIds,
+    setSidebarOpen, setMoreMenuOpen, setSelectedIds, setCurrentProjectId,
   } as FlowDeckState;
 }
 

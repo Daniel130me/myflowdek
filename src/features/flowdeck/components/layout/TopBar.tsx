@@ -1,7 +1,8 @@
 'use client';
 
 import React, { forwardRef, useImperativeHandle, useRef, useState, useEffect, useMemo } from 'react';
-import { Menu, Search, Plus, ChevronDown, SlidersHorizontal, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Menu, Search, Plus, ChevronDown, SlidersHorizontal, LogOut, Settings } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { GlobalSearch } from '../ui/GlobalSearch';
 import { FONT_FAMILY as FF, COLORS, type SearchFilters } from '@/features/flowdeck/model';
@@ -26,6 +27,7 @@ export const TopBar = forwardRef<TopBarHandle, {
   onShowNewTask, onShowNewProject, onSearchChange, onSearchFiltersChange, onClearFilters,
   onLogout
 }, ref) {
+  const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -120,6 +122,14 @@ export const TopBar = forwardRef<TopBarHandle, {
               }}>
                 <Plus size={14} strokeWidth={2} /> New project
               </button>
+              <div style={{ height: 1, background: S.topbar.border, margin: '6px 6px' }} />
+              <button onClick={() => { onToggleProjectMenu(); router.push('/settings'); }} style={{
+                width: '100%', textAlign: 'left', padding: isMobile ? '12px 14px' : '10px 12px', borderRadius: 10, border: 'none',
+                background: 'transparent', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                fontSize: 13.5, fontWeight: 500, color: colors.ink, minHeight: 44, fontFamily: FF,
+              }}>
+                <Settings size={14} strokeWidth={1.8} color={COLORS.accent} /> Workspace Settings
+              </button>
             </div>
           )}
         </div>
@@ -171,51 +181,69 @@ export const TopBar = forwardRef<TopBarHandle, {
         {/* Notification bell */}
         <NotificationBell />
 
-        {/* User avatar + logout menu */}
-        {onLogout && (
-          <div ref={userMenuRef} style={{ position: 'relative' }}>
-            <button
-              onClick={() => setUserMenuOpen(o => !o)}
-              style={{
-                width: isMobile ? 34 : 36, height: isMobile ? 34 : 36, borderRadius: '50%',
-                background: myAvatarColor, border: `2px solid ${S.topbar.bg}`, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: isMobile ? 12 : 13, fontWeight: 800, color: '#FFFFFF',
-                fontFamily: FF, flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-                padding: 0, outline: 'none',
-              }}
-              title={myName}
-            >
-              {initials}
-            </button>
-            {userMenuOpen && (
-              <div style={{
-                position: 'absolute', top: isMobile ? 42 : 46, right: 0,
-                background: S.card.bg, border: `1px solid ${S.topbar.border}`,
-                borderRadius: 12, boxShadow: S.card.shadowLg,
-                width: isMobile ? 180 : 200, zIndex: 30, padding: 6, overflow: 'hidden',
-              }}>
-                {/* User info header */}
-                <div style={{ padding: '10px 12px', borderBottom: `1px solid ${S.topbar.border}`, marginBottom: 4 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: colors.ink, fontFamily: FF }}>{myName}</div>
-                  <div style={{ fontSize: 11, color: colors.gray, marginTop: 2, fontFamily: FF }}>{myRole}</div>
-                </div>
-                <button
-                  onClick={() => { setUserMenuOpen(false); onLogout(); }}
-                  style={{
-                    width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none',
-                    background: 'transparent', display: 'flex', alignItems: 'center', gap: 10,
-                    cursor: 'pointer', fontSize: 13, fontWeight: 500, color: '#DC2626',
-                    minHeight: 40, fontFamily: FF, transition: 'background 0.1s',
-                  }}
-                >
-                  <LogOut size={15} strokeWidth={1.8} />
-                  Sign out
-                </button>
+        {/* User avatar + settings/logout menu */}
+        <div ref={userMenuRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setUserMenuOpen(o => !o)}
+            style={{
+              width: isMobile ? 34 : 36, height: isMobile ? 34 : 36, borderRadius: '50%',
+              background: myAvatarColor, border: `2px solid ${S.topbar.bg}`, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: isMobile ? 12 : 13, fontWeight: 800, color: '#FFFFFF',
+              fontFamily: FF, flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+              padding: 0, outline: 'none',
+            }}
+            title={myName}
+          >
+            {initials}
+          </button>
+          {userMenuOpen && (
+            <div style={{
+              position: 'absolute', top: isMobile ? 42 : 46, right: 0,
+              background: S.card.bg, border: `1px solid ${S.topbar.border}`,
+              borderRadius: 12, boxShadow: S.card.shadowLg,
+              width: isMobile ? 180 : 200, zIndex: 30, padding: 6, overflow: 'hidden',
+            }}>
+              {/* User info header */}
+              <div style={{ padding: '10px 12px', borderBottom: `1px solid ${S.topbar.border}`, marginBottom: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: colors.ink, fontFamily: FF }}>{myName}</div>
+                <div style={{ fontSize: 11, color: colors.gray, marginTop: 2, fontFamily: FF }}>{myRole || 'Member'}</div>
               </div>
-            )}
-          </div>
-        )}
+              <button
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  router.push('/settings');
+                }}
+                style={{
+                  width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none',
+                  background: 'transparent', display: 'flex', alignItems: 'center', gap: 10,
+                  cursor: 'pointer', fontSize: 13, fontWeight: 500, color: colors.ink,
+                  minHeight: 40, fontFamily: FF, transition: 'background 0.1s',
+                }}
+              >
+                <Settings size={15} strokeWidth={1.8} color={COLORS.accent} />
+                Workspace Settings
+              </button>
+              {onLogout && (
+                <>
+                  <div style={{ height: 1, background: S.topbar.border, margin: '4px 0' }} />
+                  <button
+                    onClick={() => { setUserMenuOpen(false); onLogout(); }}
+                    style={{
+                      width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none',
+                      background: 'transparent', display: 'flex', alignItems: 'center', gap: 10,
+                      cursor: 'pointer', fontSize: 13, fontWeight: 500, color: '#DC2626',
+                      minHeight: 40, fontFamily: FF, transition: 'background 0.1s',
+                    }}
+                  >
+                    <LogOut size={15} strokeWidth={1.8} />
+                    Sign out
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Global search overlay */}

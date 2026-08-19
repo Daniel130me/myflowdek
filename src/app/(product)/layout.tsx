@@ -192,6 +192,10 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
             router.push(routes.projects());
           }}
           bottomNavHeight={bottomNavHeight}
+          workspaces={wsHook.workspaces}
+          selectedWorkspace={wsHook.selectedWorkspace}
+          onSelectWorkspace={wsHook.setSelectedWorkspace}
+          onLogout={onLogout}
         />
       )}
 

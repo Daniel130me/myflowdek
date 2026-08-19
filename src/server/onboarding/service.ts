@@ -3,9 +3,13 @@ import type { Prisma } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { AuthError } from '@/server/auth/authorization';
 import { sendInvitationEmail } from '@/server/email/service';
+import { hashToken } from '@/server/invitations/service';
 
 /** Input shape for the onboarding payload (matches the client OnboardingData). */
 export interface OnboardingInput {
+  name?: string;
+  jobTitle?: string;
+  avatarColor?: string;
   projectName?: string;
   projectColor?: string;
   projectDesc?: string;
@@ -129,7 +133,7 @@ export async function completeOnboarding(userId: string, input: OnboardingInput)
     });
 
     // 5. Create invitation records for invited members.
-    const invitations: Array<{ email: string; token: string }> = [];
+    const invitations: Array<{ email: string; rawToken: string; hashedToken: string }> = [];
     if (input.invitedMembers && input.invitedMembers.length > 0) {
       const expiresAt = new Date(Date.now() + ONBOARDING_INVITATION_TTL_HOURS * 60 * 60 * 1000);
 
@@ -137,16 +141,18 @@ export async function completeOnboarding(userId: string, input: OnboardingInput)
         const cleanEmail = email.trim().toLowerCase();
         if (!cleanEmail) continue;
 
-        invitations.push({ email: cleanEmail, token: generateToken() });
+        const rawToken = generateToken();
+        const hashedToken = hashToken(rawToken);
+        invitations.push({ email: cleanEmail, rawToken, hashedToken });
       }
 
       if (invitations.length > 0) {
         await tx.invitation.createMany({
-          data: invitations.map(({ email, token }) => ({
+          data: invitations.map(({ email, hashedToken }) => ({
             workspaceId: workspace.id,
             email,
             role: 'MEMBER',
-            token,
+            token: hashedToken,
             status: 'PENDING',
             invitedById: userId,
             expiresAt,
@@ -155,10 +161,15 @@ export async function completeOnboarding(userId: string, input: OnboardingInput)
       }
     }
 
-    // 6. Mark the user as onboarded (server-side source of truth).
+    // 6. Persist profile fields & mark user as onboarded (server-side source of truth).
     await tx.user.update({
       where: { id: userId },
-      data: { onboardedAt: new Date() },
+      data: {
+        ...(input.name?.trim() ? { name: input.name.trim() } : {}),
+        ...(input.jobTitle?.trim() ? { jobTitle: input.jobTitle.trim() } : {}),
+        ...(input.avatarColor?.trim() ? { avatarColor: input.avatarColor.trim() } : {}),
+        onboardedAt: new Date(),
+      },
     });
 
     return { workspace, project, invitations };
@@ -173,7 +184,7 @@ export async function completeOnboarding(userId: string, input: OnboardingInput)
   for (const invitation of result.invitations) {
     sendInvitationEmail(
       invitation.email,
-      invitation.token,
+      invitation.rawToken,
       result.workspace.name,
       APP_BASE_URL,
     ).catch((error) => {
@@ -191,6 +202,9 @@ export function parseOnboardingInput(body: unknown): OnboardingInput {
   }
   const b = body as Record<string, unknown>;
   return {
+    name: typeof b.name === 'string' ? b.name : undefined,
+    jobTitle: typeof b.jobTitle === 'string' ? b.jobTitle : undefined,
+    avatarColor: typeof b.avatarColor === 'string' ? b.avatarColor : undefined,
     projectName: typeof b.projectName === 'string' ? b.projectName : undefined,
     projectColor: typeof b.projectColor === 'string' ? b.projectColor : undefined,
     projectDesc: typeof b.projectDesc === 'string' ? b.projectDesc : undefined,

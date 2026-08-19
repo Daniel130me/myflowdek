@@ -1,17 +1,29 @@
 'use client';
 
 import React, { useRef, useState, useCallback } from 'react';
-import { Upload, Trash2, Paperclip, Eye, Download } from 'lucide-react';
+import { Cloud, Trash2, Paperclip, ExternalLink, Share2, Eye } from 'lucide-react';
 import { COLORS, fmtSize, fmtDate, extOf, type Task, type FileItem } from '@/features/flowdeck/model';
 import { Avatar, SectionHeader, FileThumbnail, FF, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 
-export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }: { files: FileItem[]; tasks: Task[]; onAdd: (files: File[]) => void; onRemove: (id: string) => void; onLink: (id: string, taskId: string | null) => void; onViewFile: (id: string) => void }) {
+export function FilesView({
+  files,
+  tasks,
+  onAttachClick,
+  onRemove,
+  onLink,
+  onViewFile,
+  onShareFile,
+}: {
+  files: FileItem[];
+  tasks: Task[];
+  onAttachClick?: () => void;
+  onRemove: (id: string) => void;
+  onLink: (id: string, taskId: string | null) => void;
+  onViewFile: (id: string) => void;
+  onShareFile?: (file: FileItem) => void;
+}) {
   const { isMobile } = useViewport();
-  const inputRef = useRef<HTMLInputElement>(null);
-  // Resolve uploader ids to display names via the global MemberDirectory
-  // (populated by `useProjectMembers` for every opened project). Falls back
-  // to undefined for unknown ids — the label renders empty in that case.
   const { lookup: lookupMember } = useMemberDirectory();
 
   /* Track hover state for desktop cards */
@@ -19,37 +31,47 @@ export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }:
   const handleMouseEnter = useCallback((id: string) => setHoveredId(id), []);
   const handleMouseLeave = useCallback(() => setHoveredId(null), []);
 
-  function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files ?? []);
-    if (!picked.length) return;
-    onAdd(picked);
-    e.target.value = '';
-  }
-
-  function handleDownload(f: FileItem, e?: React.MouseEvent) {
+  function handleOpenFile(f: FileItem, e?: React.MouseEvent) {
     if (e) e.stopPropagation();
-    const url = f.url || '';
-    if (!url) return;
-    const a = document.createElement('a');
-    a.href = url; a.download = f.name;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    if (f.url) {
+      window.open(f.url, '_blank', 'noopener,noreferrer');
+    } else {
+      onViewFile(f.id);
+    }
   }
 
-  const uploadBtn = (
-    <>
-      <input ref={inputRef} type="file" multiple onChange={handlePick} style={{ display: 'none' }} />
-      <button onClick={() => inputRef.current?.click()} style={{ display: 'flex', alignItems: 'center', gap: 6, background: COLORS.accent, color: '#FFFFFF', border: 'none', borderRadius: 10, padding: isMobile ? '9px 14px' : '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FF, boxShadow: '0 1px 3px rgba(254,128,41,0.3)' }}><Upload size={15} /> {isMobile ? 'Upload' : 'Upload files'}</button>
-    </>
+  const attachBtn = (
+    <button
+      onClick={onAttachClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        background: COLORS.accent,
+        color: '#FFFFFF',
+        border: 'none',
+        borderRadius: 10,
+        padding: isMobile ? '9px 14px' : '8px 14px',
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: 'pointer',
+        fontFamily: FF,
+        boxShadow: '0 1px 3px rgba(254,128,41,0.3)',
+      }}
+    >
+      <Cloud size={16} /> {isMobile ? 'Attach' : 'Attach from Cloud Drive'}
+    </button>
   );
 
   /* ---------- Empty state ---------- */
   if (files.length === 0) {
     return (
       <div>
-        <SectionHeader title="Files" subtitle="0 files attached to this project" right={uploadBtn} />
+        <SectionHeader title="Files" subtitle="0 connected files in this project" right={attachBtn} />
         <div style={{ padding: 48, textAlign: 'center', color: COLORS.gray, fontFamily: FF, fontSize: 14 }}>
-          <Paperclip size={32} color={COLORS.line} style={{ marginBottom: 12, display: 'inline-block' }} />
-          <div>No files yet. Upload something to get started.</div>
+          <Cloud size={36} color={COLORS.line} style={{ marginBottom: 12, display: 'inline-block' }} />
+          <div style={{ fontWeight: 600, color: COLORS.ink, marginBottom: 4 }}>No connected files yet</div>
+          <div>Attach files directly from Google Drive, OneDrive, or Dropbox.</div>
         </div>
       </div>
     );
@@ -59,7 +81,7 @@ export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }:
   if (isMobile) {
     return (
       <div>
-        <SectionHeader title="Files" subtitle={`${files.length} files`} right={uploadBtn} />
+        <SectionHeader title="Files" subtitle={`${files.length} connected files`} right={attachBtn} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {files.map(f => {
             const linkedTask = f.linkedTaskId ? tasks.find(t => t.id === f.linkedTaskId) : null;
@@ -78,11 +100,11 @@ export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }:
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 2, alignSelf: 'flex-start' }}>
-                    <button onClick={() => onViewFile(f.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 6, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Eye size={16} /></button>
-                    {f.url && (
-                      <button onClick={(e) => handleDownload(f, e)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 6, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Download size={16} /></button>
+                    <button onClick={(e) => handleOpenFile(f, e)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 6, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Open in Cloud Drive"><ExternalLink size={16} /></button>
+                    {onShareFile && (
+                      <button onClick={(e) => { e.stopPropagation(); onShareFile(f); }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 6, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Share in Provider"><Share2 size={16} /></button>
                     )}
-                    <button onClick={() => onRemove(f.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 6, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={16} /></button>
+                    <button onClick={() => onRemove(f.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 6, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remove Reference"><Trash2 size={16} /></button>
                   </div>
                 </div>
                 {/* Footer: uploader + link task */}
@@ -102,7 +124,7 @@ export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }:
   /* ---------- Desktop: grid of thumbnail cards ---------- */
   return (
     <div>
-      <SectionHeader title="Files" subtitle={`${files.length} files attached to this project`} right={uploadBtn} />
+      <SectionHeader title="Files" subtitle={`${files.length} connected files in this project`} right={attachBtn} />
       {/* Thumbnail grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14, marginBottom: 20 }}>
         {files.map(f => {
@@ -134,15 +156,17 @@ export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }:
                 <button
                   onClick={(e) => { e.stopPropagation(); onRemove(f.id); }}
                   style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, background: 'rgba(0,0,0,0.45)', border: 'none', cursor: 'pointer', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isHovered ? 1 : 0, transition: 'opacity 0.15s' } as React.CSSProperties}
+                  title="Remove file reference"
                 >
                   <Trash2 size={14} />
                 </button>
-                {/* Download button overlay (top-left, visible on hover) */}
+                {/* Open in cloud provider button overlay (top-left, visible on hover) */}
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleDownload(f, e); }}
+                  onClick={(e) => { e.stopPropagation(); handleOpenFile(f, e); }}
                   style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, background: 'rgba(0,0,0,0.45)', border: 'none', cursor: 'pointer', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isHovered ? 1 : 0, transition: 'opacity 0.15s' } as React.CSSProperties}
+                  title="Open original file in Cloud Drive"
                 >
-                  <Download size={14} />
+                  <ExternalLink size={14} />
                 </button>
               </div>
               {/* Info area */}
@@ -157,6 +181,29 @@ export function FilesView({ files, tasks, onAdd, onRemove, onLink, onViewFile }:
                   </div>
                   <span style={{ fontSize: 11.5, color: COLORS.gray, fontFamily: FF }}>{fmtDate(f.uploadedAt)}</span>
                 </div>
+                {onShareFile && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onShareFile(f); }}
+                    style={{
+                      marginTop: 8,
+                      width: '100%',
+                      padding: '5px 8px',
+                      borderRadius: 6,
+                      border: `1px solid ${COLORS.line}`,
+                      background: '#F9FAFB',
+                      fontSize: 11.5,
+                      color: COLORS.gray,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 4,
+                      fontFamily: FF,
+                    }}
+                  >
+                    <Share2 size={12} /> Share in Cloud Provider
+                  </button>
+                )}
                 {linkedTask && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, fontSize: 11.5, color: COLORS.accent, fontFamily: FF, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     <Paperclip size={11} /> {linkedTask.name}

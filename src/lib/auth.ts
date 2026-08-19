@@ -11,6 +11,8 @@ import {
 import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { audit } from '@/server/audit/log';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 /**
  * NextAuth configuration for FlowDeck.
  *
@@ -22,10 +24,9 @@ import { audit } from '@/server/audit/log';
  */
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
-  useSecureCookies: true,
   cookies: {
     sessionToken: {
-      name: '__Secure-next-auth.session-token',
+      name: 'next-auth.session-token',
       options: {
         httpOnly: true,
         sameSite: 'none',
@@ -34,7 +35,7 @@ export const authOptions: NextAuthOptions = {
       },
     },
     callbackUrl: {
-      name: '__Secure-next-auth.callback-url',
+      name: 'next-auth.callback-url',
       options: {
         sameSite: 'none',
         path: '/',
@@ -42,36 +43,7 @@ export const authOptions: NextAuthOptions = {
       },
     },
     csrfToken: {
-      name: '__Host-next-auth.csrf-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'none',
-        path: '/',
-        secure: true,
-      },
-    },
-    pkceCodeVerifier: {
-      name: '__Secure-next-auth.pkce.code_verifier',
-      options: {
-        httpOnly: true,
-        sameSite: 'none',
-        path: '/',
-        secure: true,
-        maxAge: 900,
-      },
-    },
-    state: {
-      name: '__Secure-next-auth.state',
-      options: {
-        httpOnly: true,
-        sameSite: 'none',
-        path: '/',
-        secure: true,
-        maxAge: 900,
-      },
-    },
-    nonce: {
-      name: '__Secure-next-auth.nonce',
+      name: 'next-auth.csrf-token',
       options: {
         httpOnly: true,
         sameSite: 'none',
@@ -228,6 +200,7 @@ export const authOptions: NextAuthOptions = {
         const dbUser = await db.user.findUnique({
           where: { id: token.id as string },
           select: {
+            name: true,
             onboardedAt: true,
             jobTitle: true,
             avatarColor: true,
@@ -236,6 +209,7 @@ export const authOptions: NextAuthOptions = {
           },
         });
         if (dbUser) {
+          if (dbUser.name) token.name = dbUser.name;
           token.onboardedAt = dbUser.onboardedAt
             ? String(dbUser.onboardedAt)
             : null;
@@ -252,6 +226,7 @@ export const authOptions: NextAuthOptions = {
       // the client. Falls back to the defaults if the token is incomplete.
       if (session.user) {
         session.user.id = token.id as string;
+        if (token.name) session.user.name = token.name as string;
         session.user.jobTitle =
           (token.jobTitle as string | undefined) ?? DEFAULT_JOB_TITLE_FALLBACK;
         session.user.avatarColor =

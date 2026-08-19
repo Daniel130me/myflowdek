@@ -12,7 +12,7 @@ type InvitationEmailSender = typeof sendInvitationEmail;
 
 /** Hash a token using SHA-256 for secure storage.
  *  The raw token is emailed to the user; only the hash is stored in the DB. */
-function hashToken(token: string): string {
+export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 

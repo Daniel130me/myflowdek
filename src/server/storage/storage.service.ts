@@ -298,6 +298,10 @@ export async function disconnectStorage(userId: string, provider: StorageProvide
   await db.storageConnection.delete({ where: { id: connection.id } });
 }
 
+export async function getValidAccessToken(connection: StorageConnection): Promise<string> {
+  return accessToken(connection);
+}
+
 async function accessToken(connection: StorageConnection): Promise<string> {
   const stillValid = connection.accessTokenExpiresAt
     && connection.accessTokenExpiresAt.getTime() > Date.now() + 60_000;

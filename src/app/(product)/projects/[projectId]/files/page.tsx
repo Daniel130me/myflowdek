@@ -3,12 +3,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams, notFound } from 'next/navigation';
 import { FilesView } from '@/features/flowdeck/components/views';
+import { CloudFilePickerModal, ShareFileModal } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useProjectFiles } from '@/features/flowdeck/hooks/useProjectFiles';
 import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
-import { COLORS, FONT_FAMILY as FF } from '@/features/flowdeck/model';
+import { COLORS, FONT_FAMILY as FF, type FileItem } from '@/features/flowdeck/model';
 import { toast } from 'sonner';
 
 interface StorageConnection {
@@ -30,6 +31,8 @@ export default function ProjectFilesPage() {
   useProjectTasks(projectId);
   const [connections, setConnections] = useState<StorageConnection[]>([]);
   const [provider, setProvider] = useState<string>('');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [sharingFile, setSharingFile] = useState<FileItem | null>(null);
 
   useEffect(() => {
     fetch('/api/storage/connections')
@@ -47,32 +50,6 @@ export default function ProjectFilesPage() {
 
   const files = state.filesByProject[projectId] ?? [];
   const tasks = state.tasksByProject[projectId] ?? [];
-
-  const handleAdd = useCallback(async (selectedFiles: File[]) => {
-    if (!provider) {
-      toast.error('Connect a storage provider in Settings before uploading');
-      return;
-    }
-    for (const selectedFile of selectedFiles) {
-      try {
-        const form = new FormData();
-        form.set('provider', provider);
-        form.set('file', selectedFile);
-        const response = await fetch('/api/projects/' + projectId + '/files/upload', {
-          method: 'POST',
-          body: form,
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error ?? 'Upload failed');
-        toast.success('Uploaded ' + selectedFile.name);
-      } catch (error) {
-        toast.error('Failed to upload ' + selectedFile.name, {
-          description: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    }
-    await refetch();
-  }, [projectId, provider, refetch]);
 
   const handleRemove = useCallback(async (fileId: string) => {
     try {
@@ -110,11 +87,30 @@ export default function ProjectFilesPage() {
       <FilesView
         files={files}
         tasks={tasks}
-        onAdd={handleAdd}
+        onAttachClick={() => setPickerOpen(true)}
         onRemove={handleRemove}
         onLink={(fileId, linkedTaskId) => state.linkFile(projectId, fileId, linkedTaskId)}
         onViewFile={(fileId) => router.push(routes.file(projectId, fileId))}
+        onShareFile={(file) => setSharingFile(file)}
       />
+
+      <CloudFilePickerModal
+        projectId={projectId}
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onFileAttached={() => {
+          refetch();
+        }}
+      />
+
+      {sharingFile && (
+        <ShareFileModal
+          fileId={sharingFile.id}
+          fileName={sharingFile.name}
+          isOpen={!!sharingFile}
+          onClose={() => setSharingFile(null)}
+        />
+      )}
     </div>
   );
 }
