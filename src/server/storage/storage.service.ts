@@ -37,16 +37,25 @@ function requestBody(bytes: Buffer): ArrayBuffer {
   return copy.buffer;
 }
 
-export function baseUrl(req?: Request): string {
+export interface StorageEnvOptions {
+  nodeEnv?: string;
+  appBaseUrl?: string;
+  nextAuthUrl?: string;
+}
+
+export function baseUrl(req?: Request, env?: StorageEnvOptions): string {
   const configured =
-    process.env.APP_BASE_URL ??
-    process.env.NEXTAUTH_URL;
+    env !== undefined
+      ? (env.appBaseUrl ?? env.nextAuthUrl)
+      : (process.env.APP_BASE_URL ?? process.env.NEXTAUTH_URL);
+
+  const nodeEnv = env?.nodeEnv ?? process.env.NODE_ENV;
 
   if (configured) {
     const url = configured.replace(/\/+$/, '');
 
     if (
-      process.env.NODE_ENV === 'production' &&
+      nodeEnv === 'production' &&
       (url.includes('localhost') || url.includes('127.0.0.1'))
     ) {
       throw new Error(
@@ -70,7 +79,7 @@ export function baseUrl(req?: Request): string {
       const url = `${proto}://${host}`.replace(/\/+$/, '');
 
       if (
-        process.env.NODE_ENV === 'production' &&
+        nodeEnv === 'production' &&
         (url.includes('localhost') || url.includes('127.0.0.1'))
       ) {
         throw new Error(
@@ -106,8 +115,8 @@ function clientCredentials(provider: StorageProvider) {
   return { clientId, clientSecret };
 }
 
-export function redirectUri(provider: StorageProvider, req?: Request): string {
-  return `${baseUrl(req)}/api/storage/oauth/${providerSlug(provider)}/callback`;
+export function redirectUri(provider: StorageProvider, req?: Request, env?: StorageEnvOptions): string {
+  return `${baseUrl(req, env)}/api/storage/oauth/${providerSlug(provider)}/callback`;
 }
 
 function signState(payload: string): string {
@@ -140,14 +149,19 @@ function verifyOAuthState(state: string, userId: string, provider: StorageProvid
   }
 }
 
-export function authorizationUrl(provider: StorageProvider, userId: string, req?: Request): string {
+export function authorizationUrl(
+  provider: StorageProvider,
+  userId: string,
+  req?: Request,
+  env?: StorageEnvOptions,
+): string {
   const { clientId } = clientCredentials(provider);
   const state = createOAuthState(userId, provider);
   if (provider === 'GOOGLE_DRIVE') {
     const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     url.search = new URLSearchParams({
       client_id: clientId,
-      redirect_uri: redirectUri(provider, req),
+      redirect_uri: redirectUri(provider, req, env),
       response_type: 'code',
       scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
       access_type: 'offline',
@@ -160,7 +174,7 @@ export function authorizationUrl(provider: StorageProvider, userId: string, req?
     const url = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
     url.search = new URLSearchParams({
       client_id: clientId,
-      redirect_uri: redirectUri(provider, req),
+      redirect_uri: redirectUri(provider, req, env),
       response_type: 'code',
       response_mode: 'query',
       scope: 'offline_access Files.ReadWrite.AppFolder User.Read',
@@ -171,7 +185,7 @@ export function authorizationUrl(provider: StorageProvider, userId: string, req?
   const url = new URL('https://www.dropbox.com/oauth2/authorize');
   url.search = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: redirectUri(provider, req),
+    redirect_uri: redirectUri(provider, req, env),
     response_type: 'code',
     token_access_type: 'offline',
     state,
@@ -230,12 +244,13 @@ export async function completeAuthorization(
   code: string,
   state: string,
   req?: Request,
+  env?: StorageEnvOptions,
 ) {
   verifyOAuthState(state, userId, provider);
   const tokens = await requestTokens(provider, {
     grant_type: 'authorization_code',
     code,
-    redirect_uri: redirectUri(provider, req),
+    redirect_uri: redirectUri(provider, req, env),
   });
   const identity = await providerIdentity(provider, tokens.access_token);
   return db.storageConnection.upsert({
