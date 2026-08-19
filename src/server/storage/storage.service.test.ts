@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { describe, test } from 'node:test';
 import { randomBytes } from 'node:crypto';
-import { baseUrl, redirectUri, authorizationUrl, parseStorageProvider } from './storage.service';
+import { baseUrl, redirectUri, authorizationUrl, parseStorageProvider, extractAndVerifyOAuthState } from './storage.service';
 
 describe('active storage providers', () => {
   test('accepts Google Drive', () => {
@@ -155,5 +155,65 @@ describe('OAuth base URL and callback generation', () => {
       () => baseUrl(undefined, { nodeEnv: 'development' }),
       /APP_BASE_URL or NEXTAUTH_URL is not configured/,
     );
+  });
+
+  test('extractAndVerifyOAuthState extracts valid userId from authorizationUrl state', () => {
+    const savedKey = process.env.STORAGE_TOKEN_ENCRYPTION_KEY;
+    const savedClient = process.env.GOOGLE_DRIVE_CLIENT_ID;
+    try {
+      process.env.STORAGE_TOKEN_ENCRYPTION_KEY = randomBytes(32).toString('base64');
+      process.env.GOOGLE_DRIVE_CLIENT_ID = 'test-client-id.apps.googleusercontent.com';
+
+      const urlString = authorizationUrl('GOOGLE_DRIVE', 'user-xyz-123', undefined, {
+        nodeEnv: 'production',
+        appBaseUrl: 'https://flowdeck-cyg6.onrender.com',
+      });
+      const url = new URL(urlString);
+      const state = url.searchParams.get('state')!;
+      assert.ok(state);
+
+      const extractedUserId = extractAndVerifyOAuthState(state, 'GOOGLE_DRIVE');
+      assert.equal(extractedUserId, 'user-xyz-123');
+    } finally {
+      if (savedKey === undefined) delete process.env.STORAGE_TOKEN_ENCRYPTION_KEY;
+      else process.env.STORAGE_TOKEN_ENCRYPTION_KEY = savedKey;
+
+      if (savedClient === undefined) delete process.env.GOOGLE_DRIVE_CLIENT_ID;
+      else process.env.GOOGLE_DRIVE_CLIENT_ID = savedClient;
+    }
+  });
+
+  test('extractAndVerifyOAuthState rejects tampered state or wrong provider', () => {
+    const savedKey = process.env.STORAGE_TOKEN_ENCRYPTION_KEY;
+    const savedClient = process.env.GOOGLE_DRIVE_CLIENT_ID;
+    try {
+      process.env.STORAGE_TOKEN_ENCRYPTION_KEY = randomBytes(32).toString('base64');
+      process.env.GOOGLE_DRIVE_CLIENT_ID = 'test-client-id.apps.googleusercontent.com';
+
+      const urlString = authorizationUrl('GOOGLE_DRIVE', 'user-xyz-123', undefined, {
+        nodeEnv: 'production',
+        appBaseUrl: 'https://flowdeck-cyg6.onrender.com',
+      });
+      const url = new URL(urlString);
+      const state = url.searchParams.get('state')!;
+
+      // Tampered state
+      assert.throws(
+        () => extractAndVerifyOAuthState(state + 'corrupted', 'GOOGLE_DRIVE'),
+        /Invalid OAuth state/,
+      );
+
+      // Malformed state
+      assert.throws(
+        () => extractAndVerifyOAuthState('not-a-state', 'GOOGLE_DRIVE'),
+        /Invalid OAuth state/,
+      );
+    } finally {
+      if (savedKey === undefined) delete process.env.STORAGE_TOKEN_ENCRYPTION_KEY;
+      else process.env.STORAGE_TOKEN_ENCRYPTION_KEY = savedKey;
+
+      if (savedClient === undefined) delete process.env.GOOGLE_DRIVE_CLIENT_ID;
+      else process.env.GOOGLE_DRIVE_CLIENT_ID = savedClient;
+    }
   });
 });

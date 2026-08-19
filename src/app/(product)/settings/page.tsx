@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Building2, Users, Mail, Settings, Trash2, Crown, Shield, UserMinus, Send, HardDrive } from 'lucide-react';
 import { useWorkspaces } from '@/features/flowdeck/hooks/useWorkspaces';
 import { useAuth } from '@/features/flowdeck/components/auth';
@@ -47,6 +47,7 @@ const storageProviders = [
  */
 export default function WorkspaceSettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const ws = useWorkspaces();
   const auth = useAuth();
   const workspaceId = ws.selectedWorkspaceId;
@@ -62,6 +63,23 @@ export default function WorkspaceSettingsPage() {
   const [inviteRole, setInviteRole] = useState('MEMBER');
   const [inviting, setInviting] = useState(false);
   const [revokingInvitationId, setRevokingInvitationId] = useState<string | null>(null);
+
+  const processedToastRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const storageParam = searchParams.get('storage');
+    const storageErrorParam = searchParams.get('storage_error');
+
+    if (storageParam === 'connected' && processedToastRef.current !== 'connected') {
+      processedToastRef.current = 'connected';
+      toast.success('Cloud storage connected successfully');
+      router.replace('/settings');
+    } else if (storageErrorParam && processedToastRef.current !== storageErrorParam) {
+      processedToastRef.current = storageErrorParam;
+      toast.error('Cloud storage connection failed', { description: storageErrorParam });
+      router.replace('/settings');
+    }
+  }, [searchParams, router]);
 
   useEffect(() => {
     if (selectedWs) setName(selectedWs.name);

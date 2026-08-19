@@ -133,7 +133,7 @@ function createOAuthState(userId: string, provider: StorageProvider): string {
   return `${payload}.${signState(payload)}`;
 }
 
-function verifyOAuthState(state: string, userId: string, provider: StorageProvider): void {
+export function extractAndVerifyOAuthState(state: string, provider: StorageProvider): string {
   const [payload, signature] = state.split('.');
   if (!payload || !signature) throw new AuthError('Invalid OAuth state', 400);
   const expected = Buffer.from(signState(payload));
@@ -144,7 +144,15 @@ function verifyOAuthState(state: string, userId: string, provider: StorageProvid
   const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
     userId: string; provider: StorageProvider; expiresAt: number;
   };
-  if (decoded.userId !== userId || decoded.provider !== provider || decoded.expiresAt < Date.now()) {
+  if (decoded.provider !== provider || decoded.expiresAt < Date.now()) {
+    throw new AuthError('Expired or mismatched OAuth state', 400);
+  }
+  return decoded.userId;
+}
+
+function verifyOAuthState(state: string, userId: string, provider: StorageProvider): void {
+  const stateUserId = extractAndVerifyOAuthState(state, provider);
+  if (stateUserId !== userId) {
     throw new AuthError('Expired or mismatched OAuth state', 400);
   }
 }
