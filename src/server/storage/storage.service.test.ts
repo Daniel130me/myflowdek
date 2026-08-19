@@ -109,7 +109,7 @@ describe('OAuth base URL and callback generation', () => {
       );
       assert.equal(authUrl.searchParams.get('response_type'), 'code');
       assert.equal(authUrl.searchParams.get('access_type'), 'offline');
-      assert.equal(authUrl.searchParams.get('prompt'), 'consent');
+      assert.equal(authUrl.searchParams.get('prompt'), 'select_account consent');
       assert.ok(authUrl.searchParams.get('state'));
     } finally {
       if (savedKey === undefined) delete process.env.STORAGE_TOKEN_ENCRYPTION_KEY;
