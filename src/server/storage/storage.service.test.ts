@@ -21,12 +21,27 @@ describe('OAuth base URL and callback generation', () => {
     (process.env as Record<string, string | undefined>).NODE_ENV = value;
   }
 
+  function restoreEnv() {
+    for (const key of Object.keys(process.env)) {
+      if (!(key in originalEnv)) {
+        delete process.env[key];
+      }
+    }
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+
   beforeEach(() => {
-    process.env = { ...originalEnv };
+    restoreEnv();
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
+    restoreEnv();
   });
 
   test('production APP_BASE_URL resolves correctly', () => {
