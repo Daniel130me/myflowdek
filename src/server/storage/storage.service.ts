@@ -297,11 +297,14 @@ export function listStorageConnections(userId: string) {
 export async function disconnectStorage(userId: string, provider: StorageProvider) {
   const connection = await db.storageConnection.findUnique({
     where: { userId_provider: { userId, provider } },
-    select: { id: true, _count: { select: { files: true } } },
+    select: { id: true, _count: { select: { files: true, projectDocuments: true } } },
   });
   if (!connection) throw new AuthError('Storage connection not found', 404);
-  if (connection._count.files > 0) {
-    throw new AuthError('This connection still owns Flowdek files and cannot be disconnected', 409);
+  if (connection._count.files > 0 || connection._count.projectDocuments > 0) {
+    throw new AuthError(
+      'This connection still owns Flowdek files or project documents and cannot be disconnected',
+      409,
+    );
   }
   await db.storageConnection.delete({ where: { id: connection.id } });
 }

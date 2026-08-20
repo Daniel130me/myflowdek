@@ -11,9 +11,10 @@ interface ShareFileModalProps {
   fileName: string;
   isOpen: boolean;
   onClose: () => void;
+  shareEndpoint?: string;
 }
 
-export function ShareFileModal({ fileId, fileName, isOpen, onClose }: ShareFileModalProps) {
+export function ShareFileModal({ fileId, fileName, isOpen, onClose, shareEndpoint }: ShareFileModalProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'reader' | 'writer'>('reader');
   const [loading, setLoading] = useState(false);
@@ -26,7 +27,7 @@ export function ShareFileModal({ fileId, fileName, isOpen, onClose }: ShareFileM
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/files/${fileId}/share`, {
+      const res = await fetch(shareEndpoint ?? `/api/files/${fileId}/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), role }),

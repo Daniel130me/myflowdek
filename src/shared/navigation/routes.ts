@@ -33,6 +33,7 @@ export const routes = {
   projectCalendar: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/calendar`,
   projectRaid: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/raid`,
   projectFiles: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/files`,
+  projectDocuments: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/documents`,
   projectTeam: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/team`,
   projectReports: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/reports`,
   projectDependencies: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/dependencies`,
@@ -97,6 +98,8 @@ export function getRouteForView(viewId: string, projectId?: string): string {
       return projectId ? routes.projectRaid(projectId) : routes.projects();
     case 'files':
       return projectId ? routes.projectFiles(projectId) : routes.projects();
+    case 'documents':
+      return projectId ? routes.projectDocuments(projectId) : routes.projects();
     case 'team':
       return projectId ? routes.projectTeam(projectId) : routes.projects();
     case 'reports':

@@ -7,7 +7,7 @@ replaced by Resend without changing email callers.
 ## Google Drive OAuth
 
 1. Create or select a project in Google Cloud Console.
-2. Enable the Google Drive API.
+2. Enable the Google Drive API, Google Docs API, and Google Sheets API. All three are required for the Project Documents template library.
 3. Configure the OAuth consent screen and add the test users who will connect
    their Drive accounts during development.
 4. Create an OAuth 2.0 Client ID with application type Web application.
@@ -23,7 +23,7 @@ replaced by Resend without changing email callers.
 7. Confirm APP_BASE_URL and NEXTAUTH_URL are both http://localhost:3004.
 8. Sign in to Flowdek, open Settings, and select Connect beside Google Drive.
 
-Flowdek requests the narrow drive.file scope. It can manage files created through
+Flowdek requests the narrow drive.file scope. The same grant is used by the Docs and Sheets APIs to create native documents in the user's account. It can manage files created through
 Flowdek without receiving broad access to every file in the user's Drive. OAuth
 access and refresh tokens are encrypted in PostgreSQL with
 STORAGE_TOKEN_ENCRYPTION_KEY.

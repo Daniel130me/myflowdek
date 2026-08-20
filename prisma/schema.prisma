@@ -72,71 +72,85 @@ enum StorageProvider {
   DROPBOX
 }
 
+enum ProjectDocumentPhase {
+  INITIATION
+  PLANNING
+  EXECUTION_MONITORING
+  CLOSING
+}
+
+enum TemplateDocumentType {
+  GOOGLE_DOC
+  GOOGLE_SHEET
+  FLOWDEK_GENERATED
+}
+
 /**
  * ------------------------------- user ---------------------------------
  */
 
 model User {
-  id                   String                @id @default(cuid())
-  email                String                @unique
-  name                 String?
-  passwordHash         String?
-  avatarUrl            String?
-  avatarColor          String?
+  id                      String                @id @default(cuid())
+  email                   String                @unique
+  name                    String?
+  passwordHash            String?
+  avatarUrl               String?
+  avatarColor             String?
   /**
    * Display-only job title (e.g. "Project Manager"). NOT used for authz.
    */
-  jobTitle             String?
-  status               UserStatus            @default(ACTIVE)
+  jobTitle                String?
+  status                  UserStatus            @default(ACTIVE)
   /**
    * Platform-level role. SUPER_ADMIN = internal Flowdeck team with access
    * to the admin dashboard. Completely distinct from workspace/project roles.
    */
-  platformRole         PlatformRole          @default(USER)
+  platformRole            PlatformRole          @default(USER)
   /**
    * Incremented on password reset / account disable / logout-all to
    * invalidate existing JWT sessions. The JWT carries sessionVersion;
    * mismatch = session revoked.
    */
-  sessionVersion       Int                   @default(0)
-  deletedAt            DateTime?
+  sessionVersion          Int                   @default(0)
+  deletedAt               DateTime?
   /**
    * Timestamp set when the user finishes onboarding. Null = not onboarded.
    * Source of truth for onboarding state (not localStorage).
    */
-  onboardedAt          DateTime?
+  onboardedAt             DateTime?
   /**
    * Set when the user clicks the email verification link.
    */
-  emailVerifiedAt      DateTime?
-  ownedProjects        Project[]             @relation("ProjectOwner")
-  memberships          ProjectMember[]
-  workspaces           WorkspaceMember[]
-  assignedTasks        Task[]                @relation("TaskAssignee")
-  createdTasks         Task[]                @relation("TaskCreator")
-  followingTasks       TaskFollower[]
-  comments             Comment[]
-  commentReactions     CommentReaction[]
-  files                File[]
-  storageConnections   StorageConnection[]
-  raidItems            RaidItem[]
-  timeLogs             TimeLog[]
-  activity             ActivityEntry[]
-  notifications        Notification[]
-  savedFilters         SavedFilter[]
-  commentMentions      CommentMention[]
-  projectStatusUpdates ProjectStatusUpdate[]
-  workspacePreferences WorkspacePreference[]
-  approvalRequests     ApprovalRequest[]     @relation("ApprovalRequester")
-  approvalsToResolve   ApprovalRequest[]     @relation("ApprovalApprover")
-  timesheets           TimesheetEntry[]
-  expenses             Expense[]             @relation("ExpenseCreator")
-  formSubmissions      FormSubmission[]      @relation("FormSubmitter")
-  verificationTokens   VerificationToken[]
-  auditLogs            AuditLog[]
-  sentInvitations      Invitation[]
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  emailVerifiedAt         DateTime?
+  ownedProjects           Project[]             @relation("ProjectOwner")
+  memberships             ProjectMember[]
+  workspaces              WorkspaceMember[]
+  assignedTasks           Task[]                @relation("TaskAssignee")
+  createdTasks            Task[]                @relation("TaskCreator")
+  followingTasks          TaskFollower[]
+  comments                Comment[]
+  commentReactions        CommentReaction[]
+  files                   File[]
+  storageConnections      StorageConnection[]
+  raidItems               RaidItem[]
+  timeLogs                TimeLog[]
+  activity                ActivityEntry[]
+  notifications           Notification[]
+  savedFilters            SavedFilter[]
+  commentMentions         CommentMention[]
+  projectStatusUpdates    ProjectStatusUpdate[]
+  workspacePreferences    WorkspacePreference[]
+  approvalRequests        ApprovalRequest[]     @relation("ApprovalRequester")
+  approvalsToResolve      ApprovalRequest[]     @relation("ApprovalApprover")
+  timesheets              TimesheetEntry[]
+  expenses                Expense[]             @relation("ExpenseCreator")
+  formSubmissions         FormSubmission[]      @relation("FormSubmitter")
+  verificationTokens      VerificationToken[]
+  auditLogs               AuditLog[]
+  sentInvitations         Invitation[]
+  createdProjectDocuments ProjectDocument[]     @relation("ProjectDocumentCreator")
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
 }
 
 /**
@@ -244,6 +258,7 @@ model Project {
   expenses        Expense[]
   statusUpdates   ProjectStatusUpdate[]
   customFields    CustomField[]
+  documents       ProjectDocument[]
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
 
@@ -484,7 +499,7 @@ model File {
  * OAuth credentials for a cloud drive connected by one Flowdek user.
  */
 model StorageConnection {
-  id                    String          @id @default(cuid())
+  id                    String            @id @default(cuid())
   userId                String
   provider              StorageProvider
   providerAccountId     String?
@@ -493,13 +508,59 @@ model StorageConnection {
   encryptedRefreshToken String?
   accessTokenExpiresAt  DateTime?
   scope                 String?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
-  user                  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   files                 File[]
+  projectDocuments      ProjectDocument[]
 
   @@unique([userId, provider])
   @@index([userId])
+}
+
+model DocumentTemplate {
+  id           String               @id @default(cuid())
+  slug         String               @unique
+  name         String
+  description  String
+  phase        ProjectDocumentPhase
+  documentType TemplateDocumentType
+  content      Json
+  thumbnailUrl String?
+  tags         String[]
+  version      Int                  @default(1)
+  isPublished  Boolean              @default(true)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  documents    ProjectDocument[]
+
+  @@index([phase, isPublished])
+  @@index([documentType, isPublished])
+}
+
+model ProjectDocument {
+  id                  String            @id @default(cuid())
+  projectId           String
+  templateId          String?
+  createdById         String
+  name                String
+  storageProvider     StorageProvider
+  storageConnectionId String
+  providerFileId      String
+  providerWebUrl      String
+  mimeType            String?
+  thumbnailUrl        String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  project             Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  template            DocumentTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdBy           User              @relation("ProjectDocumentCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  storageConnection   StorageConnection @relation(fields: [storageConnectionId], references: [id], onDelete: Restrict)
+
+  @@index([projectId, createdAt])
+  @@index([templateId])
+  @@index([createdById])
+  @@index([storageConnectionId])
 }
 
 model RaidItem {

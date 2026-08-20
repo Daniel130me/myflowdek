@@ -314,3 +314,19 @@ when measurements or team ownership demonstrate a real boundary.
 Wait for production measurements before adding a separate public API service,
 domain microservices, cross-region active-active operation, a search cluster, an
 analytics database, Kubernetes, or table partitioning.
+
+## Project Documents and template library
+
+Project Documents is a provider-native document domain. `DocumentTemplate` stores versioned, structured template definitions; `ProjectDocument` stores only project metadata and the provider file reference. File bodies never pass through or remain in Flowdek storage.
+
+Creation follows this boundary:
+
+1. The route verifies the project capability and validates input.
+2. The service loads the project, template, and caller's Google connection in one parallel read group.
+3. The allow-listed resolver substitutes project and workspace variables without evaluating code.
+4. The Google adapter creates and populates a native Doc or Sheet.
+5. Only after provider success does Flowdek persist the reference and audit the action.
+
+A provider failure therefore leaves no orphaned database reference. Removing a Project Document deletes only the Flowdek reference; it intentionally does not delete the user's Google Drive file. Disconnecting a storage account is blocked while either uploaded files or project-document references depend on it.
+
+The adapter interface isolates provider APIs so OneDrive and Dropbox document implementations can be added without changing routes, template data, or the user interface. Template seeding uses stable slugs and transactional upserts, making repeated deployment seeds safe.

@@ -2,7 +2,7 @@
 
 import {
   LayoutGrid, GanttChartSquare, KanbanSquare, ListChecks, Users, BarChart3,
-  ShieldAlert, FolderOpen, Calendar as CalendarIcon, Table2, MoreHorizontal,
+  ShieldAlert, FolderOpen, BookOpen, Calendar as CalendarIcon, Table2, MoreHorizontal,
   CheckSquare, Link2, Inbox, Target, Zap, FileText, CheckCircle, DollarSign, Clock, Sparkles,
 } from 'lucide-react';
 
@@ -16,6 +16,7 @@ export const NAV = [
   { id: 'calendar', label: 'Calendar', icon: CalendarIcon },
   { id: 'raid', label: 'RAID Log', icon: ShieldAlert },
   { id: 'files', label: 'Files', icon: FolderOpen },
+  { id: 'documents', label: 'Documents', icon: BookOpen },
   { id: 'team', label: 'Team', icon: Users },
   { id: 'reports', label: 'Reports', icon: BarChart3 },
   { id: 'deps', label: 'Dependencies', icon: Link2 },
@@ -43,6 +44,7 @@ export const MORE_NAV = [
   { id: 'sheet', label: 'Sheet', icon: Table2 },
   { id: 'raid', label: 'RAID Log', icon: ShieldAlert },
   { id: 'files', label: 'Files', icon: FolderOpen },
+  { id: 'documents', label: 'Documents', icon: BookOpen },
   { id: 'team', label: 'Team', icon: Users },
   { id: 'reports', label: 'Reports', icon: BarChart3 },
   { id: 'deps', label: 'Dependencies', icon: Link2 },

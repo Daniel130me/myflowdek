@@ -95,6 +95,18 @@ All endpoints (except auth routes and public invitation view) require a valid Ne
 |----------|--------|------|-------------|
 | `/api/files/:fileId/download` | GET | Project member | Stream from connected storage (legacy R2 fallback) |
 
+## Project Documents
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/document-templates` | GET | Authenticated | List published templates; accepts `phase` and `search` |
+| `/api/document-templates/:templateId` | GET | Authenticated | Retrieve one published template by id or slug |
+| `/api/projects/:projectId/documents` | GET | Project member | List project document references |
+| `/api/projects/:projectId/documents/from-template` | POST | Upload capability | Create a native Google Doc or Sheet and persist its reference |
+| `/api/projects/:projectId/documents/:documentId` | PATCH/DELETE | Creator or project manager | Rename or remove the Flowdek reference |
+| `/api/projects/:projectId/documents/:documentId/share` | POST | Creator or project manager | Grant a project/workspace member provider access |
+
+Deleting a Project Document reference never deletes the provider-owned file.
 ## Invitations
 
 | Endpoint | Method | Auth | Description |

@@ -111,6 +111,7 @@ export const NAV_ITEMS = [
   { id: "calendar", label: "Calendar" },
   { id: "raid", label: "RAID Log" },
   { id: "files", label: "Files" },
+  { id: "documents", label: "Documents" },
   { id: "team", label: "Team" },
   { id: "reports", label: "Reports" },
   { id: "deps", label: "Dependencies" },
