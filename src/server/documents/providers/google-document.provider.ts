@@ -14,6 +14,19 @@ const GOOGLE_SHEET_MIME = 'application/vnd.google-apps.spreadsheet';
 
 type GoogleDocsRequest = Record<string, unknown>;
 
+type GoogleWorkspaceApi = 'Google Docs' | 'Google Sheets';
+
+interface GoogleApiErrorBody {
+  error?: {
+    message?: string;
+    errors?: Array<{ reason?: string }>;
+    details?: Array<{ reason?: string; metadata?: { service?: string } }>;
+  };
+}
+
+const API_DISABLED_REASONS = new Set(['accessnotconfigured', 'service_disabled']);
+const INSUFFICIENT_SCOPE_REASONS = new Set(['insufficientpermissions', 'access_token_scope_insufficient']);
+
 function appendBlock(requests: GoogleDocsRequest[], block: DocumentBlock, startIndex: number): number {
   if (block.type === 'heading') {
     const text = `${block.text}\n`;
@@ -115,12 +128,57 @@ function sheetGridData(sheet: SheetDefinition) {
   };
 }
 
-async function providerError(response: Response, fallback: string): Promise<never> {
-  const body = await response.json().catch(() => ({})) as { error?: { message?: string } };
-  if (response.status === 401 || response.status === 403) {
+async function providerError(
+  response: Response,
+  fallback: string,
+  api: GoogleWorkspaceApi,
+): Promise<never> {
+  const body = await response.json().catch(() => ({})) as GoogleApiErrorBody;
+  const reasons = [
+    ...(body.error?.errors?.map(({ reason }) => reason) ?? []),
+    ...(body.error?.details?.map(({ reason }) => reason) ?? []),
+  ]
+    .filter((reason): reason is string => Boolean(reason))
+    .map((reason) => reason.toLowerCase());
+  const message = body.error?.message ?? '';
+  const normalizedMessage = message.toLowerCase();
+
+  if (response.status === 401) {
     throw new AuthError('Google Drive authorization is no longer valid. Reconnect it in Settings.', 403);
   }
-  throw new AuthError(body.error?.message ?? fallback, 502);
+
+  if (
+    response.status === 403
+    && (
+      reasons.some((reason) => API_DISABLED_REASONS.has(reason))
+      || normalizedMessage.includes('has not been used in project')
+      || normalizedMessage.includes('api is disabled')
+    )
+  ) {
+    throw new AuthError(
+      `${api} API is not enabled for this OAuth project. Enable it in Google Cloud Console, wait a few minutes, then try again.`,
+      502,
+    );
+  }
+
+  if (
+    response.status === 403
+    && (
+      reasons.some((reason) => INSUFFICIENT_SCOPE_REASONS.has(reason))
+      || normalizedMessage.includes('insufficient authentication scopes')
+    )
+  ) {
+    throw new AuthError('Google Drive authorization is missing the required permission. Reconnect it in Settings.', 403);
+  }
+
+  if (response.status === 403) {
+    throw new AuthError(
+      `${api} denied the request. Confirm the API is enabled and your Google account can create files.`,
+      403,
+    );
+  }
+
+  throw new AuthError(message || fallback, 502);
 }
 
 export class GoogleDocumentProviderAdapter implements IDocumentProviderAdapter {
@@ -141,7 +199,7 @@ export class GoogleDocumentProviderAdapter implements IDocumentProviderAdapter {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: input.name }),
     });
-    if (!created.ok) return providerError(created, 'Google Docs could not create the document.');
+    if (!created.ok) return providerError(created, 'Google Docs could not create the document.', 'Google Docs');
     const document = await created.json() as { documentId: string };
 
     const populated = await this.fetcher(
@@ -152,7 +210,7 @@ export class GoogleDocumentProviderAdapter implements IDocumentProviderAdapter {
         body: JSON.stringify({ requests: buildGoogleDocsRequests(input.content) }),
       },
     );
-    if (!populated.ok) return providerError(populated, 'Google Docs could not populate the document.');
+    if (!populated.ok) return providerError(populated, 'Google Docs could not populate the document.', 'Google Docs');
 
     return {
       providerFileId: document.documentId,
@@ -184,7 +242,7 @@ export class GoogleDocumentProviderAdapter implements IDocumentProviderAdapter {
         })),
       }),
     });
-    if (!created.ok) return providerError(created, 'Google Sheets could not create the spreadsheet.');
+    if (!created.ok) return providerError(created, 'Google Sheets could not create the spreadsheet.', 'Google Sheets');
     const spreadsheet = await created.json() as {
       spreadsheetId: string;
       spreadsheetUrl?: string;
@@ -211,7 +269,7 @@ export class GoogleDocumentProviderAdapter implements IDocumentProviderAdapter {
           body: JSON.stringify({ requests: autoResizeRequests }),
         },
       );
-      if (!formatted.ok) return providerError(formatted, 'Google Sheets could not format the spreadsheet.');
+      if (!formatted.ok) return providerError(formatted, 'Google Sheets could not format the spreadsheet.', 'Google Sheets');
     }
 
     return {

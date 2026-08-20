@@ -45,3 +45,44 @@ test('surfaces expired Google authorization without persisting metadata', async 
   const provider = new GoogleDocumentProviderAdapter((async () => jsonResponse({ error: { message: 'expired' } }, 401)) as typeof fetch, async () => 'access-token');
   await assert.rejects(() => provider.createDocument(connection, { name: 'Charter', content: { sections: [] } }), /Reconnect it in Settings/);
 });
+test('reports a disabled Google Docs API instead of asking the user to reconnect', async () => {
+  const response = jsonResponse({
+    error: {
+      message: 'Google Docs API has not been used in project 123 before or it is disabled.',
+      details: [{ reason: 'SERVICE_DISABLED', metadata: { service: 'docs.googleapis.com' } }],
+    },
+  }, 403);
+  const provider = new GoogleDocumentProviderAdapter((async () => response) as typeof fetch, async () => 'access-token');
+
+  await assert.rejects(
+    () => provider.createDocument(connection, { name: 'Charter', content: { sections: [] } }),
+    /Google Docs API is not enabled.*Google Cloud Console/,
+  );
+});
+
+test('asks for reconnection only when Google reports insufficient OAuth scope', async () => {
+  const response = jsonResponse({
+    error: {
+      message: 'Request had insufficient authentication scopes.',
+      errors: [{ reason: 'insufficientPermissions' }],
+    },
+  }, 403);
+  const provider = new GoogleDocumentProviderAdapter((async () => response) as typeof fetch, async () => 'access-token');
+
+  await assert.rejects(
+    () => provider.createDocument(connection, { name: 'Charter', content: { sections: [] } }),
+    /missing the required permission.*Reconnect/,
+  );
+});
+
+test('reports a generic Google Docs denial without claiming the token expired', async () => {
+  const provider = new GoogleDocumentProviderAdapter(
+    (async () => jsonResponse({ error: { message: 'Forbidden' } }, 403)) as typeof fetch,
+    async () => 'access-token',
+  );
+
+  await assert.rejects(
+    () => provider.createDocument(connection, { name: 'Charter', content: { sections: [] } }),
+    /Google Docs denied the request/,
+  );
+});

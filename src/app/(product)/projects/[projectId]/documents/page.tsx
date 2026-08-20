@@ -148,7 +148,7 @@ export default function ProjectDocumentsPage() {
       <section className={styles.modal} role="dialog" aria-modal="true" aria-label={`Preview ${preview.name}`}>
         <button className={styles.close} onClick={() => setPreview(null)} disabled={creating}><X size={18} /></button>
         <div className={styles.previewHeading}><div className={`${styles.fileIcon} ${styles.large}`}><DocumentIcon type={preview.documentType} size={28} /></div><div><span className={styles.badge}>{phaseLabel(preview.phase)}</span><h2>{preview.name}</h2></div></div>
-        <p className={styles.description}>{preview.description}</p><h3>What this template contains</h3><ul>{contents(preview).map((item) => <li key={item}>{item}</li>)}</ul>
+        <p className={styles.description}>{preview.description}</p><h3>What this template contains</h3><ul>{contents(preview).map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>
         <div className={styles.note}><Cloud size={17} /><span>A native {preview.documentType === 'GOOGLE_SHEET' ? 'Google Sheet' : 'Google Doc'} will be created in <strong>your</strong> connected Drive. Flowdek stores only its reference.</span></div>
         <div className={styles.modalActions}><button className={styles.secondary} onClick={() => setPreview(null)} disabled={creating}>Cancel</button><button className={styles.primary} onClick={() => void createDocument()} disabled={creating}>{creating ? <><Loader2 className={styles.spin} size={16} /> Creating…</> : 'Create in Google Drive'}</button></div>
       </section>
