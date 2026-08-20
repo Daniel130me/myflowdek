@@ -1,11 +1,16 @@
-import type { ProjectRole } from '@prisma/client';
+import type { ProjectRole, StorageProvider } from '@prisma/client';
 import { db } from '@/server/db/client';
 import { AuthError } from '@/server/auth/authorization';
 import { audit } from '@/server/audit/log';
 import { getFileProviderAdapter } from '@/server/storage/providers';
 import { getDocumentProviderAdapter } from './providers';
 import type { IDocumentProviderAdapter } from './providers';
-import type { GoogleDocumentContent, GoogleSheetContent, StructuredTemplateContent } from './types';
+import type {
+  GoogleDocumentContent,
+  GoogleSheetContent,
+  ProviderDocumentUpdate,
+  StructuredTemplateContent,
+} from './types';
 import { resolveTemplateVariables } from './template-resolver';
 import type { CreateProjectDocumentInput } from './schemas';
 
@@ -45,7 +50,7 @@ function isDocumentContent(content: StructuredTemplateContent): content is Googl
   return 'sections' in content;
 }
 
-export type DocumentProviderFactory = (provider: 'GOOGLE_DRIVE') => IDocumentProviderAdapter;
+export type DocumentProviderFactory = (provider: StorageProvider) => IDocumentProviderAdapter;
 
 /** Create a provider-native document, then persist metadata only after success. */
 export async function createProjectDocumentFromTemplate(
@@ -132,6 +137,69 @@ export async function createProjectDocumentFromTemplate(
 
 function canManageDocument(createdById: string, userId: string, role: ProjectRole): boolean {
   return createdById === userId || managerRoles.includes(role);
+}
+
+function findDocumentWithConnection(projectId: string, documentId: string) {
+  return db.projectDocument.findFirst({
+    where: { id: documentId, projectId },
+    select: {
+      id: true,
+      createdById: true,
+      storageProvider: true,
+      providerFileId: true,
+      mimeType: true,
+      storageConnection: true,
+    },
+  });
+}
+
+export async function getProjectDocumentContent(
+  projectId: string,
+  documentId: string,
+  userId: string,
+  role: ProjectRole,
+  providerFactory: DocumentProviderFactory = getDocumentProviderAdapter,
+) {
+  const document = await findDocumentWithConnection(projectId, documentId);
+  if (!document) throw new AuthError('Project document not found', 404);
+  const provider = providerFactory(document.storageProvider);
+  const content = await provider.readContent(
+    document.storageConnection,
+    document.providerFileId,
+    document.mimeType,
+  );
+  return {
+    content,
+    canEdit: canManageDocument(document.createdById, userId, role),
+  };
+}
+
+export async function updateProjectDocumentContent(
+  projectId: string,
+  documentId: string,
+  userId: string,
+  role: ProjectRole,
+  update: ProviderDocumentUpdate,
+  providerFactory: DocumentProviderFactory = getDocumentProviderAdapter,
+) {
+  const document = await findDocumentWithConnection(projectId, documentId);
+  if (!document) throw new AuthError('Project document not found', 404);
+  if (!canManageDocument(document.createdById, userId, role)) {
+    throw new AuthError('Only the document creator or a project manager can edit it', 403);
+  }
+  const provider = providerFactory(document.storageProvider);
+  const content = await provider.updateContent(
+    document.storageConnection,
+    document.providerFileId,
+    document.mimeType,
+    update,
+  );
+  await audit({
+    userId,
+    action: 'project_document_content_updated',
+    meta: { projectId, projectDocumentId: document.id, contentKind: update.kind },
+  });
+  return content;
 }
 
 export async function renameProjectDocumentReference(

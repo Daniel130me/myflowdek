@@ -41,6 +41,78 @@ test('creates a formatted native Google Sheet', async () => {
   assert.match(calls[1]!, /sheet-1:batchUpdate$/);
 });
 
+test('reads Google Docs paragraphs for an in-app preview', async () => {
+  const response = jsonResponse({
+    title: 'Project Charter',
+    revisionId: 'revision-7',
+    body: { content: [
+      { sectionBreak: {}, startIndex: 0, endIndex: 1 },
+      { paragraph: { paragraphStyle: { namedStyleType: 'TITLE' }, elements: [{ startIndex: 1, endIndex: 9, textRun: { content: 'Charter\n' } }] }, startIndex: 1, endIndex: 9 },
+      { paragraph: { bullet: { listId: 'list-1' }, elements: [{ startIndex: 9, endIndex: 15, textRun: { content: 'Scope\n' } }] }, startIndex: 9, endIndex: 15 },
+    ] },
+  });
+  const provider = new GoogleDocumentProviderAdapter((async () => response) as typeof fetch, async () => 'access-token');
+  const snapshot = await provider.readContent(connection, 'doc-123', 'application/vnd.google-apps.document');
+  assert.equal(snapshot.kind, 'document');
+  if (snapshot.kind !== 'document') return;
+  assert.equal(snapshot.revisionId, 'revision-7');
+  assert.equal(snapshot.paragraphs[0]?.text, 'Charter');
+  assert.equal(snapshot.paragraphs[0]?.style, 'TITLE');
+  assert.equal(snapshot.paragraphs[1]?.isBullet, true);
+});
+
+test('updates changed Google Docs paragraphs with revision conflict protection', async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const responses = [
+    jsonResponse({}),
+    jsonResponse({ title: 'Project Charter', revisionId: 'revision-8', body: { content: [
+      { paragraph: { elements: [{ startIndex: 1, endIndex: 17, textRun: { content: 'Updated Charter\n' } }] }, startIndex: 1, endIndex: 17 },
+    ] } }),
+  ];
+  const fetcher = (async (input: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(input), init });
+    return responses.shift()!;
+  }) as typeof fetch;
+  const provider = new GoogleDocumentProviderAdapter(fetcher, async () => 'access-token');
+  const snapshot = await provider.updateContent(
+    connection,
+    'doc-123',
+    'application/vnd.google-apps.document',
+    { kind: 'document', revisionId: 'revision-7', paragraphs: [{ startIndex: 1, endIndex: 8, text: 'Updated Charter' }] },
+  );
+  const body = JSON.parse(String(calls[0]?.init?.body)) as { requests: unknown[]; writeControl: { requiredRevisionId: string } };
+  assert.equal(body.writeControl.requiredRevisionId, 'revision-7');
+  assert.equal(body.requests.length, 2);
+  assert.equal(snapshot.revisionId, 'revision-8');
+});
+
+test('reads a bounded Google Sheets grid with a content revision', async () => {
+  const responses = [
+    jsonResponse({ properties: { title: 'Risk Register' }, sheets: [{ properties: { sheetId: 12, title: 'Risks' } }] }),
+    jsonResponse({ valueRanges: [{ values: [['Risk', 'Owner'], ['Delay', 'Daniel']] }] }),
+  ];
+  const provider = new GoogleDocumentProviderAdapter((async () => responses.shift()!) as typeof fetch, async () => 'access-token');
+  const snapshot = await provider.readContent(connection, 'sheet-1', 'application/vnd.google-apps.spreadsheet');
+  assert.equal(snapshot.kind, 'spreadsheet');
+  if (snapshot.kind !== 'spreadsheet') return;
+  assert.equal(snapshot.sheets[0]?.values[1]?.[0], 'Delay');
+  assert.ok(snapshot.revisionId.length > 10);
+  assert.equal(snapshot.sheets[0]?.truncated, false);
+});
+
+test('reports a Google Docs revision conflict without discarding user edits', async () => {
+  const provider = new GoogleDocumentProviderAdapter(
+    (async () => jsonResponse({ error: { message: 'The provided revision is not the latest revision.' } }, 400)) as typeof fetch,
+    async () => 'access-token',
+  );
+  await assert.rejects(
+    () => provider.updateContent(connection, 'doc-123', 'application/vnd.google-apps.document', {
+      kind: 'document', revisionId: 'old-revision', paragraphs: [{ startIndex: 1, endIndex: 8, text: 'Updated' }],
+    }),
+    /changed in Google.*Reload/,
+  );
+});
+
 test('surfaces expired Google authorization without persisting metadata', async () => {
   const provider = new GoogleDocumentProviderAdapter((async () => jsonResponse({ error: { message: 'expired' } }, 401)) as typeof fetch, async () => 'access-token');
   await assert.rejects(() => provider.createDocument(connection, { name: 'Charter', content: { sections: [] } }), /Reconnect it in Settings/);

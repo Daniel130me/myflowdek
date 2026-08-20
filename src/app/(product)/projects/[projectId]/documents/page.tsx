@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { BookOpen, CalendarDays, Cloud, ExternalLink, FileSpreadsheet, FileText, Loader2, Pencil, Search, Share2, Trash2, UserRound, X } from 'lucide-react';
+import { BookOpen, CalendarDays, Cloud, ExternalLink, Eye, FileSpreadsheet, FileText, Loader2, Pencil, Search, Share2, Trash2, UserRound, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ShareFileModal } from '@/features/flowdeck/components/modals';
 import { getSingleParam } from '@/shared/utils/routeParams';
+import { DocumentWorkspace } from './DocumentWorkspace';
+import type { ProjectDocument } from './document-client.types';
 import styles from './documents.module.css';
 
 const PHASES = [
@@ -16,7 +18,6 @@ const PHASES = [
 
 type TemplateContent = { sections?: Array<{ heading: string }>; sheets?: Array<{ name: string; columns: string[] }> };
 type DocumentTemplate = { id: string; slug: string; name: string; description: string; phase: string; documentType: 'GOOGLE_DOC' | 'GOOGLE_SHEET' | 'FLOWDEK_GENERATED'; content: TemplateContent; tags: string[] };
-type ProjectDocument = { id: string; name: string; providerWebUrl: string; mimeType: string | null; storageProvider: 'GOOGLE_DRIVE'; createdAt: string; createdBy: { name: string | null; email: string }; template: { name: string; phase: string; documentType: string } | null };
 type StorageConnection = { provider: 'GOOGLE_DRIVE'; providerEmail: string | null };
 
 async function readResponse<T>(response: Response): Promise<T> {
@@ -52,6 +53,7 @@ export default function ProjectDocumentsPage() {
   const [creating, setCreating] = useState(false);
   const [preview, setPreview] = useState<DocumentTemplate | null>(null);
   const [sharing, setSharing] = useState<ProjectDocument | null>(null);
+  const [viewer, setViewer] = useState<ProjectDocument | null>(null);
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -86,7 +88,7 @@ export default function ProjectDocumentsPage() {
       setDocuments((current) => [document, ...current]);
       setPreview(null); setTab('documents');
       toast.success('Document created in your Google Drive');
-      window.open(document.providerWebUrl, '_blank', 'noopener,noreferrer');
+      setViewer(document);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Document creation failed';
       toast.error(message); if (/connect google drive/i.test(message)) router.push('/settings');
@@ -139,8 +141,10 @@ export default function ProjectDocumentsPage() {
     </section> : !documents.length ? <div className={styles.empty}><div className={styles.emptyIcon}><BookOpen size={30} /></div><h2>No project documents yet</h2><p>Choose a template and Flowdek will create a native file in your Google Drive.</p><button className={styles.primary} onClick={() => setTab('templates')}>Browse templates</button></div> : <section className={styles.list}>
       {documents.map((document) => <article className={styles.row} key={document.id}>
         <div className={styles.fileIcon}><DocumentIcon type={document.template?.documentType ?? document.mimeType ?? ''} /></div>
-        <div className={styles.documentMain}><h2>{document.name}</h2><div className={styles.metadata}><span><UserRound size={13} /> {document.createdBy.name ?? document.createdBy.email}</span><span><CalendarDays size={13} /> {new Date(document.createdAt).toLocaleDateString()}</span>{document.template && <><span>{document.template.name}</span><span>{phaseLabel(document.template.phase)}</span><span>{typeLabel(document.template.documentType)}</span></>}<span><Cloud size={13} /> Google Drive · {drive ? 'Connected' : 'Reconnect required'}</span></div></div>
-        <div className={styles.actions}><button title="Open in Google Drive" onClick={() => window.open(document.providerWebUrl, '_blank', 'noopener,noreferrer')}><ExternalLink size={17} /></button><button title="Share" onClick={() => setSharing(document)}><Share2 size={17} /></button><button title="Rename Flowdek reference" onClick={() => void renameDocument(document)}><Pencil size={17} /></button><button className={styles.danger} title="Remove from Flowdek" onClick={() => void removeDocument(document)}><Trash2 size={17} /></button></div>
+        <button className={styles.documentMain} onClick={() => setViewer(document)}>
+          <h2>{document.name}</h2><div className={styles.metadata}><span><UserRound size={13} /> {document.createdBy.name ?? document.createdBy.email}</span><span><CalendarDays size={13} /> {new Date(document.createdAt).toLocaleDateString()}</span>{document.template && <><span>{document.template.name}</span><span>{phaseLabel(document.template.phase)}</span><span>{typeLabel(document.template.documentType)}</span></>}<span><Cloud size={13} /> Google Drive · {drive ? 'Connected' : 'Reconnect required'}</span></div>
+        </button>
+        <div className={styles.actions}><button title="Preview in Flowdek" onClick={() => setViewer(document)}><Eye size={17} /></button><button title="Open in Google Drive" onClick={() => window.open(document.providerWebUrl, '_blank', 'noopener,noreferrer')}><ExternalLink size={17} /></button><button title="Share" onClick={() => setSharing(document)}><Share2 size={17} /></button><button title="Rename Flowdek reference" onClick={() => void renameDocument(document)}><Pencil size={17} /></button><button className={styles.danger} title="Remove from Flowdek" onClick={() => void removeDocument(document)}><Trash2 size={17} /></button></div>
       </article>)}
     </section>}
 
@@ -155,5 +159,6 @@ export default function ProjectDocumentsPage() {
     </div>}
 
     {sharing && <ShareFileModal fileId={sharing.id} fileName={sharing.name} isOpen shareEndpoint={`/api/projects/${projectId}/documents/${sharing.id}/share`} onClose={() => setSharing(null)} />}
+    {viewer && projectId && <DocumentWorkspace projectId={projectId} document={viewer} onClose={() => setViewer(null)} />}
   </main>;
 }

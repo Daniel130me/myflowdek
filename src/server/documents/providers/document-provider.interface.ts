@@ -1,5 +1,10 @@
 import type { StorageConnection, StorageProvider } from '@prisma/client';
-import type { GoogleDocumentContent, GoogleSheetContent } from '../types';
+import type {
+  GoogleDocumentContent,
+  GoogleSheetContent,
+  ProviderDocumentSnapshot,
+  ProviderDocumentUpdate,
+} from '../types';
 
 export interface CreatedProviderDocument {
   providerFileId: string;
@@ -22,4 +27,15 @@ export interface IDocumentProviderAdapter {
   provider: StorageProvider;
   createDocument(connection: StorageConnection, input: CreateDocumentInput): Promise<CreatedProviderDocument>;
   createSpreadsheet(connection: StorageConnection, input: CreateSpreadsheetInput): Promise<CreatedProviderDocument>;
+  readContent(
+    connection: StorageConnection,
+    providerFileId: string,
+    mimeType: string | null,
+  ): Promise<ProviderDocumentSnapshot>;
+  updateContent(
+    connection: StorageConnection,
+    providerFileId: string,
+    mimeType: string | null,
+    update: ProviderDocumentUpdate,
+  ): Promise<ProviderDocumentSnapshot>;
 }

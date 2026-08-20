@@ -4,8 +4,10 @@ import { PrismaClient } from '@prisma/client';
 import { requireProjectCapability } from '@/server/auth/authorization';
 import {
   createProjectDocumentFromTemplate,
+  getProjectDocumentContent,
   listProjectDocuments,
   removeProjectDocumentReference,
+  updateProjectDocumentContent,
 } from '../project-document.service';
 import { getDocumentTemplate, listDocumentTemplates } from '../template.service';
 import { seedDocumentTemplates } from '../template-seed.service';
@@ -26,6 +28,21 @@ const provider: IDocumentProviderAdapter = {
   },
   async createSpreadsheet(_connection, input) {
     return { providerFileId: `sheet-${runId}`, providerWebUrl: `https://docs.google.com/spreadsheets/d/sheet-${runId}/edit`, mimeType: 'application/vnd.google-apps.spreadsheet' };
+  },
+  async readContent() {
+    return {
+      kind: 'document', title: 'Project Charter', revisionId: 'revision-1',
+      paragraphs: [{ id: '1:8', startIndex: 1, endIndex: 8, text: 'Charter', style: 'TITLE', isBullet: false, editable: true }],
+      hasUnsupportedContent: false,
+    };
+  },
+  async updateContent(_connection, _providerFileId, _mimeType, update) {
+    assert.equal(update.kind, 'document');
+    return {
+      kind: 'document', title: 'Project Charter', revisionId: 'revision-2',
+      paragraphs: [{ id: '1:16', startIndex: 1, endIndex: 16, text: 'Updated Charter', style: 'TITLE', isBullet: false, editable: true }],
+      hasUnsupportedContent: false,
+    };
   },
 };
 
@@ -87,6 +104,25 @@ describe('project document lifecycle', () => {
     const document = await createProjectDocumentFromTemplate(projectId, ownerId, { templateId, name: 'Removable Charter' }, () => provider);
     await removeProjectDocumentReference(projectId, document.id, ownerId, 'OWNER');
     assert.equal(await prisma.projectDocument.findUnique({ where: { id: document.id } }), null);
+  });
+
+  test('previews and updates provider content without storing a local copy', async () => {
+    const document = await createProjectDocumentFromTemplate(projectId, ownerId, { templateId, name: 'Editable Charter' }, () => provider);
+    const preview = await getProjectDocumentContent(projectId, document.id, ownerId, 'OWNER', () => provider);
+    assert.equal(preview.canEdit, true);
+    assert.equal(preview.content.kind, 'document');
+
+    const updated = await updateProjectDocumentContent(
+      projectId,
+      document.id,
+      ownerId,
+      'OWNER',
+      { kind: 'document', revisionId: 'revision-1', paragraphs: [{ startIndex: 1, endIndex: 8, text: 'Updated Charter' }] },
+      () => provider,
+    );
+    assert.equal(updated.revisionId, 'revision-2');
+    const persisted = await prisma.projectDocument.findUniqueOrThrow({ where: { id: document.id } });
+    assert.equal((persisted as Record<string, unknown>).content, undefined);
   });
 
   test('rejects creation when the caller has no connected Google Drive', async () => {
