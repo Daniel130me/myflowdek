@@ -66,7 +66,7 @@ export default function ProjectFilesPage() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontFamily: FF }}>
-        <span style={{ fontSize: 12, color: COLORS.gray }}>Save uploads to</span>
+        <span style={{ fontSize: 12, color: COLORS.gray }}>Connected storage</span>
         {connections.length > 0 ? (
           <select
             value={provider}
