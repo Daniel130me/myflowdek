@@ -20,7 +20,7 @@ import { getValidAccessToken } from '@/server/storage/storage.service';
  *     clientId: string,        // Google OAuth client ID (for Picker API)
  *     appId: string,           // Google Cloud project number (for Picker)
  *     accessToken: string,     // Valid OAuth token for the connected user
- *     developerKey: string | null  // API key if configured (optional)
+ *     developerKey: string     // Google API key (required for Picker)
  *   }
  *
  * The frontend uses this to construct a `google.picker.PickerBuilder` and
@@ -60,8 +60,16 @@ export async function GET() {
     const appId = process.env.GOOGLE_DRIVE_APP_ID
       ?? clientId.split('-')[0].split('.')[0];
 
-    // The developer key (API key) is optional for Picker when using OAuth tokens.
-    const developerKey = process.env.GOOGLE_DRIVE_DEVELOPER_KEY ?? null;
+    // The developer key (API key) is REQUIRED for Google Picker.
+    // Without it, the Picker API cannot initialize. This is a server-side
+    // configuration error — return 500 so it's visible in logs.
+    const developerKey = process.env.GOOGLE_DRIVE_DEVELOPER_KEY;
+    if (!developerKey) {
+      return NextResponse.json(
+        { error: 'Google Picker is not configured. Set GOOGLE_DRIVE_DEVELOPER_KEY on the server.' },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({
       clientId,

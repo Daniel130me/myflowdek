@@ -124,6 +124,23 @@ export async function attachConnectedFile(
   });
 }
 
+/**
+ * Share a connected-provider file with a teammate via the provider's
+ * permissions API (e.g. Google Drive permissions).
+ *
+ * Authorization policy:
+ *   - Only the file owner (uploadedById) OR a project MANAGER/ADMIN/OWNER
+ *     can share a file. Ordinary VIEWERs and MEMBERs cannot mutate
+ *     another user's Google Drive permissions — that would allow them
+ *     to grant arbitrary external emails access to files they don't own.
+ *   - The target email MUST be a member of the same project (or workspace).
+ *     This prevents sharing with arbitrary external emails under the guise
+ *     of "share with teammate". If the target is not a project/workspace
+ *     member, the request is rejected.
+ *   - The caller's own OAuth connection is used — NOT the file owner's —
+ *     so the permission is applied under the caller's identity, and only
+ *     if the caller has their own connected storage.
+ */
 export async function shareFileWithTeammate(
   fileId: string,
   callerUserId: string,
@@ -139,13 +156,77 @@ export async function shareFileWithTeammate(
     throw new AuthError('Sharing is only supported for cloud provider files', 400);
   }
 
-  // Find caller's connection or file owner's connection
-  const connection = file.storageConnection ?? await db.storageConnection.findUnique({
+  // Authorization: only the file owner OR a project MANAGER+ can share.
+  const isFileOwner = file.uploadedById === callerUserId;
+  if (!isFileOwner) {
+    const callerMembership = await db.projectMember.findUnique({
+      where: { projectId_userId: { projectId: file.projectId, userId: callerUserId } },
+      select: { role: true },
+    });
+    if (!callerMembership) {
+      throw new AuthError('You do not have access to this project', 403);
+    }
+    const managerRoles = ['OWNER', 'ADMIN'];
+    if (!managerRoles.includes(callerMembership.role)) {
+      throw new AuthError(
+        'Only the file owner or a project manager can share connected files',
+        403,
+      );
+    }
+  }
+
+  // Validate that the target email is a project or workspace member.
+  // This prevents sharing with arbitrary external emails.
+  const targetUser = await db.user.findUnique({
+    where: { email: targetEmail.toLowerCase() },
+    select: { id: true },
+  });
+  if (!targetUser) {
+    throw new AuthError(
+      'The recipient is not a Flowdek user. Only project/workspace members can be shared with.',
+      400,
+    );
+  }
+  const targetIsProjectMember = await db.projectMember.findUnique({
+    where: { projectId_userId: { projectId: file.projectId, userId: targetUser.id } },
+    select: { userId: true },
+  });
+  if (!targetIsProjectMember) {
+    // Check workspace membership as a fallback.
+    const workspace = await db.workspace.findFirst({
+      where: { projects: { some: { id: file.projectId } } },
+      select: { id: true },
+    });
+    if (workspace) {
+      const targetIsWorkspaceMember = await db.workspaceMember.findUnique({
+        where: { workspaceId_userId: { workspaceId: workspace.id, userId: targetUser.id } },
+        select: { userId: true },
+      });
+      if (!targetIsWorkspaceMember) {
+        throw new AuthError(
+          'The recipient is not a member of this project or workspace',
+          400,
+        );
+      }
+    } else {
+      throw new AuthError(
+        'The recipient is not a member of this project',
+        400,
+      );
+    }
+  }
+
+  // Use the CALLER's own OAuth connection — NOT the file owner's — so
+  // the permission is applied under the caller's identity. If the caller
+  // doesn't have their own connected storage for this provider, reject.
+  const connection = await db.storageConnection.findUnique({
     where: { userId_provider: { userId: callerUserId, provider: file.storageProvider } },
   });
-
   if (!connection) {
-    throw new AuthError('No storage connection available to apply provider permissions', 409);
+    throw new AuthError(
+      `You must connect your own ${file.storageProvider} account in Settings before sharing files`,
+      409,
+    );
   }
 
   const adapter = getFileProviderAdapter(file.storageProvider);

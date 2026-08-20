@@ -39,6 +39,14 @@ const PROVIDER_NAMES: Record<string, string> = {
 };
 
 /**
+ * Providers currently enabled in the product.
+ * Only Google Drive is active — OneDrive and Dropbox are deferred until
+ * their adapters are fully implemented. Hiding them prevents users from
+ * hitting unsupported-provider errors.
+ */
+const ENABLED_PROVIDERS: ReadonlyArray<string> = ['google-drive'];
+
+/**
  * CloudFilePickerModal — lets the user attach files from connected cloud
  * storage providers.
  *
@@ -271,9 +279,9 @@ export function CloudFilePickerModal({
             alignItems: isMobile ? 'stretch' : 'center',
           }}
         >
-          {/* Provider Tabs */}
+          {/* Provider Tabs — only show enabled providers */}
           <div style={{ display: 'flex', gap: 6 }}>
-            {(['google-drive', 'onedrive', 'dropbox'] as const).map((pSlug) => {
+            {ENABLED_PROVIDERS.map((pSlug) => {
               const isSelected = activeProvider === pSlug;
               return (
                 <button

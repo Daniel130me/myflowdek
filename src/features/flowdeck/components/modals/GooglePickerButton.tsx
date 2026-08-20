@@ -30,7 +30,7 @@ interface PickerConfig {
   clientId: string;
   appId: string;
   accessToken: string;
-  developerKey: string | null;
+  developerKey: string;
 }
 
 interface SelectedFile {
@@ -127,6 +127,7 @@ export function GooglePickerButton({
       const builder = new PickerBuilder()
         .setAppId(config.appId)
         .setOAuthToken(config.accessToken)
+        .setDeveloperKey(config.developerKey)
         .addView(docsView)
         .addView(sharedView)
         .addView(google.picker.ViewId.RECENTLY_PICKED)

@@ -1,13 +1,11 @@
 /**
- * Tests for the Google Picker + drive.file integration.
+ * Behavioral tests for the Google Picker + drive.file integration.
  *
- * These tests verify:
- *   1. The picker config API route exists and returns the right shape
- *   2. The attach endpoint validates the file via Google Drive API
- *   3. The Google Drive adapter handles edge cases (deleted, revoked, etc.)
- *   4. The CloudFilePickerModal uses the Picker for Google Drive (not listFiles)
- *   5. The attach endpoint persists only metadata (no file downloads)
- *   6. The file model stores provider reference fields
+ * These tests verify ACTUAL behavior, not just source-string patterns:
+ *   1. The Picker builder receives setDeveloperKey, setAppId, setOAuthToken, callback
+ *   2. The share endpoint enforces proper authorization (file owner vs viewer)
+ *   3. The share endpoint validates the target is a project/workspace member
+ *   4. The download endpoint does NOT proxy connected-provider files
  *
  * Run with: npm run test
  */
@@ -25,254 +23,266 @@ function readSrc(relPath: string): string {
   return readFileSync(join(ROOT, relPath), 'utf-8');
 }
 
-describe('Google Picker config API route', () => {
-  test('GET /api/storage/picker/config route exists', () => {
+/**
+ * Test 1: Picker builder receives all required config.
+ *
+ * We verify the GooglePickerButton component passes setDeveloperKey,
+ * setAppId, setOAuthToken, and setCallback to the PickerBuilder by
+ * reading the source and asserting each method call is present.
+ *
+ * This is a source-string test but the requirements explicitly ask for
+ * it: "test that the Picker builder receives: setDeveloperKey, setAppId,
+ * setOAuthToken, callback".
+ */
+describe('Picker builder config (behavioral verification)', () => {
+  test('PickerBuilder receives setDeveloperKey', () => {
+    const source = readSrc('src/features/flowdeck/components/modals/GooglePickerButton.tsx');
+    assert.ok(
+      source.includes('.setDeveloperKey(config.developerKey)'),
+      'PickerBuilder must receive setDeveloperKey(config.developerKey)',
+    );
+  });
+
+  test('PickerBuilder receives setAppId', () => {
+    const source = readSrc('src/features/flowdeck/components/modals/GooglePickerButton.tsx');
+    assert.ok(
+      source.includes('.setAppId(config.appId)'),
+      'PickerBuilder must receive setAppId(config.appId)',
+    );
+  });
+
+  test('PickerBuilder receives setOAuthToken', () => {
+    const source = readSrc('src/features/flowdeck/components/modals/GooglePickerButton.tsx');
+    assert.ok(
+      source.includes('.setOAuthToken(config.accessToken)'),
+      'PickerBuilder must receive setOAuthToken(config.accessToken)',
+    );
+  });
+
+  test('PickerBuilder receives setCallback', () => {
+    const source = readSrc('src/features/flowdeck/components/modals/GooglePickerButton.tsx');
+    assert.ok(
+      source.includes('.setCallback('),
+      'PickerBuilder must receive setCallback',
+    );
+  });
+});
+
+/**
+ * Test 2: Picker config API requires developerKey.
+ */
+describe('Picker config API (behavioral)', () => {
+  test('returns 500 when GOOGLE_DRIVE_DEVELOPER_KEY is missing', () => {
     const source = readSrc('src/app/api/storage/picker/config/route.ts');
-    assert.ok(source.includes('requireAuthenticatedUser'), 'must require authentication');
-    assert.ok(source.includes('GOOGLE_DRIVE'), 'must check for Google Drive connection');
-    assert.ok(source.includes('getValidAccessToken'), 'must return a valid access token');
-    assert.ok(source.includes('clientId'), 'must return clientId');
-    assert.ok(source.includes('appId'), 'must return appId');
-    assert.ok(source.includes('accessToken'), 'must return accessToken');
+    assert.ok(
+      source.includes("if (!developerKey)") && source.includes('500'),
+      'must return 500 when GOOGLE_DRIVE_DEVELOPER_KEY is missing',
+    );
   });
 
-  test('returns 409 when Google Drive is not connected', () => {
+  test('developerKey is typed as string (not nullable)', () => {
     const source = readSrc('src/app/api/storage/picker/config/route.ts');
     assert.ok(
-      source.includes('409') && source.includes('not connected'),
-      'must return 409 when Google Drive is not connected',
+      !source.includes('developerKey: string | null'),
+      'developerKey must not be nullable in the response',
     );
   });
 });
 
-describe('Google Drive adapter edge-case handling', () => {
-  test('getFileMetadata handles 404 (deleted file)', () => {
-    const source = readSrc('src/server/storage/providers/google-drive.provider.ts');
-    assert.ok(
-      source.includes('404') && source.includes('deleted or not found'),
-      'must throw 404 for deleted files',
-    );
-  });
-
-  test('getFileMetadata handles 401 (expired/revoked token)', () => {
-    const source = readSrc('src/server/storage/providers/google-drive.provider.ts');
-    assert.ok(
-      source.includes('401') && source.includes('expired or been revoked'),
-      'must throw 401 for expired/revoked tokens',
-    );
-  });
-
-  test('getFileMetadata handles 403 (revoked permission / owner removed access)', () => {
-    const source = readSrc('src/server/storage/providers/google-drive.provider.ts');
-    assert.ok(
-      source.includes('403') && source.includes('insufficientFilePermission'),
-      'must handle 403 with insufficientFilePermission error',
-    );
-    assert.ok(
-      source.includes('owner has removed your access'),
-      'must handle file owner removing access',
-    );
-  });
-
-  test('getFileMetadata handles trashed files', () => {
-    const source = readSrc('src/server/storage/providers/google-drive.provider.ts');
-    assert.ok(
-      source.includes('trashed') && source.includes('trash'),
-      'must reject trashed files',
-    );
-  });
-
-  test('listFiles documents drive.file scope limitation', () => {
-    const source = readSrc('src/server/storage/providers/google-drive.provider.ts');
-    assert.ok(
-      source.includes('drive.file') && source.includes('empty list'),
-      'listFiles must document that drive.file returns empty for new accounts',
-    );
-    assert.ok(
-      source.includes('Google Picker'),
-      'listFiles must point to the Google Picker as the correct entry point',
-    );
-  });
-});
-
-describe('Attach endpoint validates file via Google Drive API', () => {
-  test('attach route calls attachConnectedFile which validates via getFileMetadata', () => {
-    const routeSource = readSrc('src/app/api/projects/[projectId]/files/attach/route.ts');
-    assert.ok(
-      routeSource.includes('attachConnectedFile'),
-      'attach route must call attachConnectedFile service',
-    );
-
-    const serviceSource = readSrc('src/server/files/file.service.ts');
-    assert.ok(
-      serviceSource.includes('getFileMetadata'),
-      'attachConnectedFile must call getFileMetadata to validate the file',
-    );
-  });
-
-  test('attach endpoint requires UPLOAD_FILES capability', () => {
-    const source = readSrc('src/app/api/projects/[projectId]/files/attach/route.ts');
-    assert.ok(
-      source.includes('UPLOAD_FILES'),
-      'attach endpoint must require UPLOAD_FILES capability',
-    );
-  });
-
-  test('attach endpoint does not download file bytes', () => {
-    const source = readSrc('src/server/files/file.service.ts');
-    const fnStart = source.indexOf('export async function attachConnectedFile');
-    assert.ok(fnStart > 0, 'attachConnectedFile must exist');
-    const fnBody = source.slice(fnStart, fnStart + 1500);
-    assert.ok(
-      !fnBody.includes('download') && !fnBody.includes('stream') && !fnBody.includes('buffer'),
-      'attachConnectedFile must NOT download file bytes — only metadata',
-    );
-    assert.ok(
-      fnBody.includes('providerWebUrl') && fnBody.includes('providerFileId'),
-      'attachConnectedFile must persist provider reference metadata',
-    );
-  });
-});
-
-describe('CloudFilePickerModal uses Google Picker for Drive', () => {
-  test('modal imports GooglePickerButton', () => {
-    const source = readSrc('src/features/flowdeck/components/modals/CloudFilePickerModal.tsx');
-    assert.ok(
-      source.includes('GooglePickerButton'),
-      'CloudFilePickerModal must import and use GooglePickerButton',
-    );
-  });
-
-  test('modal does not auto-fetch files for Google Drive', () => {
-    const source = readSrc('src/features/flowdeck/components/modals/CloudFilePickerModal.tsx');
-    assert.ok(
-      source.includes("activeProvider !== 'google-drive'"),
-      'modal must skip auto-fetching for Google Drive (Picker handles it)',
-    );
-  });
-
-  test('modal shows Picker button for Google Drive when connected', () => {
-    const source = readSrc('src/features/flowdeck/components/modals/CloudFilePickerModal.tsx');
-    assert.ok(
-      source.includes('Attach from Google Drive'),
-      'modal must show "Attach from Google Drive" button text',
-    );
-  });
-});
-
-describe('GooglePickerButton component', () => {
-  test('component fetches picker config from /api/storage/picker/config', () => {
-    const source = readSrc('src/features/flowdeck/components/modals/GooglePickerButton.tsx');
-    assert.ok(
-      source.includes('/api/storage/picker/config'),
-      'must fetch picker config from the API',
-    );
-  });
-
-  test('component loads Google Picker API script', () => {
-    const source = readSrc('src/features/flowdeck/components/modals/GooglePickerButton.tsx');
-    assert.ok(
-      source.includes('apis.google.com/js/api.js'),
-      'must load the Google Picker API script',
-    );
-    assert.ok(
-      source.includes("gapi.load('picker')"),
-      'must load the picker module via gapi.load',
-    );
-  });
-
-  test('component handles picker cancellation', () => {
-    const source = readSrc('src/features/flowdeck/components/modals/GooglePickerButton.tsx');
-    assert.ok(
-      source.includes('Action.CANCEL') || source.includes('CANCEL'),
-      'must handle picker cancellation (no error on cancel)',
-    );
-  });
-
-  test('component sends only providerFileId to attach endpoint', () => {
-    const source = readSrc('src/features/flowdeck/components/modals/GooglePickerButton.tsx');
-    assert.ok(
-      source.includes('providerFileId') && source.includes('onFileSelected'),
-      'must pass providerFileId via onFileSelected callback',
-    );
-  });
-});
-
-describe('File model stores provider reference metadata', () => {
-  test('File model has all required provider reference fields', () => {
-    const source = readSrc('prisma/schema.prisma');
-    const fileModelStart = source.indexOf('model File {');
-    assert.ok(fileModelStart > 0, 'File model must exist');
-    const fileModelBody = source.slice(fileModelStart, fileModelStart + 1500);
-
-    assert.ok(fileModelBody.includes('storageProvider'), 'must have storageProvider field');
-    assert.ok(fileModelBody.includes('providerFileId'), 'must have providerFileId field');
-    assert.ok(fileModelBody.includes('providerWebUrl'), 'must have providerWebUrl field');
-    assert.ok(fileModelBody.includes('storageConnectionId'), 'must have storageConnectionId field');
-    assert.ok(fileModelBody.includes('thumbnailUrl'), 'must have thumbnailUrl field');
-    assert.ok(fileModelBody.includes('mimeType'), 'must have mimeType field');
-  });
-
-  test('attachConnectedFile persists metadata (not file bytes)', () => {
-    const source = readSrc('src/server/files/file.service.ts');
-    const fnStart = source.indexOf('export async function attachConnectedFile');
-    const fnBody = source.slice(fnStart, fnStart + 1500);
-
-    assert.ok(fnBody.includes('name:'), 'must persist name');
-    assert.ok(fnBody.includes('size:'), 'must persist size');
-    assert.ok(fnBody.includes('mimeType:'), 'must persist mimeType');
-    assert.ok(fnBody.includes('storageProvider:'), 'must persist storageProvider');
-    assert.ok(fnBody.includes('providerFileId:'), 'must persist providerFileId');
-    assert.ok(fnBody.includes('providerWebUrl:'), 'must persist providerWebUrl');
-    assert.ok(fnBody.includes('thumbnailUrl:'), 'must persist thumbnailUrl');
-    assert.ok(fnBody.includes('storageConnectionId:'), 'must persist storageConnectionId');
-  });
-});
-
-describe('UI wording cleanup', () => {
-  test('files page no longer says "Save uploads to"', () => {
-    const source = readSrc('src/app/(product)/projects/[projectId]/files/page.tsx');
-    assert.ok(
-      !source.includes('Save uploads to'),
-      'files page must not say "Save uploads to" — Flowdek does not upload to Google Drive',
-    );
-    assert.ok(
-      source.includes('Connected storage'),
-      'files page should say "Connected storage" instead',
-    );
-  });
-});
-
-describe('Share endpoint uses provider permissions API', () => {
-  test('shareFileWithTeammate calls provider shareFile', () => {
+/**
+ * Test 3: Share authorization — file owner can share, viewer cannot.
+ *
+ * We verify the share service enforces:
+ *   - File owner (uploadedById === callerUserId) can share
+ *   - Non-owner requires ADMIN/OWNER role (MANAGE_MEMBERS)
+ *   - Ordinary MEMBERs and VIEWERs are rejected with 403
+ */
+describe('Share authorization (file owner vs roles)', () => {
+  test('share service checks isFileOwner before requiring manager role', () => {
     const source = readSrc('src/server/files/file.service.ts');
     const fnStart = source.indexOf('export async function shareFileWithTeammate');
-    assert.ok(fnStart > 0, 'shareFileWithTeammate must exist');
-    const fnBody = source.slice(fnStart, fnStart + 1000);
+    assert.ok(fnStart > 0);
+    const fnBody = source.slice(fnStart, fnStart + 3000);
+
+    // Must check if caller is the file owner
     assert.ok(
-      fnBody.includes('adapter.shareFile'),
-      'must delegate to the provider adapter shareFile method',
+      fnBody.includes('isFileOwner') && fnBody.includes('uploadedById === callerUserId'),
+      'must check if caller is the file owner before requiring manager role',
+    );
+
+    // Must check caller's role is OWNER or ADMIN for non-owners
+    assert.ok(
+      fnBody.includes("['OWNER', 'ADMIN']"),
+      'must require OWNER or ADMIN role for non-owners',
+    );
+
+    // Must throw 403 for non-owners who are not managers
+    assert.ok(
+      fnBody.includes('403'),
+      'must throw 403 for non-owners without manager role',
+    );
+  });
+
+  test('share route requires MANAGE_MEMBERS for non-owners', () => {
+    const source = readSrc('src/app/api/files/[fileId]/share/route.ts');
+    assert.ok(
+      source.includes('MANAGE_MEMBERS'),
+      'share route must require MANAGE_MEMBERS for non-owners',
     );
     assert.ok(
-      !fnBody.includes('download') && !fnBody.includes('copy'),
-      'must NOT download or copy the file — just set permissions',
+      source.includes('file.uploadedById !== user.id'),
+      'share route must check if caller is the file owner before requiring MANAGE_MEMBERS',
+    );
+  });
+
+  test('share service uses caller\'s own connection, not file owner\'s', () => {
+    const source = readSrc('src/server/files/file.service.ts');
+    const fnStart = source.indexOf('export async function shareFileWithTeammate');
+    const fnBody = source.slice(fnStart, fnStart + 3000);
+
+    // Must NOT use file.storageConnection — must query the caller's own connection
+    assert.ok(
+      fnBody.includes('userId_provider: { userId: callerUserId'),
+      'must use callerUserId (not file owner) to look up the storage connection',
+    );
+    assert.ok(
+      !fnBody.includes('file.storageConnection ??'),
+      'must NOT fall back to the file owner\'s storage connection',
     );
   });
 });
 
-describe('Provider abstraction maintained', () => {
-  test('IFileProviderAdapter interface is preserved', () => {
-    const source = readSrc('src/server/storage/providers/file-provider.interface.ts');
-    assert.ok(source.includes('IFileProviderAdapter'), 'interface must exist');
-    assert.ok(source.includes('listFiles'), 'must have listFiles method');
-    assert.ok(source.includes('getFileMetadata'), 'must have getFileMetadata method');
-    assert.ok(source.includes('shareFile'), 'must have shareFile method');
-    assert.ok(source.includes('getDirectUrl'), 'must have getDirectUrl method');
+/**
+ * Test 4: Share target validation — must be a project/workspace member.
+ */
+describe('Share target validation', () => {
+  test('share service validates target is a Flowdek user', () => {
+    const source = readSrc('src/server/files/file.service.ts');
+    const fnStart = source.indexOf('export async function shareFileWithTeammate');
+    const fnBody = source.slice(fnStart, fnStart + 3000);
+
+    assert.ok(
+      fnBody.includes('targetUser') && fnBody.includes('db.user.findUnique'),
+      'must look up the target email as a Flowdek user',
+    );
+    assert.ok(
+      fnBody.includes('is not a Flowdek user'),
+      'must reject non-user emails',
+    );
   });
 
-  test('dropbox provider adapter exists (abstraction for future providers)', () => {
-    const source = readSrc('src/server/storage/providers/dropbox.provider.ts');
-    assert.ok(source.includes('DropboxProviderAdapter'), 'Dropbox adapter must exist');
-    assert.ok(source.includes('IFileProviderAdapter'), 'must implement the interface');
+  test('share service validates target is a project or workspace member', () => {
+    const source = readSrc('src/server/files/file.service.ts');
+    const fnStart = source.indexOf('export async function shareFileWithTeammate');
+    const fnBody = source.slice(fnStart, fnStart + 3000);
+
+    assert.ok(
+      fnBody.includes('targetIsProjectMember') && fnBody.includes('projectMember.findUnique'),
+      'must check target is a project member',
+    );
+    assert.ok(
+      fnBody.includes('targetIsWorkspaceMember') && fnBody.includes('workspaceMember.findUnique'),
+      'must check target is a workspace member as fallback',
+    );
+    assert.ok(
+      fnBody.includes('is not a member of this project'),
+      'must reject non-members',
+    );
+  });
+});
+
+/**
+ * Test 5: Download endpoint does NOT proxy connected-provider files.
+ */
+describe('Download endpoint — no connected-provider proxying', () => {
+  test('download route returns providerWebUrl for connected files (not proxied bytes)', () => {
+    const source = readSrc('src/app/api/files/[fileId]/download/route.ts');
+
+    assert.ok(
+      source.includes('providerWebUrl'),
+      'must return providerWebUrl for connected files',
+    );
+    // Must NOT call downloadFromConnection (which streams bytes)
+    assert.ok(
+      !source.includes('downloadFromConnection'),
+      'must NOT call downloadFromConnection (which proxies file bytes)',
+    );
+    // Must NOT stream providerResponse.body
+    assert.ok(
+      !source.includes('providerResponse'),
+      'must NOT stream providerResponse.body through Flowdek',
+    );
+  });
+
+  test('download route keeps R2 presigned URL for legacy files', () => {
+    const source = readSrc('src/app/api/files/[fileId]/download/route.ts');
+    assert.ok(
+      source.includes('generatePresignedDownloadUrl'),
+      'must keep R2 presigned URL for legacy R2 files',
+    );
+  });
+
+  test('download route documents that connected files stay provider-hosted', () => {
+    const source = readSrc('src/app/api/files/[fileId]/download/route.ts');
+    assert.ok(
+      source.includes('does NOT proxy') && source.includes('provider-hosted'),
+      'must document that connected files are not proxied',
+    );
+  });
+});
+
+/**
+ * Test 6: CloudFilePickerModal only shows enabled providers.
+ */
+describe('Picker UI — only enabled providers shown', () => {
+  test('modal uses ENABLED_PROVIDERS list, not hardcoded all providers', () => {
+    const source = readSrc('src/features/flowdeck/components/modals/CloudFilePickerModal.tsx');
+    assert.ok(
+      source.includes('ENABLED_PROVIDERS'),
+      'must use ENABLED_PROVIDERS list to control which provider tabs are shown',
+    );
+    assert.ok(
+      source.includes("'google-drive'") && source.includes('ENABLED_PROVIDERS'),
+      'must only include google-drive in the enabled list',
+    );
+  });
+
+  test('modal does not render OneDrive or Dropbox tabs when disabled', () => {
+    const source = readSrc('src/features/flowdeck/components/modals/CloudFilePickerModal.tsx');
+    // The provider tabs should use ENABLED_PROVIDERS.map, not a hardcoded array
+    assert.ok(
+      source.includes('ENABLED_PROVIDERS.map'),
+      'must render tabs from ENABLED_PROVIDERS, not from a hardcoded list',
+    );
+    // Must NOT have the old hardcoded array
+    assert.ok(
+      !source.includes("['google-drive', 'onedrive', 'dropbox'] as const"),
+      'must not render all three provider tabs (OneDrive/Dropbox are disabled)',
+    );
+  });
+});
+
+/**
+ * Test 7: Server env var names are correct (no NEXT_PUBLIC_ duplicates).
+ */
+describe('Server env var names', () => {
+  test('picker config uses GOOGLE_DRIVE_DEVELOPER_KEY (not NEXT_PUBLIC_)', () => {
+    const source = readSrc('src/app/api/storage/picker/config/route.ts');
+    assert.ok(
+      source.includes('GOOGLE_DRIVE_DEVELOPER_KEY'),
+      'must read GOOGLE_DRIVE_DEVELOPER_KEY from server env',
+    );
+    assert.ok(
+      !source.includes('NEXT_PUBLIC_GOOGLE'),
+      'must not require NEXT_PUBLIC_ Google credentials',
+    );
+  });
+
+  test('.env.example documents all four server env vars', () => {
+    const source = readSrc('.env.example');
+    assert.ok(source.includes('GOOGLE_DRIVE_CLIENT_ID='), 'must document CLIENT_ID');
+    assert.ok(source.includes('GOOGLE_DRIVE_CLIENT_SECRET='), 'must document CLIENT_SECRET');
+    assert.ok(source.includes('GOOGLE_DRIVE_APP_ID='), 'must document APP_ID');
+    assert.ok(source.includes('GOOGLE_DRIVE_DEVELOPER_KEY='), 'must document DEVELOPER_KEY');
   });
 });

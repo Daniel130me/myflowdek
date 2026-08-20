@@ -9,7 +9,19 @@ const shareSchema = z.object({
   role: z.enum(['reader', 'writer']).default('reader'),
 });
 
-/** POST /api/files/:fileId/share — share file with teammate via provider permission API */
+/**
+ * POST /api/files/:fileId/share — share a connected-provider file with a
+ * teammate via the provider's permissions API (e.g. Google Drive).
+ *
+ * Authorization:
+ *   - The caller must be the file owner OR have MANAGE_MEMBERS capability
+ *     (ADMIN/OWNER). Ordinary VIEWERs and MEMBERs cannot share files —
+ *     this prevents them from mutating another user's Google Drive
+ *     permissions.
+ *   - The service also validates the target email is a project/workspace
+ *     member (no arbitrary external emails).
+ *   - The caller's own OAuth connection is used — NOT the file owner's.
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ fileId: string }> },
@@ -18,12 +30,16 @@ export async function POST(
     const user = await requireAuthenticatedUser();
     const { fileId } = await params;
 
-    const file = await db.file.findUnique({ where: { id: fileId }, select: { projectId: true } });
+    const file = await db.file.findUnique({ where: { id: fileId }, select: { projectId: true, uploadedById: true } });
     if (!file) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 });
     }
 
-    await requireProjectCapability(user.id, file.projectId, 'VIEW_PROJECT');
+    // Require MANAGE_MEMBERS for non-owners. The file owner can share
+    // their own files without a capability check (they own the file).
+    if (file.uploadedById !== user.id) {
+      await requireProjectCapability(user.id, file.projectId, 'MANAGE_MEMBERS');
+    }
 
     const body = await request.json().catch(() => ({}));
     const parsed = shareSchema.safeParse(body);

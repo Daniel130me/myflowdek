@@ -6,14 +6,24 @@ import {
 } from '@/server/auth/authorization';
 import { db } from '@/server/db/client';
 import { generatePresignedDownloadUrl } from '@/server/files/r2.service';
-import { downloadFromConnection } from '@/server/storage/storage.service';
 
 /**
  * GET /api/files/:fileId/download
  *
- * Returns a presigned download URL for a file stored in R2. The browser
- * redirects to this URL to download the actual file. Flowdek verifies the
- * caller is a project member before issuing the URL.
+ * Returns a download URL for a file.
+ *
+ * For LEGACY R2 files (files uploaded directly to R2 before connected
+ * storage was introduced), this returns a presigned R2 download URL.
+ *
+ * For CONNECTED-PROVIDER files (Google Drive, OneDrive, Dropbox), this
+ * route does NOT proxy or stream the file bytes through Flowdek. Instead,
+ * it returns the provider's direct web URL (e.g. Google Drive webViewLink)
+ * so the browser opens/redirects directly to the provider. The file stays
+ * provider-hosted — Flowdek never downloads or copies it.
+ *
+ * This route is kept for legacy R2 compatibility only. Connected-provider
+ * files should use the `providerWebUrl` field from the file record directly
+ * (e.g. open in a new tab) rather than calling this endpoint.
  */
 export async function GET(
   _request: Request,
@@ -31,9 +41,9 @@ export async function GET(
         r2Key: true,
         projectId: true,
         mimeType: true,
+        storageProvider: true,
         providerFileId: true,
-        providerPath: true,
-        storageConnection: true,
+        providerWebUrl: true,
       },
     });
 
@@ -44,24 +54,21 @@ export async function GET(
     // Verify the caller is a member of the file's project.
     await requireProjectCapability(user.id, file.projectId, 'VIEW_PROJECT');
 
-    if (file.storageConnection && file.providerFileId) {
-      const providerResponse = await downloadFromConnection(
-        file.storageConnection,
-        file.providerFileId,
-        file.providerPath,
-      );
-      if (!providerResponse.ok || !providerResponse.body) {
-        return NextResponse.json({ error: 'Storage provider could not download the file' }, { status: 502 });
-      }
-      return new Response(providerResponse.body, {
-        headers: { 'Content-Type': file.mimeType ?? 'application/octet-stream' },
+    // Connected-provider files: return the provider's direct web URL.
+    // Do NOT proxy the file bytes through Flowdek.
+    if (file.storageProvider && file.providerFileId) {
+      return NextResponse.json({
+        providerWebUrl: file.providerWebUrl,
+        fileName: file.name,
+        mimeType: file.mimeType,
+        message: 'This file is hosted by a connected storage provider. Open the providerWebUrl directly.',
       });
     }
 
-    // Compatibility-only fallback for files uploaded before connected storage.
+    // Legacy R2 files: return a presigned download URL.
     if (!file.r2Key) {
       return NextResponse.json(
-        { error: 'File has no R2 key — it may be a legacy mock file' },
+        { error: 'File has no R2 key and is not a connected-provider file' },
         { status: 404 },
       );
     }
