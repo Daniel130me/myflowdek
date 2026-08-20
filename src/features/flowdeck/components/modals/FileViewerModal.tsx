@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, ArrowLeft, ExternalLink, Paperclip, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ArrowLeft, ExternalLink, Paperclip, ChevronLeft, ChevronRight, Cloud, FileText, Image as ImageIcon, File } from 'lucide-react';
 import { COLORS, fmtSize, fmtDate, extOf, type FileItem, type Task } from '@/features/flowdeck/model';
 import { FF } from '../ui/styles';
 import { Avatar } from '../ui/Avatar';
@@ -31,6 +31,49 @@ function getExtColor(name: string): string {
   return EXT_COLORS[ext] || '#6B7280';
 }
 
+/**
+ * Google-native document MIME types. These cannot be rendered in an iframe
+ * via a direct URL — they must be opened in Google Drive's native UI.
+ */
+const GOOGLE_NATIVE_MIME_TYPES = new Set([
+  'application/vnd.google-apps.document',
+  'application/vnd.google-apps.spreadsheet',
+  'application/vnd.google-apps.presentation',
+  'application/vnd.google-apps.drawing',
+  'application/vnd.google-apps.form',
+  'application/vnd.google-apps.site',
+]);
+
+/**
+ * Check if a file is a connected-provider file (e.g. Google Drive).
+ * Connected files are provider-hosted and must NOT be iframed via the
+ * Flowdek download endpoint.
+ */
+function isConnectedFile(file: FileItem): boolean {
+  return !!file.storageProvider;
+}
+
+/**
+ * Check if a file is a Google-native document (Docs, Sheets, Slides, etc.)
+ * that cannot be rendered in an iframe and must be opened in Google Drive.
+ */
+function isGoogleNativeDoc(file: FileItem): boolean {
+  return GOOGLE_NATIVE_MIME_TYPES.has(file.mimeType ?? '');
+}
+
+/**
+ * Check if a file type can be previewed in an iframe.
+ * Only legacy R2/local files with a direct URL can be iframed.
+ * Connected-provider files are never iframed (they return metadata JSON
+ * from the download endpoint, not file bytes).
+ */
+function canIframe(file: FileItem): boolean {
+  // Connected-provider files must NEVER be iframed via Flowdek.
+  if (isConnectedFile(file)) return false;
+  // Legacy/local files with a URL can be iframed.
+  return !!file.url;
+}
+
 interface FileViewerModalProps {
   file: FileItem;
   allFiles: FileItem[];
@@ -51,6 +94,13 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < allFiles.length - 1;
 
+  const connected = isConnectedFile(file);
+  const isGoogleDoc = isGoogleNativeDoc(file);
+  // The URL to open in the provider's native UI (e.g. Google Drive).
+  // For connected files, this is the providerWebUrl. For legacy files,
+  // this is the file.url (R2 presigned URL).
+  const openUrl = connected ? (file.providerWebUrl ?? undefined) : file.url;
+
   const navBtnStyle = (disabled: boolean): React.CSSProperties => ({
     width: 36, height: 36, borderRadius: 10,
     border: `1px solid ${COLORS.line}`,
@@ -60,7 +110,75 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
     color: disabled ? COLORS.grayLight : COLORS.ink,
   });
 
-  /* Mobile: full-screen panel */
+  /**
+   * Render the connected-file preview card.
+   * This is shown for all connected-provider files (Google Drive, etc.)
+   * instead of an iframe. It shows file metadata and an "Open in Google
+   * Drive" button.
+   */
+  function renderConnectedFilePreview() {
+    const providerName = file.storageProvider === 'GOOGLE_DRIVE' ? 'Google Drive'
+      : file.storageProvider === 'ONEDRIVE' ? 'OneDrive'
+      : file.storageProvider === 'DROPBOX' ? 'Dropbox'
+      : 'Cloud Drive';
+
+    const icon = isGoogleDoc ? <FileText size={48} color={COLORS.accent} />
+      : (file.mimeType?.startsWith('image/') ? <ImageIcon size={48} color={COLORS.accent} />
+      : <File size={48} color={COLORS.accent} />);
+
+    return (
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        gap: 16, padding: 32, background: '#F9FAFB',
+      }}>
+        <div style={{
+          width: 96, height: 96, borderRadius: 16,
+          background: '#FFFFFF', border: `1px solid ${COLORS.line}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {icon}
+        </div>
+        <div style={{ textAlign: 'center', maxWidth: 400 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: COLORS.ink, fontFamily: FF, marginBottom: 4 }}>
+            {file.name}
+          </div>
+          <div style={{ fontSize: 13, color: COLORS.gray, fontFamily: FF, marginBottom: 2 }}>
+            {providerName} · {fmtSize(file.size)}
+          </div>
+          {file.mimeType && (
+            <div style={{ fontSize: 11, color: COLORS.grayLight, fontFamily: FF }}>
+              {file.mimeType}
+            </div>
+          )}
+          {isGoogleDoc && (
+            <div style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF, marginTop: 8 }}>
+              This is a Google-native document. Open it in Google Drive to view and edit.
+            </div>
+          )}
+        </div>
+        {openUrl && (
+          <a
+            href={openUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '10px 20px', borderRadius: 10,
+              background: COLORS.accent, color: '#FFFFFF',
+              fontSize: 14, fontWeight: 600, fontFamily: FF,
+              textDecoration: 'none', cursor: 'pointer',
+            }}
+          >
+            <Cloud size={16} />
+            Open in {providerName}
+          </a>
+        )}
+      </div>
+    );
+  }
+
+  /** Mobile: full-screen panel */
   if (isMobile) {
     return (
       <div style={{
@@ -96,12 +214,17 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
               <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF }}>{fmtSize(file.size)}</span>
               <span style={{ fontSize: 12, color: COLORS.line }}>·</span>
               <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF }}>{fmtDate(file.uploadedAt)}</span>
+              {connected && (
+                <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.accent, fontFamily: FF }}>
+                  · {file.storageProvider === 'GOOGLE_DRIVE' ? 'Google Drive' : 'Cloud'}
+                </span>
+              )}
             </div>
           </div>
         </div>
 
         {/* Content */}
-        {file.url ? (
+        {connected ? renderConnectedFilePreview() : canIframe(file) ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <iframe src={file.url} title={file.name} style={{ width: '100%', height: '100%', border: 'none' }} />
           </div>
@@ -122,9 +245,9 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
             <ChevronRight size={18} />
           </button>
           <div style={{ width: 1, height: 20, background: COLORS.line, flexShrink: 0 }} />
-          {file.url && (
-            <a href={file.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: COLORS.accent, textDecoration: 'none', fontFamily: FF, cursor: 'pointer', padding: '6px 12px', borderRadius: 8 }}>
-              <ExternalLink size={15} /> Open in Cloud Drive
+          {openUrl && (
+            <a href={openUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: COLORS.accent, textDecoration: 'none', fontFamily: FF, cursor: 'pointer', padding: '6px 12px', borderRadius: 8 }}>
+              <ExternalLink size={15} /> {connected ? `Open in ${file.storageProvider === 'GOOGLE_DRIVE' ? 'Google Drive' : 'Cloud'}` : 'Open in Cloud Drive'}
             </a>
           )}
           {linkedTask && (
@@ -142,7 +265,7 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
     );
   }
 
-  /* Desktop: centered modal */
+  /** Desktop: centered modal */
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 50,
@@ -166,6 +289,11 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
             <span style={{ fontSize: 13, color: COLORS.gray, fontFamily: FF, flexShrink: 0 }}>{fmtSize(file.size)}</span>
             <span style={{ fontSize: 13, color: COLORS.line, flexShrink: 0 }}>·</span>
             <span style={{ fontSize: 13, color: COLORS.gray, fontFamily: FF, flexShrink: 0 }}>{fmtDate(file.uploadedAt)}</span>
+            {connected && (
+              <span style={{ fontSize: 11, fontWeight: 600, color: COLORS.accent, fontFamily: FF, flexShrink: 0 }}>
+                · {file.storageProvider === 'GOOGLE_DRIVE' ? 'Google Drive' : 'Cloud'}
+              </span>
+            )}
           </div>
           <button onClick={onClose} style={{ width: 40, height: 40, borderRadius: 10, border: 'none', background: '#F3F4F6', cursor: 'pointer', color: COLORS.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <X size={18} />
@@ -173,7 +301,7 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
         </div>
 
         {/* Content */}
-        {file.url ? (
+        {connected ? renderConnectedFilePreview() : canIframe(file) ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <iframe src={file.url} title={file.name} style={{ width: '100%', height: '100%', border: 'none', borderRadius: 12 }} />
           </div>
@@ -194,9 +322,9 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
             <ChevronRight size={18} />
           </button>
           <div style={{ width: 1, height: 20, background: COLORS.line, flexShrink: 0 }} />
-          {file.url && (
-            <a href={file.url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: COLORS.accent, textDecoration: 'none', fontFamily: FF, cursor: 'pointer', padding: '6px 12px', borderRadius: 8 }}>
-              <ExternalLink size={15} /> Open in Cloud Drive
+          {openUrl && (
+            <a href={openUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: COLORS.accent, textDecoration: 'none', fontFamily: FF, cursor: 'pointer', padding: '6px 12px', borderRadius: 8 }}>
+              <ExternalLink size={15} /> {connected ? `Open in ${file.storageProvider === 'GOOGLE_DRIVE' ? 'Google Drive' : 'Cloud'}` : 'Open in Cloud Drive'}
             </a>
           )}
           {linkedTask && (

@@ -15,9 +15,21 @@ interface ApiFile {
   url: string | null;
   thumbnailUrl: string | null;
   storageProvider: 'GOOGLE_DRIVE' | 'ONEDRIVE' | 'DROPBOX' | null;
+  providerWebUrl: string | null;
+  mimeType: string | null;
 }
 
-/** Map the API file shape to the frontend FileItem type. */
+/**
+ * Map the API file shape to the frontend FileItem type.
+ *
+ * For connected-provider files (Google Drive, etc.), the URL is the
+ * provider's direct web URL (e.g. Google Drive webViewLink) — NOT
+ * `/api/files/:id/download`. The download endpoint returns metadata JSON
+ * for connected files (not file bytes), so it must never be used as an
+ * iframe src or file URL.
+ *
+ * For legacy R2/local files, the URL is whatever was stored in `api.url`.
+ */
 function mapFile(api: ApiFile): FileItem {
   return {
     id: api.id,
@@ -27,8 +39,13 @@ function mapFile(api: ApiFile): FileItem {
     uploadedBy: api.uploadedById ?? '',
     uploadedAt: api.uploadedAt,
     linkedTaskId: api.taskId,
-    url: api.storageProvider ? `/api/files/${api.id}/download` : api.url ?? undefined,
+    // Connected-provider files use the provider's direct URL.
+    // Legacy/local files use the stored URL.
+    url: api.providerWebUrl ?? api.url ?? undefined,
     thumbnailUrl: api.thumbnailUrl ?? undefined,
+    storageProvider: api.storageProvider ?? null,
+    providerWebUrl: api.providerWebUrl ?? null,
+    mimeType: api.mimeType ?? null,
   };
 }
 

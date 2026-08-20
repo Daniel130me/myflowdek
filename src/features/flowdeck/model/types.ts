@@ -177,6 +177,15 @@ export interface FileItem {
   linkedTaskId: string | null;
   url?: string;
   thumbnailUrl?: string;
+  /** Connected storage provider (GOOGLE_DRIVE, ONEDRIVE, DROPBOX) or null
+   *  for legacy R2/local files. When set, the file is provider-hosted and
+   *  must be opened via `providerWebUrl`, NOT via `/api/files/:id/download`. */
+  storageProvider?: 'GOOGLE_DRIVE' | 'ONEDRIVE' | 'DROPBOX' | null;
+  /** Direct URL to the file on the provider's side (e.g. Google Drive
+   *  webViewLink). Used to open the file in the provider's native UI. */
+  providerWebUrl?: string | null;
+  /** MIME type of the file (e.g. application/vnd.google-apps.document). */
+  mimeType?: string | null;
 }
 
 /* ---------------------------------- RAID ---------------------------------- */
