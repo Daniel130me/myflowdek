@@ -23,7 +23,7 @@ export function MoreMenu({ activeView, project, onNavigate, onClose }: {
         {MORE_NAV.map(item => {
           const Icon = item.icon;
           const active = activeView === item.id;
-          const disabled = !project;
+          const disabled = !project && item.id !== 'talent';
           return (
             <button key={item.id} onClick={() => { if (!disabled) { onNavigate(item.id); onClose(); } }} disabled={disabled} style={{
               display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', padding: '11px 14px',

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 import { ServiceError } from "./errors";
+import { AuthError } from "@/server/auth/authorization";
 
 export function validationError(error: ZodError) {
   return NextResponse.json(
@@ -12,6 +13,10 @@ export function validationError(error: ZodError) {
 }
 
 export function apiError(error: unknown, context: string) {
+  if (error instanceof AuthError) {
+    return NextResponse.json({ message: error.message }, { status: error.statusCode });
+  }
+
   if (error instanceof ServiceError) {
     return NextResponse.json({ message: error.message }, { status: error.status });
   }

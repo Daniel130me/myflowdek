@@ -112,7 +112,7 @@ export function Sidebar({ project, projects, activeView, onNavigate, goToPortfol
         {NAV.map(n => {
           const Icon = n.icon;
           const active = activeView === n.id;
-          const disabled = !project;
+          const disabled = !project && n.id !== 'talent';
           return (
             <button key={n.id} onClick={() => { if (!disabled) onNavigate(n.id); }} disabled={disabled} style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10,

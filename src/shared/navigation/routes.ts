@@ -23,6 +23,8 @@ export const routes = {
   shortcuts: () => '/shortcuts',
   command: () => '/command',
   settings: () => '/settings',
+  talentProfile: () => '/talent/profile',
+  editTalentProfile: () => '/talent/profile/edit',
 
   // Project workspace routes
   projectOverview: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/overview`,
@@ -81,6 +83,8 @@ export function getRouteForView(viewId: string, projectId?: string): string {
       return routes.command();
     case 'settings':
       return routes.settings();
+    case 'talent':
+      return routes.talentProfile();
     case 'dashboard':
     case 'overview':
       return projectId ? routes.projectOverview(projectId) : routes.projects();
@@ -123,6 +127,7 @@ export function getViewFromPathname(pathname: string): string {
   if (pathname.startsWith('/timesheets')) return 'timesheets';
   if (pathname.startsWith('/ai')) return 'ai';
   if (pathname.startsWith('/settings')) return 'settings';
+  if (pathname.startsWith('/talent')) return 'talent';
   if (pathname.startsWith('/projects')) {
     const parts = pathname.split('/').filter(Boolean);
     if (parts.length === 1) return 'projects'; // /projects
