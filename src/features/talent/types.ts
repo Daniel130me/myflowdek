@@ -63,6 +63,47 @@ export interface ProfessionalProfile {
   portfolioItems: PortfolioItem[];
 }
 
+export interface PublicProfessionalProfile {
+  id: string;
+  slug: string;
+  displayName: string;
+  avatarColor: string | null;
+  professionalTitle: string | null;
+  bio: string | null;
+  yearsOfExperience: number | null;
+  location: string | null;
+  timezone: string | null;
+  remotePreference: RemotePreference | null;
+  rateType: RateType | null;
+  minimumRate: string | null;
+  maximumRate: string | null;
+  currency: string | null;
+  createdAt: string;
+  updatedAt: string;
+  availability: ProfessionalProfile['availability'];
+  roles: ProfessionalRoleOption[];
+  skills: DeclaredSkill[];
+  portfolioItems: PortfolioItem[];
+}
+
+export interface ProfessionalDirectoryResponse {
+  profiles: PublicProfessionalProfile[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasPrevious: boolean;
+    hasNext: boolean;
+  };
+}
+
+export type ProfessionalDirectorySort =
+  | 'RELEVANCE'
+  | 'NEWEST'
+  | 'RATE_LOW_TO_HIGH'
+  | 'RATE_HIGH_TO_LOW';
+
 export async function readApiMessage(response: Response): Promise<string> {
   const body = await response.json().catch(() => ({}));
   if (typeof body.message === 'string') return body.message;

@@ -204,6 +204,40 @@ export async function requireProjectCapability(
 }
 
 /**
+ * Resolve a task and verify a project capability in one indexed query.
+ * Talent and other task-scoped routes use this to avoid a separate task lookup
+ * followed by the two queries performed by `requireProjectMember`.
+ */
+export async function requireTaskProjectCapability(
+  userId: string,
+  taskId: string,
+  capability: ProjectCapability,
+) {
+  const task = await db.task.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      projectId: true,
+      project: {
+        select: {
+          members: { where: { userId }, select: { role: true }, take: 1 },
+        },
+      },
+    },
+  });
+  if (!task) throw new AuthError('Task not found', 404);
+
+  const membership = task.project.members[0];
+  if (!membership) throw new AuthError('You do not have access to this project', 403);
+
+  const allowedRoles = PROJECT_PERMISSIONS[capability];
+  if (!allowedRoles.includes(membership.role)) {
+    throw new AuthError(`Insufficient permissions: ${capability} requires ${allowedRoles.join(' or ')}`, 403);
+  }
+  return { task: { id: task.id, projectId: task.projectId }, membership };
+}
+
+/**
  * Require the user to have a specific workspace capability.
  * Uses the centralized WORKSPACE_PERMISSIONS matrix.
  *

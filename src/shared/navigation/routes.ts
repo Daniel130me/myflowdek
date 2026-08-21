@@ -23,6 +23,9 @@ export const routes = {
   shortcuts: () => '/shortcuts',
   command: () => '/command',
   settings: () => '/settings',
+  talentDirectory: () => '/talent',
+  talentInvitations: () => '/talent/invitations',
+  talentProfessional: (slug: string) => `/talent/professionals/${encodeURIComponent(slug)}`,
   talentProfile: () => '/talent/profile',
   editTalentProfile: () => '/talent/profile/edit',
 
@@ -84,7 +87,7 @@ export function getRouteForView(viewId: string, projectId?: string): string {
     case 'settings':
       return routes.settings();
     case 'talent':
-      return routes.talentProfile();
+      return routes.talentDirectory();
     case 'dashboard':
     case 'overview':
       return projectId ? routes.projectOverview(projectId) : routes.projects();
