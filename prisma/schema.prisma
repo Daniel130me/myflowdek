@@ -144,6 +144,22 @@ enum TalentInvitationStatus {
   EXPIRED
 }
 
+enum OpportunityStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  AWARDED
+  CANCELLED
+}
+
+enum ProposalStatus {
+  SUBMITTED
+  SHORTLISTED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
 /**
  * ------------------------------- user ---------------------------------
  */
@@ -210,6 +226,7 @@ model User {
   createdProjectDocuments ProjectDocument[]     @relation("ProjectDocumentCreator")
   professionalProfile     ProfessionalProfile?
   sentTalentInvitations   TalentInvitation[]      @relation("TalentInvitationSender")
+  createdOpportunities    TalentOpportunity[]     @relation("OpportunityCreator")
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
 }
@@ -240,6 +257,7 @@ model ProfessionalProfile {
   portfolioItems        PortfolioItem[]
   availability          ProfessionalAvailability?
   invitations           TalentInvitation[]
+  proposals             TalentProposal[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
@@ -275,6 +293,7 @@ model Skill {
   isActive    Boolean             @default(true)
   profiles         ProfessionalSkill[]
   taskRequirements TaskCompetencyRequirement[]
+  opportunityRequirements OpportunitySkillRequirement[]
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 
@@ -520,6 +539,7 @@ model Task {
   timesheetEntries       TimesheetEntry[]
   competencyRequirements TaskCompetencyRequirement[]
   talentInvitations      TalentInvitation[]
+  talentOpportunities    TalentOpportunity[]
 
   @@index([projectId, status])
   @@index([projectId, assigneeId])
@@ -569,6 +589,74 @@ model TalentInvitation {
   @@index([taskId, status, createdAt])
   @@index([professionalProfileId, status, createdAt])
   @@index([invitedById])
+}
+
+model TalentOpportunity {
+  id                   String                       @id @default(cuid())
+  taskId               String
+  createdById          String
+  status               OpportunityStatus            @default(DRAFT)
+  title                String
+  description          String
+  deliverablesSummary  String?
+  budgetType           RateType?
+  minimumBudget        Decimal?                     @db.Decimal(12, 2)
+  maximumBudget        Decimal?                     @db.Decimal(12, 2)
+  currency             String?                      @db.Char(3)
+  expectedDuration     String?
+  applicationDeadline  DateTime?
+  publishedAt          DateTime?
+  closedAt             DateTime?
+  task                 Task                         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdBy            User                         @relation("OpportunityCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  proposals            TalentProposal[]
+  requiredSkills       OpportunitySkillRequirement[]
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  @@index([status, publishedAt])
+  @@index([taskId, status])
+  @@index([createdById])
+}
+
+model OpportunitySkillRequirement {
+  id                 String            @id @default(cuid())
+  opportunityId      String
+  skillId            String
+  minimumProficiency ProficiencyLevel
+  isRequired         Boolean           @default(true)
+  notes              String?
+  opportunity        TalentOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  skill              Skill             @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([opportunityId, skillId])
+  @@index([skillId, minimumProficiency])
+}
+
+model TalentProposal {
+  id                    String              @id @default(cuid())
+  opportunityId         String
+  professionalProfileId String
+  proposedPrice         Decimal             @db.Decimal(12, 2)
+  currency              String              @db.Char(3)
+  estimatedDuration     String
+  coverMessage          String
+  proposedApproach      String?
+  milestoneSuggestions  Json?
+  status                ProposalStatus      @default(SUBMITTED)
+  submittedAt           DateTime            @default(now())
+  reviewedAt            DateTime?
+  respondedAt           DateTime?
+  opportunity           TalentOpportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  professionalProfile   ProfessionalProfile @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@unique([opportunityId, professionalProfileId])
+  @@index([opportunityId, status, createdAt])
+  @@index([professionalProfileId, status, createdAt])
 }
 
 model Section {

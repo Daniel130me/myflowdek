@@ -424,7 +424,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
           {subtasksSection}
           <Field label="Status"><select value={task.status} onChange={e => onUpdate({ status: e.target.value as TaskStatus, progress: e.target.value === 'done' ? 100 : task.progress })} style={selectStyle}>{['backlog', 'in_progress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select></Field>
           <Field label="Assignee"><select value={task.assignee} onChange={e => onUpdate({ assignee: e.target.value })} style={selectStyle}>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
-          <TaskTalentPanel taskId={task.id} />
+          <TaskTalentPanel taskId={task.id} taskTitle={task.name} projectId={currentProjectId ?? ''} />
           <Field label="Priority"><select value={task.priority} onChange={e => onUpdate({ priority: e.target.value as TaskPriority })} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
           {dueDateField}
           {recurrenceField}
@@ -518,7 +518,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
         {subtasksSection}
         <Field label="Status"><select value={task.status} onChange={e => onUpdate({ status: e.target.value as TaskStatus, progress: e.target.value === 'done' ? 100 : task.progress })} style={selectStyle}>{['backlog', 'in_progress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select></Field>
         <Field label="Assignee"><select value={task.assignee} onChange={e => onUpdate({ assignee: e.target.value })} style={selectStyle}>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
-        <TaskTalentPanel taskId={task.id} />
+        <TaskTalentPanel taskId={task.id} taskTitle={task.name} projectId={currentProjectId ?? ''} />
         <Field label="Priority"><select value={task.priority} onChange={e => onUpdate({ priority: e.target.value as TaskPriority })} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
         {dueDateField}
         {recurrenceField}
