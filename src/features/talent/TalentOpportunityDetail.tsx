@@ -154,6 +154,12 @@ export function TalentOpportunityDetail({ opportunityId }: TalentOpportunityDeta
     try {
       const res = await fetch(`/api/talent/proposals/${proposalId}/${action}`, { method: 'POST' });
       if (!res.ok) throw new Error(await readApiMessage(res));
+      const payload = await res.json();
+      const engagementId = payload?.proposal?.engagementId ?? payload?.engagementId;
+      if (action === 'accept' && engagementId) {
+        router.push(routes.talentEngagement(engagementId));
+        return;
+      }
       loadData();
     } catch (err: any) {
       alert(err?.message ?? `Failed to ${action} proposal.`);

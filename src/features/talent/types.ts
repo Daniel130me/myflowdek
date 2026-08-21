@@ -112,6 +112,218 @@ export type OpportunityDirectorySort =
   | 'BUDGET_LOW_TO_HIGH'
   | 'DEADLINE_SOONEST';
 
+export type EngagementStatus =
+  | 'DRAFT'
+  | 'AWAITING_PROFESSIONAL_ACCEPTANCE'
+  | 'ACTIVE'
+  | 'WORK_SUBMITTED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'DISPUTED';
+
+export type MilestoneStatus =
+  | 'PENDING'
+  | 'ACTIVE'
+  | 'SUBMITTED'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+export interface EngagementMilestoneDto {
+  id: string;
+  engagementId: string;
+  title: string;
+  description: string | null;
+  amount: number;
+  dueDate: string | null;
+  sortOrder: number;
+  status: MilestoneStatus;
+  submittedAt: string | null;
+  approvedAt: string | null;
+  rejectedAt: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EngagementDeliverableDto {
+  id: string;
+  engagementId: string;
+  milestoneId: string | null;
+  submittedById: string;
+  title: string;
+  description: string | null;
+  fileUrl: string | null;
+  externalUrl: string | null;
+  notes: string | null;
+  submittedAt: string;
+  submittedBy: {
+    id: string;
+    name: string | null;
+    email: string;
+    avatarUrl: string | null;
+    avatarColor: string | null;
+  };
+}
+
+export interface EngagementActivityDto {
+  id: string;
+  engagementId: string;
+  authorId: string | null;
+  type: string;
+  description: string;
+  metadata: any;
+  createdAt: string;
+  author: {
+    id: string;
+    name: string | null;
+    email: string;
+    avatarUrl: string | null;
+    avatarColor: string | null;
+  } | null;
+}
+
+export interface EngagementListItemDto {
+  id: string;
+  taskId: string;
+  opportunityId: string | null;
+  proposalId: string | null;
+  professionalProfileId: string;
+  clientUserId: string;
+  status: EngagementStatus;
+  title: string;
+  scopeDescription: string;
+  agreedPrice: number;
+  currency: string;
+  startDate: string | null;
+  deadline: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  disputedAt: string | null;
+  cancellationReason: string | null;
+  disputeReason: string | null;
+  termsAcceptedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  task: {
+    id: string;
+    name: string;
+    status: string;
+    priority: string;
+    dueDate: string | null;
+    projectId: string;
+  };
+  professional: {
+    profileId: string;
+    slug: string;
+    userId: string;
+    name: string;
+    email: string;
+    avatarUrl: string | null;
+    avatarColor: string | null;
+  };
+  client: {
+    userId: string;
+    name: string;
+    email: string;
+    avatarUrl: string | null;
+    avatarColor: string | null;
+  };
+  milestones: {
+    id: string;
+    title: string;
+    amount: number;
+    status: MilestoneStatus;
+    dueDate: string | null;
+    sortOrder: number;
+  }[];
+  deliverablesCount: number;
+  activitiesCount: number;
+  viewerRole: 'client' | 'professional' | 'other';
+}
+
+export interface EngagementDetailDto {
+  id: string;
+  taskId: string;
+  opportunityId: string | null;
+  proposalId: string | null;
+  professionalProfileId: string;
+  clientUserId: string;
+  status: EngagementStatus;
+  title: string;
+  scopeDescription: string;
+  agreedPrice: number;
+  currency: string;
+  startDate: string | null;
+  deadline: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  disputedAt: string | null;
+  cancellationReason: string | null;
+  disputeReason: string | null;
+  termsAcceptedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  task: {
+    id: string;
+    name: string;
+    description: string | null;
+    status: string;
+    priority: string;
+    dueDate: string | null;
+    projectId: string;
+  };
+  opportunity: {
+    id: string;
+    title: string;
+    status: OpportunityStatus;
+  } | null;
+  proposal: {
+    id: string;
+    proposedPrice: number;
+    currency: string;
+    coverMessage: string;
+    status: ProposalStatus;
+  } | null;
+  professional: {
+    profileId: string;
+    slug: string;
+    userId: string;
+    name: string;
+    email: string;
+    avatarUrl: string | null;
+    avatarColor: string | null;
+  };
+  client: {
+    userId: string;
+    name: string;
+    email: string;
+    avatarUrl: string | null;
+    avatarColor: string | null;
+  };
+  milestones: EngagementMilestoneDto[];
+  deliverables: EngagementDeliverableDto[];
+  activities: EngagementActivityDto[];
+  viewerRole: 'client' | 'professional' | 'other';
+  canManage: boolean;
+  canSubmitDeliverables: boolean;
+  canAcceptTerms: boolean;
+  canSubmitMilestones: boolean;
+  canReviewMilestones: boolean;
+  canSubmitFinalWork: boolean;
+  canComplete: boolean;
+  canCancel: boolean;
+  canDispute: boolean;
+}
+
+export interface EngagementsListResponse {
+  items: EngagementListItemDto[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface OpportunitySkillRequirement {
   id: string;
   minimumProficiency: ProficiencyLevel;

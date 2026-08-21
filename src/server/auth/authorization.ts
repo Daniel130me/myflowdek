@@ -260,6 +260,65 @@ export async function requireWorkspaceCapability(
 }
 
 /**
+ * Centralized check for external professional task-scoped access (Phase 5).
+ * External contractors have access only to their contracted task, its comments,
+ * deliverables, milestones, and task-attached files, and ONLY when their engagement
+ * is in an active or completed state (never draft or cancelled).
+ */
+export async function canAccessTaskAsExternalProfessional(userId: string, taskId: string): Promise<boolean> {
+  const engagement = await db.engagement.findFirst({
+    where: {
+      taskId,
+      professionalProfile: { userId },
+      status: {
+        in: ['ACTIVE', 'WORK_SUBMITTED', 'COMPLETED'],
+      },
+    },
+    select: { id: true },
+  });
+  return Boolean(engagement);
+}
+
+/**
+ * Validates task access for either internal project members or external contracted professionals.
+ */
+export async function requireTaskAccess(
+  userId: string,
+  taskId: string,
+  requiredCapability: ProjectCapability = 'VIEW_PROJECT',
+) {
+  const task = await db.task.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      projectId: true,
+      project: {
+        select: {
+          members: { where: { userId }, select: { role: true }, take: 1 },
+        },
+      },
+    },
+  });
+  if (!task) throw new AuthError('Task not found', 404);
+
+  const membership = task.project.members[0];
+  if (membership) {
+    const allowedRoles = PROJECT_PERMISSIONS[requiredCapability];
+    if (allowedRoles.includes(membership.role)) {
+      return { task: { id: task.id, projectId: task.projectId }, accessType: 'PROJECT_MEMBER' as const };
+    }
+  }
+
+  // Check if user has active external contractor engagement for this task
+  const hasContractorAccess = await canAccessTaskAsExternalProfessional(userId, taskId);
+  if (hasContractorAccess) {
+    return { task: { id: task.id, projectId: task.projectId }, accessType: 'EXTERNAL_CONTRACTOR' as const };
+  }
+
+  throw new AuthError('You do not have access to this task', 403);
+}
+
+/**
  * Convenience: convert an AuthError into a NextResponse with the right status
  * and a generic message (never leaks internal details).
  */

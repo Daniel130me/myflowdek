@@ -118,11 +118,15 @@ export function TalentOpportunitiesDirectory() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Link href={routes.talentDirectory()} className={styles.buttonOutline}>
+            <Link href={routes.talentEngagements()} className={styles.secondaryButton}>
+              <Briefcase className="w-4 h-4 mr-1.5 inline" />
+              My Contracts
+            </Link>
+            <Link href={routes.talentDirectory()} className={styles.secondaryButton}>
               <Users className="w-4 h-4 mr-1.5 inline" />
               Find Talent
             </Link>
-            <Link href={routes.talentProfile()} className={styles.button}>
+            <Link href={routes.talentProfile()} className={styles.primaryButton}>
               <User className="w-4 h-4 mr-1.5 inline" />
               My Profile
             </Link>

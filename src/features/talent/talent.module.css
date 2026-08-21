@@ -985,6 +985,173 @@
   color: #991B1B;
 }
 
+.badgeActive {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.badgeAwaiting {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.badgeSubmitted {
+  background: #EDE9FE;
+  color: #5B21B6;
+}
+
+.badgeCompleted {
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+.badgeDisputed {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.engagementGrid {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.engagementCard {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  display: grid;
+  gap: 16px;
+}
+
+.engagementCard:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.engagementCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.engagementCardHeader h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.engagementMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.tabBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  margin: 24px 0 20px;
+  padding-bottom: 2px;
+  overflow-x: auto;
+}
+
+.tabButton {
+  padding: 8px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tabButton:hover {
+  color: var(--foreground);
+}
+
+.tabButtonActive {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.actionBanner {
+  padding: 18px 24px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.milestoneList {
+  display: grid;
+  gap: 12px;
+}
+
+.milestoneCard {
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.deliverableList {
+  display: grid;
+  gap: 12px;
+}
+
+.deliverableCard {
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  display: grid;
+  gap: 10px;
+}
+
+.activityTimeline {
+  display: grid;
+  gap: 16px;
+  position: relative;
+  padding-left: 20px;
+  border-left: 2px solid var(--border);
+}
+
+.activityItem {
+  position: relative;
+  display: grid;
+  gap: 4px;
+}
+
+.activityDot {
+  position: absolute;
+  left: -27px;
+  top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid var(--background);
+}
+
 @media (max-width: 1050px) {
   .filterGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .professionalGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

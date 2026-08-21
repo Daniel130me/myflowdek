@@ -707,7 +707,30 @@ export async function acceptTalentProposal(proposalId: string, managerUserId: st
       data: { status: 'AWARDED', closedAt: respondedAt },
     });
 
-    // 4. Audit & notifications
+    // 4. Create engagement offer awaiting professional acceptance
+    const createdEngagement = await tx.engagement.create({
+      data: {
+        taskId: proposal.opportunity.taskId,
+        opportunityId: proposal.opportunityId,
+        proposalId: proposal.id,
+        professionalProfileId: proposal.professionalProfileId,
+        clientUserId: managerUserId,
+        status: 'AWAITING_PROFESSIONAL_ACCEPTANCE',
+        title: proposal.opportunity.title,
+        scopeDescription: proposal.coverMessage + (proposal.proposedApproach ? `\n\nProposed Approach:\n${proposal.proposedApproach}` : ''),
+        agreedPrice: proposal.proposedPrice,
+        currency: proposal.currency,
+        activities: {
+          create: {
+            authorId: managerUserId,
+            type: 'OFFER_SENT',
+            description: `Engagement offer automatically generated from accepted proposal. Awaiting professional acceptance.`,
+          },
+        },
+      },
+    });
+
+    // 5. Audit & notifications
     await Promise.all([
       tx.notification.create({
         data: {
@@ -730,7 +753,10 @@ export async function acceptTalentProposal(proposalId: string, managerUserId: st
       }),
     ]);
 
-    return toProposalDto(acceptedProposal);
+    return {
+      ...toProposalDto(acceptedProposal),
+      engagementId: createdEngagement.id,
+    };
   });
 }
 

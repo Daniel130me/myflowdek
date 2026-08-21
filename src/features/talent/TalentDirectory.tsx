@@ -86,6 +86,9 @@ export function TalentDirectory() {
           <p>Browse published Flowdek profiles by role, skill, availability, location and rate.</p>
         </div>
         <div className={styles.headerActions}>
+          <Link className={styles.textButton} href={routes.talentEngagements()}>
+            My engagements
+          </Link>
           <Link className={styles.textButton} href={routes.talentOpportunities()}>
             Task opportunities
           </Link>
