@@ -8,7 +8,7 @@ import {
 
 export const NAV = [
   { id: 'mytasks', label: 'My Tasks', icon: CheckSquare },
-  { id: 'talent', label: 'Talent Profile', icon: BriefcaseBusiness },
+  { id: 'talent', label: 'Talent Network', icon: BriefcaseBusiness },
   { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
   { id: 'timeline', label: 'Timeline', icon: GanttChartSquare },
   { id: 'board', label: 'Board', icon: KanbanSquare },
@@ -40,7 +40,7 @@ export const BOTTOM_NAV = [
 ];
 
 export const MORE_NAV = [
-  { id: 'talent', label: 'Talent Profile', icon: BriefcaseBusiness },
+  { id: 'talent', label: 'Talent Network', icon: BriefcaseBusiness },
   { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
   { id: 'timeline', label: 'Timeline', icon: GanttChartSquare },
   { id: 'sheet', label: 'Sheet', icon: Table2 },

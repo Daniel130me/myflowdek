@@ -234,6 +234,11 @@ model ProfessionalProfile {
   updatedAt             DateTime               @updatedAt
 
   @@index([status, visibility, updatedAt])
+  @@index([status, visibility, professionalTitle])
+  @@index([status, visibility, location])
+  @@index([status, visibility, timezone])
+  @@index([status, visibility, remotePreference])
+  @@index([status, visibility, rateType, minimumRate])
 }
 
 model ProfessionalRole {

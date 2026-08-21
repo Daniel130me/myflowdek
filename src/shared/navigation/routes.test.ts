@@ -5,6 +5,8 @@ import { routes, getRouteForView, getViewFromPathname } from './routes';
 test('routes generator functions produce correct paths', () => {
   assert.strictEqual(routes.projects(), '/projects');
   assert.strictEqual(routes.myTasks(), '/my-tasks');
+  assert.strictEqual(routes.talentDirectory(), '/talent');
+  assert.strictEqual(routes.talentProfessional('ada lovelace'), '/talent/professionals/ada%20lovelace');
   assert.strictEqual(routes.talentProfile(), '/talent/profile');
   assert.strictEqual(routes.editTalentProfile(), '/talent/profile/edit');
   assert.strictEqual(routes.projectOverview('p1'), '/projects/p1/overview');
@@ -17,7 +19,7 @@ test('routes generator functions produce correct paths', () => {
 test('getRouteForView resolves view IDs correctly', () => {
   assert.strictEqual(getRouteForView('projects'), '/projects');
   assert.strictEqual(getRouteForView('mytasks'), '/my-tasks');
-  assert.strictEqual(getRouteForView('talent'), '/talent/profile');
+  assert.strictEqual(getRouteForView('talent'), '/talent');
   assert.strictEqual(getRouteForView('dashboard', 'proj-1'), '/projects/proj-1/overview');
   assert.strictEqual(getRouteForView('board', 'proj-1'), '/projects/proj-1/board');
   assert.strictEqual(getRouteForView('documents', 'proj-1'), '/projects/proj-1/documents');
