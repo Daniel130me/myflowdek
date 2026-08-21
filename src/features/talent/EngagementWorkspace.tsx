@@ -43,7 +43,29 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<EngagementDetailDto | null>(null);
-  const [activeTab, setActiveTab] = useState<'milestones' | 'payments' | 'deliverables' | 'scope' | 'timeline' | 'resolution'>('milestones');
+  const [activeTab, setActiveTab] = useState<'milestones' | 'payments' | 'deliverables' | 'reviews' | 'scope' | 'timeline' | 'resolution'>('milestones');
+
+  // Reviews State
+  const [reviewsData, setReviewsData] = useState<any>(null);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewFeedback, setReviewFeedback] = useState('');
+  const [reviewQuality, setReviewQuality] = useState(5);
+  const [reviewComm, setReviewComm] = useState(5);
+  const [reviewComp, setReviewComp] = useState(5);
+  const [reviewTime, setReviewTime] = useState(5);
+  const [reviewWouldHire, setReviewWouldHire] = useState(true);
+
+  const loadReviews = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/talent/engagements/${encodeURIComponent(engagementId)}/reviews`);
+      if (res.ok) {
+        const json = await res.json();
+        setReviewsData(json);
+      }
+    } catch (err) {
+      console.error('Failed to load engagement reviews:', err);
+    }
+  }, [engagementId]);
 
   // Payments State
   const [paymentsData, setPaymentsData] = useState<any>(null);
@@ -105,7 +127,8 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
     loadEngagement();
     loadEngagementPayments();
     loadPayoutAccount();
-  }, [loadEngagement, loadEngagementPayments, loadPayoutAccount]);
+    loadReviews();
+  }, [loadEngagement, loadEngagementPayments, loadPayoutAccount, loadReviews]);
 
   const handleConnectBank = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -650,6 +673,13 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab('reviews')}
+            className={`${styles.tabButton} ${activeTab === 'reviews' ? styles.tabButtonActive : ''}`}
+          >
+            Reviews & Ratings
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('scope')}
             className={`${styles.tabButton} ${activeTab === 'scope' ? styles.tabButtonActive : ''}`}
           >
@@ -980,7 +1010,113 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
           </div>
         )}
 
-        {/* Tab 3: Scope & Details */}
+        {/* Tab: Verified Reviews & Ratings */}
+        {activeTab === 'reviews' && (
+          <div className="space-y-6">
+            <div className={styles.panel}>
+              <h2>Contract Reviews & Trust Signals</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Verified feedback submitted after engagement completion is published directly to professional and client profiles.
+              </p>
+
+              {data.status !== 'COMPLETED' ? (
+                <div className="p-4 bg-muted/40 rounded-lg text-sm text-muted-foreground">
+                  <p className="m-0 font-medium text-foreground">Review submission is available once the engagement status is marked COMPLETED.</p>
+                  <p className="m-0 mt-1 text-xs">All milestones must be approved and settled prior to leaving contract feedback.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left: Professional Review */}
+                  <div className="border border-border rounded-lg p-4 bg-card">
+                    <h3 className="text-sm font-semibold mb-2">Client Review for Contractor</h3>
+                    {reviewsData?.professionalReview ? (
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-1 text-amber-500 font-bold">
+                          <span>Overall Quality: {reviewsData.professionalReview.qualityRating}/5 ★</span>
+                        </div>
+                        <p className="text-muted-foreground m-0 italic">"{reviewsData.professionalReview.writtenFeedback || 'No written comments provided.'}"</p>
+                        <div className="text-xs text-muted-foreground pt-2 border-t border-border">
+                          Submitted by {reviewsData.professionalReview.clientUser?.name ?? 'Client'} • {new Date(reviewsData.professionalReview.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        {data.viewerRole === 'client' ? (
+                          <form
+                            onSubmit={async (e) => {
+                              e.preventDefault();
+                              setReviewSubmitting(true);
+                              try {
+                                const res = await fetch(`/api/talent/engagements/${encodeURIComponent(engagementId)}/reviews/professional`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    qualityRating: reviewQuality,
+                                    communicationRating: reviewComm,
+                                    competenceRating: reviewComp,
+                                    timelinessRating: reviewTime,
+                                    wouldHireAgain: reviewWouldHire,
+                                    writtenFeedback: reviewFeedback,
+                                  }),
+                                });
+                                if (res.ok) {
+                                  await loadReviews();
+                                  setReviewFeedback('');
+                                } else {
+                                  const errJson = await res.json();
+                                  alert(errJson.error || 'Failed to submit review');
+                                }
+                              } catch (err) {
+                                console.error('Failed to submit review:', err);
+                              } finally {
+                                setReviewSubmitting(false);
+                              }
+                            }}
+                            className="space-y-3"
+                          >
+                            <div>
+                              <label className="text-xs font-semibold block mb-1">Quality Rating (1-5)</label>
+                              <input type="number" min={1} max={5} value={reviewQuality} onChange={(e) => setReviewQuality(Number(e.target.value))} className={styles.inputField} />
+                            </div>
+                            <div>
+                              <label className="text-xs font-semibold block mb-1">Written Feedback</label>
+                              <textarea rows={3} value={reviewFeedback} onChange={(e) => setReviewFeedback(e.target.value)} placeholder="Describe your experience working with this contractor..." className={styles.inputField} />
+                            </div>
+                            <button type="submit" disabled={reviewSubmitting} className={styles.primaryButton}>
+                              {reviewSubmitting ? 'Submitting...' : 'Submit Verified Review'}
+                            </button>
+                          </form>
+                        ) : (
+                          <p className="text-xs text-muted-foreground m-0">Awaiting review from the contract manager / client.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Client Review */}
+                  <div className="border border-border rounded-lg p-4 bg-card">
+                    <h3 className="text-sm font-semibold mb-2">Contractor Feedback for Client</h3>
+                    {reviewsData?.clientReview ? (
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center gap-1 text-emerald-600 font-bold">
+                          <span>Communication & Clarity: {reviewsData.clientReview.communicationRating}/5 ★</span>
+                        </div>
+                        <p className="text-muted-foreground m-0 italic">"{reviewsData.clientReview.writtenFeedback || 'No written comments provided.'}"</p>
+                        <div className="text-xs text-muted-foreground pt-2 border-t border-border">
+                          Submitted by Contractor • {new Date(reviewsData.clientReview.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground m-0">
+                        {data.viewerRole === 'professional' ? 'You can submit feedback regarding project clarity and communication.' : 'Awaiting feedback from contractor.'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {activeTab === 'scope' && (
           <div className="grid gap-6">
             <div className={styles.panel}>
