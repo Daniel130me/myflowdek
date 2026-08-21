@@ -43,7 +43,165 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<EngagementDetailDto | null>(null);
-  const [activeTab, setActiveTab] = useState<'milestones' | 'deliverables' | 'scope' | 'timeline' | 'resolution'>('milestones');
+  const [activeTab, setActiveTab] = useState<'milestones' | 'payments' | 'deliverables' | 'scope' | 'timeline' | 'resolution'>('milestones');
+
+  // Payments State
+  const [paymentsData, setPaymentsData] = useState<any>(null);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [showFundModal, setShowFundModal] = useState(false);
+  const [fundMilestoneId, setFundMilestoneId] = useState<string>('');
+  const [fundAmount, setFundAmount] = useState<number>(0);
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [bankName, setBankName] = useState('');
+  const [bankCode, setBankCode] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [payoutAccount, setPayoutAccount] = useState<any>(null);
+
+  const loadEngagementPayments = useCallback(async () => {
+    setPaymentsLoading(true);
+    try {
+      const res = await fetch(`/api/talent/engagements/${encodeURIComponent(engagementId)}/payments`);
+      if (res.ok) {
+        const json = await res.json();
+        setPaymentsData(json);
+      }
+    } catch (err) {
+      console.error('Failed to load payments:', err);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }, [engagementId]);
+
+  const loadPayoutAccount = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/talent/payments/account`);
+      if (res.ok) {
+        const json = await res.json();
+        setPayoutAccount(json.account);
+      }
+    } catch (err) {
+      console.error('Failed to load payout account:', err);
+    }
+  }, []);
+
+  const loadEngagement = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/talent/engagements/${encodeURIComponent(engagementId)}`);
+      if (!res.ok) {
+        throw new Error(await readApiMessage(res));
+      }
+      const json: EngagementDetailDto = await res.json();
+      setData(json);
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load engagement.');
+    } finally {
+      setLoading(false);
+    }
+  }, [engagementId]);
+
+  useEffect(() => {
+    loadEngagement();
+    loadEngagementPayments();
+    loadPayoutAccount();
+  }, [loadEngagement, loadEngagementPayments, loadPayoutAccount]);
+
+  const handleConnectBank = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const res = await fetch('/api/talent/payments/account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bankName,
+          bankCode,
+          accountNumber,
+          currency: data?.currency || 'NGN',
+        }),
+      });
+      if (!res.ok) throw new Error(await readApiMessage(res));
+      setShowBankModal(false);
+      setActionSuccess('Payout bank account connected successfully.');
+      loadPayoutAccount();
+    } catch (err: any) {
+      setActionError(err.message ?? 'Failed to connect bank account.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleInitializeFund = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/talent/engagements/${encodeURIComponent(engagementId)}/fund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          milestoneId: fundMilestoneId || undefined,
+          amount: fundAmount,
+          currency: data?.currency || 'NGN',
+        }),
+      });
+      if (!res.ok) throw new Error(await readApiMessage(res));
+      const json = await res.json();
+      setShowFundModal(false);
+      setActionSuccess('Payment initialized! Protected milestone holding is pending funding.');
+      loadEngagementPayments();
+      loadEngagement();
+
+      if (json.checkoutUrl && !json.checkoutUrl.includes('payment_ref')) {
+        window.open(json.checkoutUrl, '_blank');
+      }
+    } catch (err: any) {
+      setActionError(err.message ?? 'Failed to initialize funding.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSimulateFunding = async (paymentId: string) => {
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const res = await fetch(
+        `/api/talent/engagements/${encodeURIComponent(engagementId)}/payments/${encodeURIComponent(paymentId)}/simulate-funding`,
+        { method: 'POST' }
+      );
+      if (!res.ok) throw new Error(await readApiMessage(res));
+      setActionSuccess('Sandbox milestone payment funded successfully! Funds are held in protection.');
+      loadEngagementPayments();
+      loadEngagement();
+    } catch (err: any) {
+      setActionError(err.message ?? 'Failed to simulate funding.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReleasePayment = async (paymentId: string) => {
+    if (!confirm('Release funded payout to contractor? This will transfer net funds to the contractor account.')) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      const res = await fetch(
+        `/api/talent/engagements/${encodeURIComponent(engagementId)}/payments/${encodeURIComponent(paymentId)}/release`,
+        { method: 'POST' }
+      );
+      if (!res.ok) throw new Error(await readApiMessage(res));
+      setActionSuccess('Payout released to contractor successfully!');
+      loadEngagementPayments();
+      loadEngagement();
+    } catch (err: any) {
+      setActionError(err.message ?? 'Failed to release payout.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   // Modals & Form states
   const [actionLoading, setActionLoading] = useState(false);
@@ -68,26 +226,6 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
   const [resolutionType, setResolutionType] = useState<'CANCEL' | 'DISPUTE' | null>(null);
   const [resolutionReason, setResolutionReason] = useState('');
 
-  const loadEngagement = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/talent/engagements/${encodeURIComponent(engagementId)}`);
-      if (!res.ok) {
-        throw new Error(await readApiMessage(res));
-      }
-      const json: EngagementDetailDto = await res.json();
-      setData(json);
-    } catch (err: any) {
-      setError(err?.message ?? 'Failed to load engagement.');
-    } finally {
-      setLoading(false);
-    }
-  }, [engagementId]);
-
-  useEffect(() => {
-    loadEngagement();
-  }, [loadEngagement]);
 
   const handleAcceptTerms = async () => {
     if (!confirm('Accept these contract terms and start this engagement? You will receive scoped task access.')) return;
@@ -498,6 +636,13 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab('payments')}
+            className={`${styles.tabButton} ${activeTab === 'payments' ? styles.tabButtonActive : ''}`}
+          >
+            Payments & Protected Funding
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('deliverables')}
             className={`${styles.tabButton} ${activeTab === 'deliverables' ? styles.tabButtonActive : ''}`}
           >
@@ -611,7 +756,151 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
           </div>
         )}
 
-        {/* Tab 2: Deliverables */}
+        {/* Tab: Protected Payments */}
+        {activeTab === 'payments' && (
+          <div className="space-y-6">
+            {/* Summary Banner */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className={styles.panel}>
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider block mb-1">
+                  Total Contract Value
+                </span>
+                <strong className="text-xl text-foreground font-bold">
+                  {data.currency} {data.agreedPrice.toLocaleString()}
+                </strong>
+              </div>
+              <div className={styles.panel}>
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider block mb-1">
+                  Total Funded in Protection
+                </span>
+                <strong className="text-xl text-emerald-600 font-bold">
+                  {data.currency} {(paymentsData?.summary?.totalFunded || 0).toLocaleString()}
+                </strong>
+              </div>
+              <div className={styles.panel}>
+                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider block mb-1">
+                  Released Payouts
+                </span>
+                <strong className="text-xl text-primary font-bold">
+                  {data.currency} {(paymentsData?.summary?.totalReleased || 0).toLocaleString()}
+                </strong>
+              </div>
+            </div>
+
+            {/* Contractor Payout Account Banner */}
+            {data.viewerRole === 'professional' && (
+              <div className={styles.panel} style={{ borderColor: payoutAccount ? '#10B981' : 'var(--border)' }}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold m-0 flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-emerald-600" />
+                      Contractor Payout Account
+                    </h3>
+                    <p className="text-xs text-muted-foreground m-0 mt-0.5">
+                      {payoutAccount
+                        ? `Bank: ${payoutAccount.bankName} (${payoutAccount.accountNumberMasked}) — Verified`
+                        : 'Connect your local bank account to receive automated payout releases upon milestone approval.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowBankModal(true)}
+                    className={styles.secondaryButton}
+                  >
+                    {payoutAccount ? 'Update Bank Account' : 'Connect Payout Bank'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Client Action: Fund Contract / Milestone */}
+            {data.viewerRole === 'client' && (
+              <div className="flex justify-between items-center bg-card p-4 rounded-xl border border-border">
+                <div>
+                  <h3 className="text-sm font-bold m-0">Provider-Managed Protected Payments</h3>
+                  <p className="text-xs text-muted-foreground m-0">
+                    Funds are safely held in provider milestone protection until you approve submitted work.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFundAmount(data.agreedPrice);
+                    setShowFundModal(true);
+                  }}
+                  className={styles.primaryButton}
+                >
+                  <DollarSign className="w-4 h-4 mr-1 inline" />
+                  Fund Milestone / Contract
+                </button>
+              </div>
+            )}
+
+            {/* Payments Table */}
+            <div className={styles.panel}>
+              <h3 className="text-sm font-bold mb-3">Transaction History & Protection Records</h3>
+              {paymentsLoading ? (
+                <div className="text-xs text-muted-foreground py-4">Loading transaction history...</div>
+              ) : !paymentsData?.payments?.length ? (
+                <div className="text-xs text-muted-foreground py-6 text-center">
+                  No payment transactions initialized yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {paymentsData.payments.map((p: any) => (
+                    <div key={p.id} className="p-3 rounded-lg border border-border bg-secondary/30 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-xs px-2 py-0.5 rounded font-bold ${
+                            p.state === 'RELEASED'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : p.state === 'FUNDED'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-zinc-100 text-zinc-700'
+                          }`}>
+                            {p.state}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Ref: {p.providerReference || p.id.slice(-8)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Gross Amount: <strong>{p.currency} {Number(p.amount).toLocaleString()}</strong> |
+                          Platform Fee (10%): {p.currency} {Number(p.platformFee).toLocaleString()} |
+                          Net Contractor Payout: <strong>{p.currency} {Number(p.netAmount).toLocaleString()}</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        {/* Sandbox Simulation button for pending funding */}
+                        {p.state === 'FUNDING_PENDING' && data.viewerRole === 'client' && (
+                          <button
+                            type="button"
+                            onClick={() => handleSimulateFunding(p.id)}
+                            className={styles.secondaryButton}
+                          >
+                            Simulate Funding (Sandbox)
+                          </button>
+                        )}
+
+                        {/* Client Release Payout button */}
+                        {p.state === 'FUNDED' && data.viewerRole === 'client' && (
+                          <button
+                            type="button"
+                            onClick={() => handleReleasePayment(p.id)}
+                            className={styles.primaryButton}
+                          >
+                            Release Payout to Contractor
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {activeTab === 'deliverables' && (
           <div>
             <div className="flex justify-between items-center mb-4">
@@ -930,6 +1219,141 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                     className={resolutionType === 'CANCEL' ? styles.dangerButton : styles.primaryButton}
                   >
                     Confirm {resolutionType === 'CANCEL' ? 'Cancellation' : 'Dispute'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {/* Modal: Fund Contract / Milestone */}
+        {showFundModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-card border border-border rounded-xl p-6 max-w-md w-full">
+              <h2 className="text-lg font-bold mb-2">Fund Protected Milestone</h2>
+              <p className="text-xs text-muted-foreground mb-4">
+                Funds are held securely by our marketplace payment provider until you review and approve deliverables.
+              </p>
+
+              <form onSubmit={handleInitializeFund} className="space-y-4">
+                {data.milestones.length > 0 && (
+                  <div className={styles.fieldFull}>
+                    <label>Select Milestone (Optional)</label>
+                    <select
+                      value={fundMilestoneId}
+                      onChange={(e) => {
+                        const mId = e.target.value;
+                        setFundMilestoneId(mId);
+                        const selected = data.milestones.find((m) => m.id === mId);
+                        if (selected) setFundAmount(selected.amount);
+                      }}
+                    >
+                      <option value="">-- Entire Contract / Custom --</option>
+                      {data.milestones.map((m, idx) => (
+                        <option key={m.id} value={m.id}>
+                          #{idx + 1} - {m.title} ({data.currency} {m.amount})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className={styles.fieldFull}>
+                  <label>Amount to Fund ({data.currency}) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={fundAmount}
+                    onChange={(e) => setFundAmount(parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+
+                <div className="p-3 rounded bg-secondary/50 text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span>Gross Payment Amount:</span>
+                    <strong>{data.currency} {fundAmount.toLocaleString()}</strong>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Platform Service Fee (10%):</span>
+                    <span>{data.currency} {(fundAmount * 0.1).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between font-bold border-t border-border pt-1">
+                    <span>Net Contractor Protection Payout:</span>
+                    <span className="text-emerald-600">{data.currency} {(fundAmount * 0.9).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowFundModal(false)}
+                    className={styles.secondaryButton}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={actionLoading} className={styles.primaryButton}>
+                    Proceed to Payment Protection
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Connect Contractor Bank Account */}
+        {showBankModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-card border border-border rounded-xl p-6 max-w-md w-full">
+              <h2 className="text-lg font-bold mb-2">Connect Payout Bank Account</h2>
+              <p className="text-xs text-muted-foreground mb-4">
+                Enter your local bank account details to receive automated payouts when clients release milestone payments.
+              </p>
+
+              <form onSubmit={handleConnectBank} className="space-y-4">
+                <div className={styles.fieldFull}>
+                  <label>Bank Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Access Bank, GTBank, Zenith, FirstBank"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                  />
+                </div>
+
+                <div className={styles.fieldFull}>
+                  <label>Bank Code *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 044 or 058"
+                    value={bankCode}
+                    onChange={(e) => setBankCode(e.target.value)}
+                  />
+                </div>
+
+                <div className={styles.fieldFull}>
+                  <label>Account Number (10 digits) *</label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={12}
+                    placeholder="e.g. 0123456789"
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowBankModal(false)}
+                    className={styles.secondaryButton}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={actionLoading} className={styles.primaryButton}>
+                    Connect Payout Account
                   </button>
                 </div>
               </form>
