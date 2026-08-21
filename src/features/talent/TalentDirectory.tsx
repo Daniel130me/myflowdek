@@ -85,7 +85,7 @@ export function TalentDirectory() {
           <h1>Find the right professional for the work</h1>
           <p>Browse published Flowdek profiles by role, skill, availability, location and rate.</p>
         </div>
-        <Link className={styles.secondaryButton} href={routes.talentProfile()}>My professional profile</Link>
+        <div className={styles.headerActions}><Link className={styles.textButton} href={routes.talentInvitations()}>My invitations</Link><Link className={styles.secondaryButton} href={routes.talentProfile()}>My professional profile</Link></div>
       </header>
 
       <form className={styles.directoryFilters} onSubmit={submit}>

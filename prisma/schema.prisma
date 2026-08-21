@@ -136,6 +136,14 @@ enum SkillCategory {
   SECURITY
 }
 
+enum TalentInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+  EXPIRED
+}
+
 /**
  * ------------------------------- user ---------------------------------
  */
@@ -201,6 +209,7 @@ model User {
   sentInvitations         Invitation[]
   createdProjectDocuments ProjectDocument[]     @relation("ProjectDocumentCreator")
   professionalProfile     ProfessionalProfile?
+  sentTalentInvitations   TalentInvitation[]      @relation("TalentInvitationSender")
   createdAt               DateTime              @default(now())
   updatedAt               DateTime              @updatedAt
 }
@@ -230,6 +239,7 @@ model ProfessionalProfile {
   skills                ProfessionalSkill[]
   portfolioItems        PortfolioItem[]
   availability          ProfessionalAvailability?
+  invitations           TalentInvitation[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
@@ -263,7 +273,8 @@ model Skill {
   description String?
   sortOrder   Int                 @default(0)
   isActive    Boolean             @default(true)
-  profiles    ProfessionalSkill[]
+  profiles         ProfessionalSkill[]
+  taskRequirements TaskCompetencyRequirement[]
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 
@@ -506,7 +517,9 @@ model Task {
   formSubmissions    FormSubmission[]       @relation("FormConvertedTask")
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
-  timesheetEntries   TimesheetEntry[]
+  timesheetEntries       TimesheetEntry[]
+  competencyRequirements TaskCompetencyRequirement[]
+  talentInvitations      TalentInvitation[]
 
   @@index([projectId, status])
   @@index([projectId, assigneeId])
@@ -519,6 +532,45 @@ model Task {
 /**
  * Task grouping within a project (collapsible sections in the task list).
  */
+model TaskCompetencyRequirement {
+  id                 String           @id @default(cuid())
+  taskId             String
+  skillId            String
+  minimumProficiency ProficiencyLevel
+  isRequired         Boolean          @default(true)
+  notes              String?
+  task               Task             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  skill              Skill            @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([taskId, skillId])
+  @@index([skillId, minimumProficiency])
+}
+
+model TalentInvitation {
+  id                    String                 @id @default(cuid())
+  taskId                String
+  professionalProfileId String
+  invitedById           String
+  message               String?
+  proposedBudget        Decimal?               @db.Decimal(12, 2)
+  currency              String?                @db.Char(3)
+  proposedDeadline      DateTime?
+  status                TalentInvitationStatus @default(PENDING)
+  expiresAt             DateTime
+  respondedAt           DateTime?
+  task                  Task                   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  professionalProfile   ProfessionalProfile    @relation(fields: [professionalProfileId], references: [id], onDelete: Cascade)
+  invitedBy             User                   @relation("TalentInvitationSender", fields: [invitedById], references: [id], onDelete: Restrict)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@index([taskId, status, createdAt])
+  @@index([professionalProfileId, status, createdAt])
+  @@index([invitedById])
+}
+
 model Section {
   id        String  @id @default(cuid())
   projectId String

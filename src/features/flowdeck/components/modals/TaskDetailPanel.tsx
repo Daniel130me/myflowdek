@@ -12,6 +12,7 @@ import { SubtasksSection } from '../ui/SubtasksSection';
 import { TagPill, TagPills, CommentsSection, FollowersSection, TimeTrackingSection, DuplicateTaskDialog, MarkdownDescription } from '../ui';
 import { selectStyle, FF } from '../ui/styles';
 import { CloudFilePickerModal } from './CloudFilePickerModal';
+import { TaskTalentPanel } from '@/features/talent/TaskTalentPanel';
 
 interface TaskDetailPanelProps {
   task: Task;
@@ -423,6 +424,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
           {subtasksSection}
           <Field label="Status"><select value={task.status} onChange={e => onUpdate({ status: e.target.value as TaskStatus, progress: e.target.value === 'done' ? 100 : task.progress })} style={selectStyle}>{['backlog', 'in_progress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select></Field>
           <Field label="Assignee"><select value={task.assignee} onChange={e => onUpdate({ assignee: e.target.value })} style={selectStyle}>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
+          <TaskTalentPanel taskId={task.id} />
           <Field label="Priority"><select value={task.priority} onChange={e => onUpdate({ priority: e.target.value as TaskPriority })} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
           {dueDateField}
           {recurrenceField}
@@ -516,6 +518,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
         {subtasksSection}
         <Field label="Status"><select value={task.status} onChange={e => onUpdate({ status: e.target.value as TaskStatus, progress: e.target.value === 'done' ? 100 : task.progress })} style={selectStyle}>{['backlog', 'in_progress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select></Field>
         <Field label="Assignee"><select value={task.assignee} onChange={e => onUpdate({ assignee: e.target.value })} style={selectStyle}>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
+        <TaskTalentPanel taskId={task.id} />
         <Field label="Priority"><select value={task.priority} onChange={e => onUpdate({ priority: e.target.value as TaskPriority })} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
         {dueDateField}
         {recurrenceField}

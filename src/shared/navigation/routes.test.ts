@@ -6,6 +6,7 @@ test('routes generator functions produce correct paths', () => {
   assert.strictEqual(routes.projects(), '/projects');
   assert.strictEqual(routes.myTasks(), '/my-tasks');
   assert.strictEqual(routes.talentDirectory(), '/talent');
+  assert.strictEqual(routes.talentInvitations(), '/talent/invitations');
   assert.strictEqual(routes.talentProfessional('ada lovelace'), '/talent/professionals/ada%20lovelace');
   assert.strictEqual(routes.talentProfile(), '/talent/profile');
   assert.strictEqual(routes.editTalentProfile(), '/talent/profile/edit');

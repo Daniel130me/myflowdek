@@ -24,6 +24,7 @@ export const routes = {
   command: () => '/command',
   settings: () => '/settings',
   talentDirectory: () => '/talent',
+  talentInvitations: () => '/talent/invitations',
   talentProfessional: (slug: string) => `/talent/professionals/${encodeURIComponent(slug)}`,
   talentProfile: () => '/talent/profile',
   editTalentProfile: () => '/talent/profile/edit',
