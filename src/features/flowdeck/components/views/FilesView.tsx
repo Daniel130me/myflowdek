@@ -100,6 +100,7 @@ export function FilesView({
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: 2, alignSelf: 'flex-start' }}>
+                    <button onClick={(e) => { e.stopPropagation(); onViewFile(f.id); }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 6, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Preview file"><Eye size={16} /></button>
                     <button onClick={(e) => handleOpenFile(f, e)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 6, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Open in Cloud Drive"><ExternalLink size={16} /></button>
                     {onShareFile && (
                       <button onClick={(e) => { e.stopPropagation(); onShareFile(f); }} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 6, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Share in Provider"><Share2 size={16} /></button>
