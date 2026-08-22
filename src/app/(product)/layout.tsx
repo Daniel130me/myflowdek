@@ -233,7 +233,15 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
           />
         )}
 
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, paddingBottom: bottomNavHeight }}>
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          padding: isMobile ? '18px 14px 0' : '28px 32px 40px',
+          paddingBottom: isMobile ? bottomNavHeight : 40,
+        }}>
           {children}
         </div>
         {modal}

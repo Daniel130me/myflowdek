@@ -46,6 +46,7 @@ export function Sidebar({ project, projects, activeView, onNavigate, goToPortfol
   return (
     <aside style={{
       width: S.width, background: S.bg,
+      height: '100vh', minHeight: 0, overflowY: 'auto',
       display: 'flex', flexDirection: 'column', flexShrink: 0,
     }}>
       <div style={{ padding: '24px 20px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
