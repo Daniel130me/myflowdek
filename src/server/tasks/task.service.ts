@@ -185,6 +185,34 @@ export async function getTask(taskId: string) {
 }
 
 /**
+ * Contract-safe task projection for external professionals.
+ * Project-only metadata such as custom fields, creator IDs, hierarchy, and
+ * internal assignment details are deliberately excluded.
+ */
+export async function getExternalProfessionalTask(taskId: string) {
+  const task = await db.task.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      status: true,
+      priority: true,
+      startDate: true,
+      dueDate: true,
+      duration: true,
+      progress: true,
+      isMilestone: true,
+      completedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+  if (!task) throw new AuthError('Task not found', 404);
+  return task;
+}
+
+/**
  * Update a task's editable fields. Records activity entries for significant
  * changes (status, priority, assignee, due date, name).
  *

@@ -240,7 +240,7 @@ export async function sendEngagementOffer(userId: string, engagementId: string, 
 /**
  * Professional accepts the engagement terms and activates the contract.
  * Status: AWAITING_PROFESSIONAL_ACCEPTANCE -> ACTIVE.
- * Grants task access and assigns the task.
+ * Grants task-scoped access through the centralized engagement access check.
  */
 export async function acceptEngagement(userId: string, engagementId: string) {
   const engagement = await db.engagement.findUnique({
@@ -264,33 +264,29 @@ export async function acceptEngagement(userId: string, engagementId: string) {
   const now = new Date();
 
   return db.$transaction(async (tx) => {
-    // 1. Update engagement to ACTIVE
-    const updated = await tx.engagement.update({
-      where: { id: engagementId },
+    const claimed = await tx.engagement.updateMany({
+      where: { id: engagementId, status: 'AWAITING_PROFESSIONAL_ACCEPTANCE' },
       data: {
         status: 'ACTIVE',
         termsAcceptedAt: now,
         startDate: engagement.startDate ?? now,
-        activities: {
-          create: {
-            authorId: userId,
-            type: 'ACCEPTED',
-            description: `Terms accepted by professional. Engagement is now ACTIVE with scoped task access.`,
-          },
-        },
       },
-      select: engagementDetailSelect,
     });
+    if (claimed.count === 0) {
+      throw new ServiceError('This engagement is no longer awaiting acceptance.', 409);
+    }
 
-    // 2. Assign professional user to the task
-    await tx.task.update({
-      where: { id: engagement.taskId },
+    await tx.engagementActivity.create({
       data: {
-        assigneeId: userId,
+        engagementId,
+        authorId: userId,
+        type: 'ACCEPTED',
+        description: 'Terms accepted by professional. Engagement is now ACTIVE with scoped task access.',
       },
     });
 
-    // 3. Notify client
+    // Scoped access is derived from the ACTIVE engagement. The existing task
+    // assignee remains untouched because contractors are not project members.
     await tx.notification.create({
       data: {
         userId: engagement.clientUserId,
@@ -300,7 +296,6 @@ export async function acceptEngagement(userId: string, engagementId: string) {
       },
     });
 
-    // 4. Audit log
     await tx.auditLog.create({
       data: {
         userId,
@@ -313,8 +308,12 @@ export async function acceptEngagement(userId: string, engagementId: string) {
       },
     });
 
+    const updated = await tx.engagement.findUniqueOrThrow({
+      where: { id: engagementId },
+      select: engagementDetailSelect,
+    });
     return toEngagementDetailDto(updated, userId);
-  });
+  }, { timeout: 15_000 });
 }
 
 /**
