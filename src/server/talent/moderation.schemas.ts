@@ -9,7 +9,7 @@ export const submitReportSchema = z.object({
 
 export const moderateProfileSchema = z.object({
   profileId: z.string().min(1),
-  action: z.enum(['SUSPEND', 'REINSTATE', 'DELETE']),
+  action: z.enum(['SUSPEND', 'REINSTATE']),
   reason: z.string().trim().min(5).max(500),
 });
 
