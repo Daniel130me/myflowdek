@@ -437,7 +437,7 @@ export function TaskListView({ tasks, tags = [], projects, currentProjectId, all
 
   /* ---- Section-aware right side content ---- */
   const headerRight = (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: 8, rowGap: 8, alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'flex-end', flexWrap: 'wrap', width: '100%' }}>
       {onAddSection && <AddSectionButton onAdd={onAddSection} />}
       <TagFilterBar tags={tags} selectedTagIds={tagFilter} onToggleTag={id => setTagFilter(prev => { const n = new Set(prev); if (n.has(id)) { n.delete(id); } else { n.add(id); } return n; })} onClearAll={() => setTagFilter(new Set())} />
       {!hasSections && ['start', 'priority', 'name'].map(k => (

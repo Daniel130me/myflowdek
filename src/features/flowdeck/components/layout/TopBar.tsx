@@ -82,6 +82,7 @@ export const TopBar = forwardRef<TopBarHandle, {
       height: topbarHeight, borderBottom: `1px solid ${S.topbar.border}`, background: S.topbar.bg,
       display: 'flex', alignItems: 'center',
       padding: isMobile ? '0 12px' : '0 28px', gap: isMobile ? 8 : 16, flexShrink: 0,
+      position: 'relative', zIndex: 50,
     }}>
       {isMobile && (
         <button onClick={onToggleSidebar} style={{ border: 'none', background: 'none', cursor: 'pointer', color: colors.ink, flexShrink: 0, padding: 6, borderRadius: 10, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Menu size={20} strokeWidth={1.8} /></button>

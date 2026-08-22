@@ -41,10 +41,11 @@ export function SearchFilterPanel({ open, onClose, filters, onChange, onClear, a
 
   const panelStyle: React.CSSProperties = {
     position: 'absolute', top: '100%', right: 0, marginTop: 8,
-    width: 'min(380px, 92vw)',
+    width: 'min(380px, calc(100vw - 24px))',
+    maxHeight: 'calc(100dvh - 110px)', overflowY: 'auto',
     background: '#FFFFFF', border: `1px solid ${COLORS.line}`, borderRadius: 14,
     boxShadow: '0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04)',
-    zIndex: 30, padding: 0, overflow: 'hidden',
+    zIndex: 30, padding: 0,
   };
 
   const sectionStyle: React.CSSProperties = {
