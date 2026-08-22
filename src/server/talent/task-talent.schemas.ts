@@ -41,6 +41,12 @@ export const createTalentInvitationSchema = z.object({
   if (value.proposedBudget != null && !value.currency) {
     context.addIssue({ code: 'custom', path: ['currency'], message: 'Currency is required when a budget is supplied.' });
   }
+  if (value.currency && value.proposedBudget == null) {
+    context.addIssue({ code: 'custom', path: ['proposedBudget'], message: 'A budget is required when currency is supplied.' });
+  }
+  if (value.proposedDeadline && value.proposedDeadline <= new Date()) {
+    context.addIssue({ code: 'custom', path: ['proposedDeadline'], message: 'The proposed deadline must be in the future.' });
+  }
 });
 
 export type ReplaceTaskCompetenciesInput = z.infer<typeof replaceTaskCompetenciesSchema>;

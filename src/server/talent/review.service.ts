@@ -29,7 +29,6 @@ export class ReviewService {
     if (engagement.status !== 'COMPLETED') {
       throw new ServiceError('Reviews can only be submitted for completed engagements', 400);
     }
-
     const existingReview = await db.professionalReview.findUnique({
       where: { engagementId },
     });
@@ -83,6 +82,11 @@ export class ReviewService {
       where: { id: engagementId },
       include: {
         professionalProfile: { select: { id: true, userId: true } },
+        payments: {
+          where: { state: { in: ['FUNDED', 'RELEASE_PENDING', 'RELEASED', 'REFUND_PENDING', 'REFUNDED'] } },
+          select: { id: true },
+          take: 1,
+        },
       },
     });
 
@@ -96,6 +100,9 @@ export class ReviewService {
 
     if (engagement.status !== 'COMPLETED') {
       throw new ServiceError('Reviews can only be submitted for completed engagements', 400);
+    }
+    if (input.paymentRating != null && engagement.payments.length === 0) {
+      throw new ServiceError('Payment reliability can be rated only when a Flowdek payment occurred.', 400);
     }
 
     const existingReview = await db.clientReview.findUnique({
@@ -115,7 +122,7 @@ export class ReviewService {
           clarityRating: input.clarityRating,
           communicationRating: input.communicationRating,
           professionalismRating: input.professionalismRating,
-          paymentRating: input.paymentRating,
+          paymentRating: input.paymentRating ?? null,
           wouldWorkAgain: input.wouldWorkAgain,
           writtenFeedback: input.writtenFeedback || null,
         },
@@ -271,13 +278,18 @@ export class ReviewService {
   /**
    * Retrieves verified client reviews and calculated trust metrics for a professional profile
    */
-  async getProfileReviewsAndMetrics(professionalProfileId: string) {
+  async getProfileReviewsAndMetrics(viewerUserId: string, professionalProfileId: string) {
     const profile = await db.professionalProfile.findUnique({
       where: { id: professionalProfileId },
-      select: { id: true },
+      select: { id: true, userId: true, status: true, visibility: true },
     });
 
     if (!profile) {
+      throw new ServiceError('Professional profile not found', 404);
+    }
+    const isOwner = profile.userId === viewerUserId;
+    const isVisible = profile.status === 'PUBLISHED' && profile.visibility === 'FLOWDEK_USERS';
+    if (!isOwner && !isVisible) {
       throw new ServiceError('Professional profile not found', 404);
     }
 

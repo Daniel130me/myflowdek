@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { authErrorResponse, requireAuthenticatedUser } from '@/server/auth/authorization';
 import { paymentService } from '@/server/talent/payment.service';
 import { ServiceError } from '@/server/http/errors';
 
 export async function POST(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ engagementId: string; paymentId: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   const { paymentId } = await params;
 
   try {
-    const payment = await paymentService.releaseMilestonePayment(session.user.id, paymentId);
+    const user = await requireAuthenticatedUser();
+    const payment = await paymentService.releaseMilestonePayment(user.id, paymentId);
     return NextResponse.json({ payment, message: 'Payout released to professional successfully' });
   } catch (error: any) {
     if (error instanceof ServiceError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    return NextResponse.json({ error: 'Failed to release payout' }, { status: 500 });
+    return authErrorResponse(error);
   }
 }

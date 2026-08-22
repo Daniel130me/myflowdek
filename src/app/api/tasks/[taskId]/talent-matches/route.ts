@@ -1,27 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { NextResponse } from 'next/server';
+
+import { requireAuthenticatedUser, requireTaskProjectCapability } from '@/server/auth/authorization';
+import { apiError } from '@/server/http/responses';
 import { matchingService } from '@/server/talent/matching.service';
-import { ServiceError } from '@/server/http/errors';
 
 export async function GET(
-  req: NextRequest,
+  _request: Request,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { taskId } = await params;
-
   try {
+    const user = await requireAuthenticatedUser();
+    const { taskId } = await params;
+    await requireTaskProjectCapability(user.id, taskId, 'EDIT_TASK');
     const matches = await matchingService.getTaskTalentMatches(taskId);
     return NextResponse.json({ matches });
-  } catch (error: any) {
-    if (error instanceof ServiceError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    return NextResponse.json({ error: 'Failed to calculate talent matches' }, { status: 500 });
+  } catch (error) {
+    return apiError(error, 'GET /api/tasks/:taskId/talent-matches');
   }
 }

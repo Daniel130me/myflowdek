@@ -37,7 +37,7 @@ export function TaskTalentPanel({
   const [opportunity, setOpportunity] = useState<PublicOpportunity | null>(null);
   const [isOpportunityModalOpen, setIsOpportunityModalOpen] = useState(false);
   const [professionals, setProfessionals] = useState<ProfessionalDirectoryResponse['profiles']>([]);
-  const [canManage, setCanManage] = useState(true);
+  const [canManage, setCanManage] = useState(false);
   const [skillId, setSkillId] = useState('');
   const [professionalId, setProfessionalId] = useState('');
   const [search, setSearch] = useState('');
@@ -50,16 +50,26 @@ export function TaskTalentPanel({
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
+    setError('');
     const [skillsResponse, requirementsResponse, invitationsResponse, oppResponse] = await Promise.all([
       fetch('/api/talent/skills'),
       fetch(`/api/tasks/${encodeURIComponent(taskId)}/competencies`),
       fetch(`/api/tasks/${encodeURIComponent(taskId)}/talent-invitations`),
       fetch(`/api/tasks/${encodeURIComponent(taskId)}/opportunity`),
     ]);
-    if (skillsResponse.ok) setSkills((await skillsResponse.json()).skills ?? []);
-    if (requirementsResponse.ok) setRequirements((await requirementsResponse.json()).requirements ?? []);
-    if (invitationsResponse.ok) setInvitations((await invitationsResponse.json()).invitations ?? []);
-    else if (invitationsResponse.status === 403) setCanManage(false);
+    if (!skillsResponse.ok) throw new Error(await readApiMessage(skillsResponse));
+    if (!requirementsResponse.ok) throw new Error(await readApiMessage(requirementsResponse));
+    setSkills((await skillsResponse.json()).skills ?? []);
+    setRequirements((await requirementsResponse.json()).requirements ?? []);
+    if (invitationsResponse.ok) {
+      setInvitations((await invitationsResponse.json()).invitations ?? []);
+      setCanManage(true);
+    } else if (invitationsResponse.status === 403) {
+      setCanManage(false);
+      setInvitations([]);
+    } else {
+      throw new Error(await readApiMessage(invitationsResponse));
+    }
     if (oppResponse.ok) {
       const oppData = await oppResponse.json();
       setOpportunity(oppData.opportunity ?? null);
@@ -81,37 +91,46 @@ export function TaskTalentPanel({
     setSaving(true);
     setError('');
     setNotice('');
-    const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/competencies`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requirements: requirements.map((item) => ({
-          skillId: item.skill.id,
-          minimumProficiency: item.minimumProficiency,
-          isRequired: item.isRequired,
-          notes: item.notes,
-        })),
-      }),
-    });
-    setSaving(false);
-    if (!response.ok) return setError(await readApiMessage(response));
-    setRequirements((await response.json()).requirements ?? []);
-    setNotice('Required competencies saved.');
+    try {
+      const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/competencies`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requirements: requirements.map((item) => ({
+            skillId: item.skill.id,
+            minimumProficiency: item.minimumProficiency,
+            isRequired: item.isRequired,
+            notes: item.notes,
+          })),
+        }),
+      });
+      if (!response.ok) throw new Error(await readApiMessage(response));
+      setRequirements((await response.json()).requirements ?? []);
+      setNotice('Required competencies saved.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Competencies could not be saved.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function findProfessionals() {
     setError('');
     setNotice('');
-    const params = new URLSearchParams({ limit: '20' });
-    if (search.trim()) params.set('search', search.trim());
-    const requiredSkills = requirements.filter((item) => item.isRequired).map((item) => item.skill.id);
-    if (requiredSkills.length) params.set('skillIds', requiredSkills.join(','));
-    const response = await fetch(`/api/talent/professionals?${params.toString()}`);
-    if (!response.ok) return setError(await readApiMessage(response));
-    const body: ProfessionalDirectoryResponse = await response.json();
-    setProfessionals(body.profiles);
-    setProfessionalId('');
-    if (body.profiles.length === 0) setNotice('No published professionals match the required skills and search.');
+    try {
+      const params = new URLSearchParams({ limit: '20' });
+      if (search.trim()) params.set('search', search.trim());
+      const requiredSkills = requirements.filter((item) => item.isRequired).map((item) => item.skill.id);
+      if (requiredSkills.length) params.set('skillIds', requiredSkills.join(','));
+      const response = await fetch(`/api/talent/professionals?${params.toString()}`);
+      if (!response.ok) throw new Error(await readApiMessage(response));
+      const body: ProfessionalDirectoryResponse = await response.json();
+      setProfessionals(body.profiles);
+      setProfessionalId('');
+      if (body.profiles.length === 0) setNotice('No published professionals match the required skills and search.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Professionals could not be loaded.');
+    }
   }
 
   async function invite(event: FormEvent) {
@@ -119,34 +138,44 @@ export function TaskTalentPanel({
     setSaving(true);
     setError('');
     setNotice('');
-    const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/talent-invitations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        professionalProfileId: professionalId,
-        message,
-        proposedBudget: budget || undefined,
-        currency: budget ? currency : undefined,
-        proposedDeadline: deadline ? new Date(`${deadline}T12:00:00Z`).toISOString() : undefined,
-      }),
-    });
-    setSaving(false);
-    if (!response.ok) return setError(await readApiMessage(response));
-    setMessage('');
-    setBudget('');
-    setDeadline('');
-    setProfessionalId('');
-    setNotice('Invitation sent. Acceptance records interest only and grants no project access.');
-    await load();
+    try {
+      const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/talent-invitations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          professionalProfileId: professionalId,
+          message,
+          proposedBudget: budget || undefined,
+          currency: budget ? currency : undefined,
+          proposedDeadline: deadline ? new Date(`${deadline}T12:00:00Z`).toISOString() : undefined,
+        }),
+      });
+      if (!response.ok) throw new Error(await readApiMessage(response));
+      setMessage('');
+      setBudget('');
+      setDeadline('');
+      setProfessionalId('');
+      setNotice('Invitation sent. Acceptance records interest only and grants no project access.');
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The invitation could not be sent.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function withdraw(invitationId: string) {
-    const response = await fetch(
-      `/api/tasks/${encodeURIComponent(taskId)}/talent-invitations/${encodeURIComponent(invitationId)}`,
-      { method: 'DELETE' },
-    );
-    if (!response.ok) return setError(await readApiMessage(response));
-    await load();
+    setError('');
+    try {
+      const response = await fetch(
+        `/api/tasks/${encodeURIComponent(taskId)}/talent-invitations/${encodeURIComponent(invitationId)}`,
+        { method: 'DELETE' },
+      );
+      if (!response.ok) throw new Error(await readApiMessage(response));
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The invitation could not be withdrawn.');
+    }
   }
 
   return (

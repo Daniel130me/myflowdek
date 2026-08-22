@@ -1,15 +1,14 @@
 import { db } from '@/server/db/client';
 import { ServiceError } from '@/server/http/errors';
 import { ModerateProfileInput, SubmitReportInput } from './moderation.schemas';
+import { isTalentNetworkEnabled } from './feature-flags';
 
 export class ModerationService {
   /**
    * Checks if the Talent Network feature flag is enabled
    */
   isTalentNetworkEnabled(): boolean {
-    const flag = process.env.TALENT_NETWORK_ENABLED;
-    if (flag === undefined || flag === null) return true; // Enabled by default unless explicitly set to false
-    return flag.toLowerCase() !== 'false';
+    return isTalentNetworkEnabled();
   }
 
   /**
@@ -68,9 +67,16 @@ export class ModerationService {
       throw new ServiceError('Professional profile not found', 404);
     }
 
-    let updatedStatus: 'PUBLISHED' | 'DRAFT' | 'SUSPENDED' = 'SUSPENDED';
-    if (input.action === 'REINSTATE') updatedStatus = 'PUBLISHED';
-    if (input.action === 'SUSPEND') updatedStatus = 'SUSPENDED';
+    if (input.action === 'SUSPEND' && profile.status === 'SUSPENDED') {
+      throw new ServiceError('Professional profile is already suspended', 409);
+    }
+    if (input.action === 'REINSTATE' && profile.status !== 'SUSPENDED') {
+      throw new ServiceError('Only a suspended professional profile can be reinstated', 409);
+    }
+
+    // Reinstatement returns the owner to a draft. Publishing again must pass
+    // the normal completeness checks instead of bypassing them through admin.
+    const updatedStatus = input.action === 'SUSPEND' ? 'SUSPENDED' : 'DRAFT';
 
     const updatedProfile = await db.$transaction(async (tx) => {
       const res = await tx.professionalProfile.update({
@@ -94,7 +100,12 @@ export class ModerationService {
       return res;
     });
 
-    return { profile: updatedProfile, message: `Profile successfully ${input.action.toLowerCase()}ed` };
+    return {
+      profile: updatedProfile,
+      message: input.action === 'SUSPEND'
+        ? 'Profile successfully suspended'
+        : 'Profile reinstated as a draft and must be republished by its owner',
+    };
   }
 }
 

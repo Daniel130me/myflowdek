@@ -249,7 +249,11 @@ export class MatchingService {
     });
 
     // Server-side Gemini AI assistance if GEMINI_API_KEY is configured
-    if (process.env.GEMINI_API_KEY && suggested.length === 0) {
+    if (
+      process.env.TALENT_AI_SUGGESTIONS_ENABLED === 'true' &&
+      process.env.GEMINI_API_KEY &&
+      suggested.length === 0
+    ) {
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         const prompt = `Given the task title "${task.name}", select up to 3 relevant skill names from this list: ${allSkills.map((s) => s.name).join(', ')}. Return a JSON array of skill names.`;

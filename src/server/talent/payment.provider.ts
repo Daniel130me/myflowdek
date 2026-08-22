@@ -1,5 +1,9 @@
 import crypto from 'crypto';
 
+export function isPaymentSandboxEnabled() {
+  return process.env.NODE_ENV !== 'production' && process.env.PAYMENTS_SANDBOX_ENABLED === 'true';
+}
+
 export interface InitializeCheckoutInput {
   engagementId: string;
   milestoneId?: string;
@@ -54,6 +58,10 @@ export class PaystackPaymentProvider implements MarketplacePaymentProvider {
     this.webhookSecret = process.env.PAYSTACK_WEBHOOK_SECRET || this.secretKey;
   }
 
+  private hasConfiguredSecret() {
+    return Boolean(this.secretKey && !this.secretKey.includes('placeholder'));
+  }
+
   async createProfessionalAccount(input: {
     userId: string;
     accountNumber: string;
@@ -64,9 +72,8 @@ export class PaystackPaymentProvider implements MarketplacePaymentProvider {
     const masked = `******${input.accountNumber.slice(-4)}`;
 
     // In live mode with API key, call Paystack /transferrecipient endpoint
-    if (this.secretKey && !this.secretKey.includes('placeholder')) {
-      try {
-        const response = await fetch('https://api.paystack.co/transferrecipient', {
+    if (this.hasConfiguredSecret()) {
+      const response = await fetch('https://api.paystack.co/transferrecipient', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${this.secretKey}`,
@@ -79,21 +86,18 @@ export class PaystackPaymentProvider implements MarketplacePaymentProvider {
             bank_code: input.bankCode,
             currency: 'NGN',
           }),
-        });
-
-        const data = await response.json();
-        if (data.status && data.data?.recipient_code) {
-          return {
-            accountCode: data.data.recipient_code,
-            accountNumberMasked: masked,
-          };
-        }
-      } catch (err) {
-        console.error('[Paystack] Error creating transfer recipient:', err);
+      });
+      const data = await response.json();
+      if (!response.ok || !data.status || !data.data?.recipient_code) {
+        throw new Error(data.message || 'Paystack could not create the transfer recipient.');
       }
+      return { accountCode: data.data.recipient_code, accountNumberMasked: masked };
     }
 
-    // Fallback sandbox recipient code generation
+    if (!isPaymentSandboxEnabled()) {
+      throw new Error('Paystack is not configured and payment sandbox mode is disabled.');
+    }
+
     const mockRecipientCode = `RCP_${crypto.randomBytes(8).toString('hex')}`;
     return {
       accountCode: mockRecipientCode,
@@ -107,10 +111,9 @@ export class PaystackPaymentProvider implements MarketplacePaymentProvider {
   }> {
     const reference = `FLW_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
 
-    if (this.secretKey && !this.secretKey.includes('placeholder')) {
-      try {
-        const amountInKobo = Math.round(input.amount * 100);
-        const response = await fetch('https://api.paystack.co/transaction/initialize', {
+    if (this.hasConfiguredSecret()) {
+      const amountInKobo = Math.round(input.amount * 100);
+      const response = await fetch('https://api.paystack.co/transaction/initialize', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${this.secretKey}`,
@@ -127,21 +130,18 @@ export class PaystackPaymentProvider implements MarketplacePaymentProvider {
               milestoneId: input.milestoneId,
             },
           }),
-        });
-
-        const data = await response.json();
-        if (data.status && data.data?.authorization_url) {
-          return {
-            checkoutUrl: data.data.authorization_url,
-            transactionReference: reference,
-          };
-        }
-      } catch (err) {
-        console.error('[Paystack] Error initializing transaction:', err);
+      });
+      const data = await response.json();
+      if (!response.ok || !data.status || !data.data?.authorization_url) {
+        throw new Error(data.message || 'Paystack could not initialize checkout.');
       }
+      return { checkoutUrl: data.data.authorization_url, transactionReference: reference };
     }
 
-    // Fallback sandbox URL
+    if (!isPaymentSandboxEnabled()) {
+      throw new Error('Paystack is not configured and payment sandbox mode is disabled.');
+    }
+
     return {
       checkoutUrl: `/talent/engagements/${input.engagementId}?payment_ref=${reference}&funded=true`,
       transactionReference: reference,
@@ -150,8 +150,7 @@ export class PaystackPaymentProvider implements MarketplacePaymentProvider {
 
   verifyWebhookSignature(rawBody: string, signatureHeader: string): boolean {
     if (!this.webhookSecret || this.webhookSecret.includes('placeholder')) {
-      // In sandbox/preview mode without secret, return true
-      return true;
+      return isPaymentSandboxEnabled() && signatureHeader === 'flowdek-sandbox';
     }
 
     const hash = crypto
@@ -168,10 +167,9 @@ export class PaystackPaymentProvider implements MarketplacePaymentProvider {
   }> {
     const transferCode = `TRF_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
 
-    if (this.secretKey && !this.secretKey.includes('placeholder')) {
-      try {
-        const amountInKobo = Math.round(input.amount * 100);
-        const response = await fetch('https://api.paystack.co/transfer', {
+    if (this.hasConfiguredSecret()) {
+      const amountInKobo = Math.round(input.amount * 100);
+      const response = await fetch('https://api.paystack.co/transfer', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${this.secretKey}`,
@@ -184,21 +182,21 @@ export class PaystackPaymentProvider implements MarketplacePaymentProvider {
             reason: input.reason,
             reference: transferCode,
           }),
-        });
-
-        const data = await response.json();
-        if (data.status) {
-          return {
-            transferReference: transferCode,
-            status: data.data?.status === 'success' ? 'SUCCESS' : 'PENDING',
-          };
-        }
-      } catch (err) {
-        console.error('[Paystack] Error initiating payout transfer:', err);
+      });
+      const data = await response.json();
+      if (!response.ok || !data.status) {
+        throw new Error(data.message || 'Paystack could not initiate the payout.');
       }
+      return {
+        transferReference: data.data?.transfer_code || transferCode,
+        status: data.data?.status === 'success' ? 'SUCCESS' : 'PENDING',
+      };
     }
 
-    // Fallback sandbox payout release
+    if (!isPaymentSandboxEnabled()) {
+      throw new Error('Paystack is not configured and payment sandbox mode is disabled.');
+    }
+
     return {
       transferReference: transferCode,
       status: 'SUCCESS',
@@ -209,11 +207,33 @@ export class PaystackPaymentProvider implements MarketplacePaymentProvider {
     refundReference: string;
     status: 'APPROVED' | 'PENDING' | 'REJECTED';
   }> {
-    const refundRef = `RFD_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-    return {
-      refundReference: refundRef,
-      status: 'APPROVED',
-    };
+    if (this.hasConfiguredSecret()) {
+      const response = await fetch('https://api.paystack.co/refund', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.secretKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transaction: input.providerReference,
+          amount: input.amount == null ? undefined : Math.round(input.amount * 100),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.status) {
+        throw new Error(data.message || 'Paystack could not initiate the refund.');
+      }
+      return {
+        refundReference: String(data.data?.id || data.data?.transaction?.reference || input.providerReference),
+        status: data.data?.status === 'processed' ? 'APPROVED' : 'PENDING',
+      };
+    }
+
+    if (!isPaymentSandboxEnabled()) {
+      throw new Error('Paystack is not configured and payment sandbox mode is disabled.');
+    }
+
+    return { refundReference: `RFD_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`, status: 'APPROVED' };
   }
 }
 

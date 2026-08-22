@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import {
   requireAuthenticatedUser,
   requireProjectCapability,
+  requireTaskAccess,
   authErrorResponse,
 } from '@/server/auth/authorization';
-import { getTask, updateTask, deleteTask } from '@/server/tasks/task.service';
+import { deleteTask, getExternalProfessionalTask, getTask, updateTask } from '@/server/tasks/task.service';
 import { updateTaskSchema } from '@/server/tasks/schemas';
 
 /** GET /api/tasks/:taskId — get a single task. */
@@ -15,8 +16,10 @@ export async function GET(
   try {
     const user = await requireAuthenticatedUser();
     const { taskId } = await params;
-    const task = await getTask(taskId);
-    await requireProjectCapability(user.id, task.projectId, 'VIEW_PROJECT');
+    const access = await requireTaskAccess(user.id, taskId, 'VIEW_PROJECT');
+    const task = access.accessType === 'EXTERNAL_CONTRACTOR'
+      ? await getExternalProfessionalTask(taskId)
+      : await getTask(taskId);
     return NextResponse.json({ task });
   } catch (error) {
     return authErrorResponse(error);

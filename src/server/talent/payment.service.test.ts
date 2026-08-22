@@ -2,7 +2,28 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { connectPaymentAccountSchema, initializePaymentSchema, requestRefundSchema } from './payment.schemas';
 import { db } from '@/server/db/client';
-import { paymentService } from './payment.service';
+import { PaymentService } from './payment.service';
+import type { MarketplacePaymentProvider } from './payment.provider';
+
+const testPaymentProvider: MarketplacePaymentProvider = {
+  async createProfessionalAccount(input) {
+    return { accountCode: `RCP_TEST_${input.userId}`, accountNumberMasked: `******${input.accountNumber.slice(-4)}` };
+  },
+  async initializeCheckout(input) {
+    return { checkoutUrl: `/test-checkout/${input.engagementId}`, transactionReference: `REF_${input.engagementId}_${input.milestoneId ?? 'full'}` };
+  },
+  verifyWebhookSignature() {
+    return true;
+  },
+  async releasePayout(input) {
+    return { transferReference: `TRF_${input.engagementPaymentId}`, status: 'SUCCESS' };
+  },
+  async processRefund(input) {
+    return { refundReference: `RFD_${input.providerReference}`, status: 'APPROVED' };
+  },
+};
+
+const paymentService = new PaymentService(testPaymentProvider);
 
 test('connectPaymentAccountSchema validates bank details and masked output', () => {
   // Invalid account number length
@@ -146,6 +167,13 @@ test('Phase 7 Payment lifecycle: initialize, simulate webhook funding, payout ac
 
     assert.ok(initResult.payment.id);
     assert.equal(initResult.payment.state, 'FUNDING_PENDING');
+    await assert.rejects(
+      () => paymentService.initializeEngagementPayment(clientUser.id, engagement.id, {
+        amount: 1,
+        currency: 'NGN',
+      }),
+      /server-calculated contract amount/i,
+    );
 
     // 3. Simulate webhook funding event (Idempotent webhook handling)
     const webhookPayload = {
@@ -154,6 +182,8 @@ test('Phase 7 Payment lifecycle: initialize, simulate webhook funding, payout ac
         id: `evt-${runId}`,
         reference: initResult.transactionReference,
         status: 'success',
+        amount: 5_000_000,
+        currency: 'NGN',
       },
     };
 
@@ -183,9 +213,23 @@ test('Phase 7 Payment lifecycle: initialize, simulate webhook funding, payout ac
     assert.equal(fundedPayment.netAmount.toString(), '45000'); // 90%
 
     // 5. Client releases milestone payment to professional
-    const releasedPayment = await paymentService.releaseMilestonePayment(clientUser.id, initResult.payment.id);
+    await db.engagementMilestone.update({ where: { id: milestone.id }, data: { status: 'APPROVED' } });
+    const releaseAttempts = await Promise.allSettled([
+      paymentService.releaseMilestonePayment(clientUser.id, initResult.payment.id),
+      paymentService.releaseMilestonePayment(clientUser.id, initResult.payment.id),
+    ]);
+    assert.equal(releaseAttempts.filter((result) => result.status === 'fulfilled').length, 1);
+    assert.equal(releaseAttempts.filter((result) => result.status === 'rejected').length, 1);
+    const releasedPayment = releaseAttempts.find(
+      (result): result is PromiseFulfilledResult<Awaited<ReturnType<PaymentService['releaseMilestonePayment']>>> => result.status === 'fulfilled',
+    )?.value;
+    assert.ok(releasedPayment);
     assert.equal(releasedPayment.state, 'RELEASED');
     assert.ok(releasedPayment.releasedAt);
+    await assert.rejects(
+      () => paymentService.releaseMilestonePayment(clientUser.id, initResult.payment.id),
+      /must be FUNDED/i,
+    );
 
     // 6. Check created ProfessionalPayout record
     const payoutRecord = await db.professionalPayout.findFirstOrThrow({
@@ -194,6 +238,9 @@ test('Phase 7 Payment lifecycle: initialize, simulate webhook funding, payout ac
     assert.equal(payoutRecord.amount.toString(), '45000');
     assert.equal(payoutRecord.status, 'SUCCESS');
   } finally {
+    await db.professionalPayout.deleteMany({
+      where: { professionalProfileId: proProfile.id },
+    });
     await db.workspace.delete({ where: { id: workspace.id } });
     await db.user.deleteMany({
       where: { id: { in: [clientUser.id, proUser.id] } },

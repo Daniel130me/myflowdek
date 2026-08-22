@@ -29,21 +29,33 @@ export function TalentInvitationInbox() {
   const [pendingId, setPendingId] = useState('');
 
   const load = useCallback(async () => {
-    setLoading(true); setError('');
-    const response = await fetch('/api/talent/invitations');
-    if (!response.ok) { setLoading(false); return setError(await readApiMessage(response)); }
-    setInvitations((await response.json()).invitations ?? []);
-    setLoading(false);
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/talent/invitations');
+      if (!response.ok) throw new Error(await readApiMessage(response));
+      setInvitations((await response.json()).invitations ?? []);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Invitations could not be loaded.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
 
   async function respond(invitationId: string, action: 'accept' | 'decline') {
-    setPendingId(invitationId); setError('');
-    const response = await fetch(`/api/talent/invitations/${encodeURIComponent(invitationId)}/${action}`, { method: 'POST' });
-    setPendingId('');
-    if (!response.ok) return setError(await readApiMessage(response));
-    await load();
+    setPendingId(invitationId);
+    setError('');
+    try {
+      const response = await fetch(`/api/talent/invitations/${encodeURIComponent(invitationId)}/${action}`, { method: 'POST' });
+      if (!response.ok) throw new Error(await readApiMessage(response));
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The invitation could not be updated.');
+    } finally {
+      setPendingId('');
+    }
   }
 
   return <main className={styles.surface}>

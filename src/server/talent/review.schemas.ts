@@ -13,7 +13,7 @@ export const createClientReviewSchema = z.object({
   clarityRating: z.number().int().min(1).max(5),
   communicationRating: z.number().int().min(1).max(5),
   professionalismRating: z.number().int().min(1).max(5),
-  paymentRating: z.number().int().min(1).max(5),
+  paymentRating: z.number().int().min(1).max(5).optional().nullable(),
   wouldWorkAgain: z.boolean(),
   writtenFeedback: z.string().trim().max(2000).optional().nullable(),
 });
