@@ -8,6 +8,7 @@ import { Avatar } from '../ui/Avatar';
 import { FileThumbnail } from '../ui/FileThumbnail';
 import { useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
+import { DocumentWorkspace } from '@/app/(product)/projects/[projectId]/documents/DocumentWorkspace';
 
 /* Extension -> colour tint for the type badge */
 const EXT_COLORS: Record<string, string> = {
@@ -44,6 +45,11 @@ const GOOGLE_NATIVE_MIME_TYPES = new Set([
   'application/vnd.google-apps.site',
 ]);
 
+const FLOWDEK_EDITABLE_MIME_TYPES = new Set([
+  'application/vnd.google-apps.document',
+  'application/vnd.google-apps.spreadsheet',
+]);
+
 /**
  * Check if a file is a connected-provider file (e.g. Google Drive).
  * Connected files are provider-hosted and must NOT be iframed via the
@@ -74,6 +80,15 @@ function canIframe(file: FileItem): boolean {
   return !!file.url;
 }
 
+/** Google Drive provides a dedicated embeddable preview for provider-hosted files. */
+function googleDrivePreviewUrl(file: FileItem): string | null {
+  if (file.storageProvider !== 'GOOGLE_DRIVE' || !file.providerWebUrl) return null;
+  const url = file.providerWebUrl;
+  if (/\/edit(?:[?#].*)?$/.test(url)) return url.replace(/\/edit(?:[?#].*)?$/, '/preview');
+  if (/\/view(?:[?#].*)?$/.test(url)) return url.replace(/\/view(?:[?#].*)?$/, '/preview');
+  return null;
+}
+
 interface FileViewerModalProps {
   file: FileItem;
   allFiles: FileItem[];
@@ -96,6 +111,9 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
 
   const connected = isConnectedFile(file);
   const isGoogleDoc = isGoogleNativeDoc(file);
+  const editableInFlowdek = file.storageProvider === 'GOOGLE_DRIVE'
+    && FLOWDEK_EDITABLE_MIME_TYPES.has(file.mimeType ?? '');
+  const providerPreviewUrl = googleDrivePreviewUrl(file);
   // The URL to open in the provider's native UI (e.g. Google Drive).
   // For connected files, this is the providerWebUrl. For legacy files,
   // this is the file.url (R2 presigned URL).
@@ -109,6 +127,22 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
     cursor: disabled ? 'not-allowed' : 'pointer',
     color: disabled ? COLORS.grayLight : COLORS.ink,
   });
+
+  if (editableInFlowdek && file.projectId) {
+    return (
+      <DocumentWorkspace
+        projectId={file.projectId}
+        document={{
+          id: file.id,
+          name: file.name,
+          providerWebUrl: file.providerWebUrl ?? '',
+          mimeType: file.mimeType ?? null,
+        }}
+        contentEndpoint={`/api/files/${file.id}/content`}
+        onClose={onClose}
+      />
+    );
+  }
 
   /**
    * Render the connected-file preview card.
@@ -224,7 +258,11 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
         </div>
 
         {/* Content */}
-        {connected ? renderConnectedFilePreview() : canIframe(file) ? (
+        {providerPreviewUrl ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <iframe src={providerPreviewUrl} title={`Preview ${file.name}`} style={{ width: '100%', height: '100%', border: 'none' }} />
+          </div>
+        ) : connected ? renderConnectedFilePreview() : canIframe(file) ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <iframe src={file.url} title={file.name} style={{ width: '100%', height: '100%', border: 'none' }} />
           </div>
@@ -301,7 +339,11 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
         </div>
 
         {/* Content */}
-        {connected ? renderConnectedFilePreview() : canIframe(file) ? (
+        {providerPreviewUrl ? (
+          <div style={{ flex: 1, minHeight: '65vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <iframe src={providerPreviewUrl} title={`Preview ${file.name}`} style={{ width: '100%', height: '100%', minHeight: '65vh', border: 'none', borderRadius: 12 }} />
+          </div>
+        ) : connected ? renderConnectedFilePreview() : canIframe(file) ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <iframe src={file.url} title={file.name} style={{ width: '100%', height: '100%', border: 'none', borderRadius: 12 }} />
           </div>

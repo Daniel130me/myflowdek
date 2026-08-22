@@ -22,10 +22,13 @@ import styles from './documents.module.css';
 const MAX_EDITABLE_SHEET_ROWS = 200;
 const MAX_EDITABLE_SHEET_COLUMNS = 50;
 
+export type WorkspaceDocument = Pick<ProjectDocument, 'id' | 'name' | 'providerWebUrl' | 'mimeType'>;
+
 type WorkspaceProps = {
   projectId: string;
-  document: ProjectDocument;
+  document: WorkspaceDocument;
   onClose: () => void;
+  contentEndpoint?: string;
 };
 
 async function readResponse<T>(response: Response): Promise<T> {
@@ -59,7 +62,7 @@ function headingLevel(style: string): number {
   return Number.isFinite(level) && level >= 1 && level <= 6 ? level + 1 : 0;
 }
 
-export function DocumentWorkspace({ projectId, document, onClose }: WorkspaceProps) {
+export function DocumentWorkspace({ projectId, document, onClose, contentEndpoint }: WorkspaceProps) {
   const [content, setContent] = useState<ProviderDocumentSnapshot | null>(null);
   const [draft, setDraft] = useState<ProviderDocumentSnapshot | null>(null);
   const [canEdit, setCanEdit] = useState(false);
@@ -73,7 +76,8 @@ export function DocumentWorkspace({ projectId, document, onClose }: WorkspacePro
     setLoading(true);
     setError(null);
     try {
-      const result = await fetch(`/api/projects/${projectId}/documents/${document.id}`, { signal })
+      const endpoint = contentEndpoint ?? `/api/projects/${projectId}/documents/${document.id}`;
+      const result = await fetch(endpoint, { signal })
         .then((response) => readResponse<{ content: ProviderDocumentSnapshot; canEdit: boolean }>(response));
       setContent(result.content);
       setDraft(cloneSnapshot(result.content));
@@ -86,7 +90,7 @@ export function DocumentWorkspace({ projectId, document, onClose }: WorkspacePro
     } finally {
       setLoading(false);
     }
-  }, [document.id, projectId]);
+  }, [contentEndpoint, document.id, projectId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -154,7 +158,8 @@ export function DocumentWorkspace({ projectId, document, onClose }: WorkspacePro
               values: sheet.values,
             })),
           };
-      const result = await fetch(`/api/projects/${projectId}/documents/${document.id}`, {
+      const endpoint = contentEndpoint ?? `/api/projects/${projectId}/documents/${document.id}`;
+      const result = await fetch(endpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
