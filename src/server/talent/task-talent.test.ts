@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { db } from '@/server/db/client';
+import { requireTaskProjectCapability } from '@/server/auth/authorization';
 import { createTalentInvitationSchema, replaceTaskCompetenciesSchema } from './task-talent.schemas';
 import {
   createTaskTalentInvitation,
@@ -21,8 +22,12 @@ test('competency replacement rejects duplicate skills', () => {
 });
 
 test('talent invitation validates money, currency, and ISO deadlines', () => {
+  const futureDeadline = new Date(Date.now() + 86_400_000).toISOString();
+  const pastDeadline = new Date(Date.now() - 86_400_000).toISOString();
   assert.equal(createTalentInvitationSchema.safeParse({ professionalProfileId: 'profile-1', proposedBudget: 500 }).success, false);
-  assert.equal(createTalentInvitationSchema.safeParse({ professionalProfileId: 'profile-1', proposedBudget: 500, currency: 'usd', proposedDeadline: '2026-09-01T12:00:00.000Z' }).success, true);
+  assert.equal(createTalentInvitationSchema.safeParse({ professionalProfileId: 'profile-1', proposedBudget: 500, currency: 'usd', proposedDeadline: futureDeadline }).success, true);
+  assert.equal(createTalentInvitationSchema.safeParse({ professionalProfileId: 'profile-1', currency: 'USD' }).success, false);
+  assert.equal(createTalentInvitationSchema.safeParse({ professionalProfileId: 'profile-1', proposedDeadline: pastDeadline }).success, false);
   assert.equal(createTalentInvitationSchema.safeParse({ professionalProfileId: 'profile-1', proposedDeadline: '09/01/2026' }).success, false);
 });
 
@@ -67,6 +72,12 @@ test('Phase 3 lifecycle persists requirements and interest without granting proj
     assert.equal(requirements.length, 1);
     assert.equal(requirements[0].skill.id, skill.id);
 
+    await requireTaskProjectCapability(owner.id, task.id, 'EDIT_TASK');
+    await assert.rejects(
+      () => requireTaskProjectCapability(outsider.id, task.id, 'EDIT_TASK'),
+      /do not have access to this project/i,
+    );
+
     const invitation = await createTaskTalentInvitation(task.id, owner.id, { professionalProfileId: profile.id, message: 'Interested in this task?', proposedBudget: 1200, currency: 'USD' });
     await assert.rejects(() => createTaskTalentInvitation(task.id, owner.id, { professionalProfileId: profile.id }), /pending invitation already exists/i);
     assert.equal((await listOwnTalentInvitations(professional.id)).length, 1);
@@ -83,6 +94,34 @@ test('Phase 3 lifecycle persists requirements and interest without granting proj
     assert.equal(persistedInvitation?.status, 'ACCEPTED');
     assert.equal(persistedTask?.assigneeId, null);
     assert.equal(membership, null);
+
+    const expiredInvitation = await db.talentInvitation.create({
+      data: {
+        taskId: task.id,
+        professionalProfileId: profile.id,
+        invitedById: owner.id,
+        expiresAt: new Date(Date.now() - 60_000),
+      },
+    });
+    await assert.rejects(
+      () => respondToOwnTalentInvitation(professional.id, expiredInvitation.id, 'ACCEPTED'),
+      /expired/i,
+    );
+    const persistedExpiry = await db.talentInvitation.findUniqueOrThrow({
+      where: { id: expiredInvitation.id },
+      select: { status: true },
+    });
+    assert.equal(persistedExpiry.status, 'EXPIRED');
+
+    const concurrentInvitation = await createTaskTalentInvitation(task.id, owner.id, {
+      professionalProfileId: profile.id,
+    });
+    const concurrentResponses = await Promise.allSettled([
+      respondToOwnTalentInvitation(professional.id, concurrentInvitation.id, 'ACCEPTED'),
+      respondToOwnTalentInvitation(professional.id, concurrentInvitation.id, 'DECLINED'),
+    ]);
+    assert.equal(concurrentResponses.filter((result) => result.status === 'fulfilled').length, 1);
+    assert.equal(concurrentResponses.filter((result) => result.status === 'rejected').length, 1);
   } finally {
     await db.workspace.delete({ where: { id: workspace.id } });
     await db.user.deleteMany({ where: { id: { in: [owner.id, professional.id, outsider.id] } } });

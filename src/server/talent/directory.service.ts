@@ -32,8 +32,24 @@ function buildPublishedProfileWhere(query: ProfessionalDirectoryQuery): Prisma.P
   if (query.timezone) filters.push({ timezone: { contains: query.timezone, mode: 'insensitive' } });
   if (query.remotePreference) filters.push({ remotePreference: query.remotePreference });
   if (query.rateType) filters.push({ rateType: query.rateType });
-  if (query.minimumRate != null) filters.push({ minimumRate: { gte: new Prisma.Decimal(query.minimumRate) } });
-  if (query.maximumRate != null) filters.push({ maximumRate: { lte: new Prisma.Decimal(query.maximumRate) } });
+  if (query.minimumRate != null) {
+    const minimumRate = new Prisma.Decimal(query.minimumRate);
+    filters.push({
+      OR: [
+        { maximumRate: { gte: minimumRate } },
+        { maximumRate: null, minimumRate: { gte: minimumRate } },
+      ],
+    });
+  }
+  if (query.maximumRate != null) {
+    const maximumRate = new Prisma.Decimal(query.maximumRate);
+    filters.push({
+      OR: [
+        { minimumRate: { lte: maximumRate } },
+        { minimumRate: null, maximumRate: { lte: maximumRate } },
+      ],
+    });
+  }
 
   return { AND: filters };
 }
@@ -41,9 +57,9 @@ function buildPublishedProfileWhere(query: ProfessionalDirectoryQuery): Prisma.P
 function buildOrderBy(sort: ProfessionalDirectorySort): Prisma.ProfessionalProfileOrderByWithRelationInput[] {
   switch (sort) {
     case 'RATE_LOW_TO_HIGH':
-      return [{ minimumRate: 'asc' }, { updatedAt: 'desc' }, { id: 'asc' }];
+      return [{ minimumRate: { sort: 'asc', nulls: 'last' } }, { updatedAt: 'desc' }, { id: 'asc' }];
     case 'RATE_HIGH_TO_LOW':
-      return [{ maximumRate: 'desc' }, { updatedAt: 'desc' }, { id: 'asc' }];
+      return [{ maximumRate: { sort: 'desc', nulls: 'last' } }, { updatedAt: 'desc' }, { id: 'asc' }];
     case 'NEWEST':
     case 'RELEVANCE':
     default:

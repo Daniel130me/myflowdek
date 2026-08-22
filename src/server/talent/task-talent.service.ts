@@ -85,7 +85,7 @@ export async function createTaskTalentInvitation(taskId: string, invitedById: st
       transaction.auditLog.create({ data: { userId: invitedById, action: 'talent_invitation_created', meta: { invitationId: invitation.id, taskId, professionalProfileId: profile.id } } }),
     ]);
     return toTaskInvitationDto(invitation);
-  });
+  }, { timeout: 15_000 });
 }
 
 const taskInvitationSelect = {
@@ -111,21 +111,21 @@ const taskInvitationSelect = {
 type TaskInvitationRecord = Prisma.TalentInvitationGetPayload<{ select: typeof taskInvitationSelect }>;
 
 function toTaskInvitationDto(invitation: TaskInvitationRecord) {
+  const { professionalProfile, ...invitationFields } = invitation;
   return {
-    ...invitation,
+    ...invitationFields,
     proposedBudget: invitation.proposedBudget?.toString() ?? null,
     proposedDeadline: invitation.proposedDeadline?.toISOString() ?? null,
     expiresAt: invitation.expiresAt.toISOString(),
     respondedAt: invitation.respondedAt?.toISOString() ?? null,
     createdAt: invitation.createdAt.toISOString(),
     professional: {
-      id: invitation.professionalProfile.id,
-      slug: invitation.professionalProfile.slug,
-      displayName: invitation.professionalProfile.user.name ?? 'Flowdek Professional',
-      avatarColor: invitation.professionalProfile.user.avatarColor,
-      professionalTitle: invitation.professionalProfile.professionalTitle,
+      id: professionalProfile.id,
+      slug: professionalProfile.slug,
+      displayName: professionalProfile.user.name ?? 'Flowdek Professional',
+      avatarColor: professionalProfile.user.avatarColor,
+      professionalTitle: professionalProfile.professionalTitle,
     },
-    professionalProfile: undefined,
   };
 }
 
@@ -136,12 +136,21 @@ export async function listTaskTalentInvitations(taskId: string) {
 }
 
 export async function withdrawTaskTalentInvitation(taskId: string, invitationId: string, userId: string) {
+  const now = new Date();
+  await db.talentInvitation.updateMany({
+    where: { id: invitationId, taskId, status: 'PENDING', expiresAt: { lte: now } },
+    data: { status: 'EXPIRED' },
+  });
+
   const result = await db.$transaction(async (transaction) => {
-    const updated = await transaction.talentInvitation.updateMany({ where: { id: invitationId, taskId, status: 'PENDING' }, data: { status: 'WITHDRAWN', respondedAt: new Date() } });
+    const updated = await transaction.talentInvitation.updateMany({
+      where: { id: invitationId, taskId, status: 'PENDING', expiresAt: { gt: now } },
+      data: { status: 'WITHDRAWN', respondedAt: now },
+    });
     if (updated.count === 0) throw new ServiceError('Only a pending invitation can be withdrawn.', 409);
     await transaction.auditLog.create({ data: { userId, action: 'talent_invitation_withdrawn', meta: { invitationId, taskId } } });
     return { ok: true };
-  });
+  }, { timeout: 15_000 });
   return result;
 }
 
@@ -176,21 +185,36 @@ export async function listOwnTalentInvitations(userId: string) {
 }
 
 export async function respondToOwnTalentInvitation(userId: string, invitationId: string, status: Extract<TalentInvitationStatus, 'ACCEPTED' | 'DECLINED'>) {
-  return db.$transaction(async (transaction) => {
-    const invitation = await transaction.talentInvitation.findFirst({
-      where: { id: invitationId, professionalProfile: { userId } },
-      select: { id: true, taskId: true, status: true, expiresAt: true },
-    });
-    if (!invitation) throw new ServiceError('Invitation was not found.', 404);
-    if (invitation.status !== 'PENDING') throw new ServiceError('This invitation can no longer be answered.', 409);
-    if (invitation.expiresAt <= new Date()) {
-      await transaction.talentInvitation.update({ where: { id: invitation.id }, data: { status: 'EXPIRED' } });
-      throw new ServiceError('This invitation has expired.', 409);
-    }
+  const invitation = await db.talentInvitation.findFirst({
+    where: { id: invitationId, professionalProfile: { userId } },
+    select: { id: true, taskId: true, status: true, expiresAt: true },
+  });
+  if (!invitation) throw new ServiceError('Invitation was not found.', 404);
+  if (invitation.status !== 'PENDING') throw new ServiceError('This invitation can no longer be answered.', 409);
 
-    const respondedAt = new Date();
-    await transaction.talentInvitation.update({ where: { id: invitation.id }, data: { status, respondedAt } });
+  const respondedAt = new Date();
+  if (invitation.expiresAt <= respondedAt) {
+    // Persist expiry before throwing; throwing inside a transaction would roll
+    // this update back and leave an already-expired invitation pending.
+    await db.talentInvitation.updateMany({
+      where: { id: invitation.id, status: 'PENDING' },
+      data: { status: 'EXPIRED' },
+    });
+    throw new ServiceError('This invitation has expired.', 409);
+  }
+
+  return db.$transaction(async (transaction) => {
+    const updated = await transaction.talentInvitation.updateMany({
+      where: {
+        id: invitation.id,
+        status: 'PENDING',
+        expiresAt: { gt: respondedAt },
+        professionalProfile: { userId },
+      },
+      data: { status, respondedAt },
+    });
+    if (updated.count === 0) throw new ServiceError('This invitation can no longer be answered.', 409);
     await transaction.auditLog.create({ data: { userId, action: status === 'ACCEPTED' ? 'talent_invitation_accepted' : 'talent_invitation_declined', meta: { invitationId, taskId: invitation.taskId } } });
     return { id: invitation.id, status, respondedAt: respondedAt.toISOString() };
-  });
+  }, { timeout: 15_000 });
 }

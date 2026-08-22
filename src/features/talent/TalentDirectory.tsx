@@ -29,6 +29,7 @@ export function TalentDirectory() {
   const [result, setResult] = useState(EMPTY_RESULT);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filterError, setFilterError] = useState('');
 
   useEffect(() => {
     Promise.all([fetch('/api/talent/roles'), fetch('/api/talent/skills')])
@@ -39,7 +40,7 @@ export function TalentDirectory() {
         setRoles(roleBody.roles ?? []);
         setSkills(skillBody.skills ?? []);
       })
-      .catch((reason) => setError(reason instanceof Error ? reason.message : 'Could not load directory filters.'));
+      .catch((reason) => setFilterError(reason instanceof Error ? reason.message : 'Could not load directory filters.'));
   }, []);
 
   const loadProfessionals = useCallback(async () => {
@@ -122,6 +123,7 @@ export function TalentDirectory() {
         <div className={styles.filterActions}><button className={styles.primaryButton} type="submit"><SlidersHorizontal size={16} />Apply filters</button><button className={styles.textButton} type="button" onClick={clearFilters}>Clear</button></div>
       </form>
 
+      {filterError && <div className={styles.error} role="alert">{filterError}</div>}
       {error && <div className={styles.error} role="alert">{error} <button type="button" onClick={() => void loadProfessionals()}>Try again</button></div>}
       {loading ? <div className={styles.loading}>Loading professionals…</div> : result.profiles.length === 0 ? (
         <section className={styles.emptyDirectory}><BriefcaseBusiness size={28} /><h2>No professionals match these filters</h2><p>Try removing a filter or broadening the search.</p><button className={styles.secondaryButton} type="button" onClick={clearFilters}>Clear filters</button></section>
