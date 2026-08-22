@@ -173,7 +173,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
       if (!res.ok) throw new Error(await readApiMessage(res));
       const json = await res.json();
       setShowFundModal(false);
-      setActionSuccess('Payment initialized! Protected milestone holding is pending funding.');
+      setActionSuccess('Payment initialized with the provider and is awaiting confirmation.');
       loadEngagementPayments();
       loadEngagement();
 
@@ -196,7 +196,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
         { method: 'POST' }
       );
       if (!res.ok) throw new Error(await readApiMessage(res));
-      setActionSuccess('Sandbox milestone payment funded successfully! Funds are held in protection.');
+      setActionSuccess('Sandbox milestone payment marked as funded.');
       loadEngagementPayments();
       loadEngagement();
     } catch (err: any) {
@@ -849,7 +849,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                 <div>
                   <h3 className="text-sm font-bold m-0">Provider-Managed Protected Payments</h3>
                   <p className="text-xs text-muted-foreground m-0">
-                    Funds are safely held in provider milestone protection until you approve submitted work.
+                    The payment provider manages milestone funding and payout after approved work.
                   </p>
                 </div>
                 <button
@@ -859,6 +859,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                     setShowFundModal(true);
                   }}
                   className={styles.primaryButton}
+                  disabled={data.currency !== 'NGN'}
                 >
                   <DollarSign className="w-4 h-4 mr-1 inline" />
                   Fund Milestone / Contract
@@ -903,7 +904,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
 
                       <div className="flex gap-2">
                         {/* Sandbox Simulation button for pending funding */}
-                        {p.state === 'FUNDING_PENDING' && data.viewerRole === 'client' && (
+                        {p.state === 'FUNDING_PENDING' && data.viewerRole === 'client' && paymentsData?.summary?.sandboxEnabled && (
                           <button
                             type="button"
                             onClick={() => handleSimulateFunding(p.id)}
@@ -914,7 +915,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                         )}
 
                         {/* Client Release Payout button */}
-                        {p.state === 'FUNDED' && data.viewerRole === 'client' && (
+                        {p.state === 'FUNDED' && data.viewerRole === 'client' && (!p.milestone || p.milestone.status === 'APPROVED') && (
                           <button
                             type="button"
                             onClick={() => handleReleasePayment(p.id)}
@@ -1367,7 +1368,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
             <div className="bg-card border border-border rounded-xl p-6 max-w-md w-full">
               <h2 className="text-lg font-bold mb-2">Fund Protected Milestone</h2>
               <p className="text-xs text-muted-foreground mb-4">
-                Funds are held securely by our marketplace payment provider until you review and approve deliverables.
+                The amount comes from the signed contract or selected milestone and cannot be changed in the browser.
               </p>
 
               <form onSubmit={handleInitializeFund} className="space-y-4">
@@ -1383,7 +1384,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                         if (selected) setFundAmount(selected.amount);
                       }}
                     >
-                      <option value="">-- Entire Contract / Custom --</option>
+                      <option value="">-- Entire Contract --</option>
                       {data.milestones.map((m, idx) => (
                         <option key={m.id} value={m.id}>
                           #{idx + 1} - {m.title} ({data.currency} {m.amount})
@@ -1400,7 +1401,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                     required
                     min={1}
                     value={fundAmount}
-                    onChange={(e) => setFundAmount(parseFloat(e.target.value) || 0)}
+                    readOnly
                   />
                 </div>
 

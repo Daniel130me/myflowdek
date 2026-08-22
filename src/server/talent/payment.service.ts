@@ -1,14 +1,25 @@
 import { Prisma } from '@prisma/client';
 import { db } from '@/server/db/client';
 import { ServiceError } from '@/server/http/errors';
-import { defaultPaymentProvider, MarketplacePaymentProvider } from './payment.provider';
+import { defaultPaymentProvider, isPaymentSandboxEnabled, MarketplacePaymentProvider } from './payment.provider';
 import { ConnectPaymentAccountInput, InitializePaymentInput, RequestRefundInput } from './payment.schemas';
 
 const getPlatformFeePercentage = (): number => {
   const envVal = process.env.PLATFORM_FEE_PERCENTAGE;
   if (!envVal) return 10.0;
   const parsed = parseFloat(envVal);
-  return isNaN(parsed) ? 10.0 : parsed;
+  return Number.isFinite(parsed) && parsed >= 0 && parsed < 100 ? parsed : 10.0;
+};
+
+type PaymentWebhookPayload = {
+  id?: string | number;
+  event?: string;
+  data?: {
+    id?: string | number;
+    reference?: string;
+    amount?: number;
+    currency?: string;
+  };
 };
 
 export class PaymentService {
@@ -91,7 +102,6 @@ export class PaymentService {
     const engagement = await db.engagement.findUnique({
       where: { id: engagementId },
       include: {
-        opportunity: { select: { createdById: true } },
         milestones: true,
       },
     });
@@ -104,6 +114,12 @@ export class PaymentService {
     if (engagement.clientUserId !== clientUserId) {
       throw new ServiceError('Only the client or contract manager can fund this engagement', 403);
     }
+    if (engagement.status !== 'ACTIVE') {
+      throw new ServiceError('Only an active engagement can be funded.', 409);
+    }
+    if (engagement.currency !== 'NGN' || input.currency !== engagement.currency) {
+      throw new ServiceError('The initial payment launch supports NGN engagements only.', 400);
+    }
 
     // Verify milestone if provided
     let targetMilestone = null;
@@ -114,10 +130,27 @@ export class PaymentService {
       }
     }
 
+    const trustedAmount = targetMilestone?.amount ?? engagement.agreedPrice;
+    if (input.amount != null && !new Prisma.Decimal(input.amount).equals(trustedAmount)) {
+      throw new ServiceError('The payment amount must match the server-calculated contract amount.', 400);
+    }
+
+    const existingPayment = await db.engagementPayment.findFirst({
+      where: {
+        engagementId,
+        milestoneId: input.milestoneId ?? null,
+        state: { notIn: ['FAILED', 'REFUNDED'] },
+      },
+      select: { id: true },
+    });
+    if (existingPayment) {
+      throw new ServiceError('A payment already exists for this contract or milestone.', 409);
+    }
+
     const feePercent = getPlatformFeePercentage();
-    const grossAmount = input.amount;
-    const platformFee = Math.round((grossAmount * (feePercent / 100)) * 100) / 100;
-    const netAmount = Math.round((grossAmount - platformFee) * 100) / 100;
+    const grossAmount = trustedAmount;
+    const platformFee = grossAmount.mul(feePercent).div(100).toDecimalPlaces(2);
+    const netAmount = grossAmount.minus(platformFee);
 
     const user = await db.user.findUnique({
       where: { id: clientUserId },
@@ -125,14 +158,19 @@ export class PaymentService {
     });
 
     // Initialize checkout with provider
-    const checkout = await this.provider.initializeCheckout({
-      engagementId,
-      milestoneId: input.milestoneId,
-      amount: grossAmount,
-      currency: input.currency,
-      clientEmail: user?.email || 'client@flowdek.app',
-      clientName: user?.name || undefined,
-    });
+    let checkout;
+    try {
+      checkout = await this.provider.initializeCheckout({
+        engagementId,
+        milestoneId: input.milestoneId,
+        amount: grossAmount.toNumber(),
+        currency: engagement.currency,
+        clientEmail: user?.email || 'client@flowdek.app',
+        clientName: user?.name || undefined,
+      });
+    } catch {
+      throw new ServiceError('The payment provider could not initialize checkout.', 502);
+    }
 
     // Save EngagementPayment record
     const payment = await db.$transaction(async (tx) => {
@@ -140,10 +178,10 @@ export class PaymentService {
         data: {
           engagementId,
           milestoneId: input.milestoneId || null,
-          amount: new Prisma.Decimal(grossAmount),
-          platformFee: new Prisma.Decimal(platformFee),
-          netAmount: new Prisma.Decimal(netAmount),
-          currency: input.currency,
+          amount: grossAmount,
+          platformFee,
+          netAmount,
+          currency: engagement.currency,
           state: 'FUNDING_PENDING',
           provider: 'PAYSTACK',
           providerReference: checkout.transactionReference,
@@ -154,8 +192,8 @@ export class PaymentService {
         data: {
           engagementPaymentId: createdPayment.id,
           type: 'FUNDING',
-          amount: new Prisma.Decimal(grossAmount),
-          currency: input.currency,
+          amount: grossAmount,
+          currency: engagement.currency,
           status: 'PENDING',
           providerReference: checkout.transactionReference,
         },
@@ -169,10 +207,10 @@ export class PaymentService {
       checkoutUrl: checkout.checkoutUrl,
       transactionReference: checkout.transactionReference,
       feeBreakdown: {
-        grossAmount,
-        platformFee,
+        grossAmount: grossAmount.toNumber(),
+        platformFee: platformFee.toNumber(),
         feePercentage: feePercent,
-        netContractorPayout: netAmount,
+        netContractorPayout: netAmount.toNumber(),
       },
     };
   }
@@ -180,18 +218,21 @@ export class PaymentService {
   /**
    * Cryptographically verifies and processes incoming payment webhooks
    */
-  async handleWebhookEvent(rawBody: string, signatureHeader: string, eventPayload: any) {
+  async handleWebhookEvent(rawBody: string, signatureHeader: string, eventPayload: PaymentWebhookPayload) {
     const isValid = this.provider.verifyWebhookSignature(rawBody, signatureHeader);
     if (!isValid) {
       throw new ServiceError('Invalid webhook signature', 401);
     }
 
-    const providerEventId = eventPayload.id || eventPayload.data?.reference || `EVT_${Date.now()}`;
+    const providerEventId = eventPayload.id ?? eventPayload.data?.id;
     const eventType = eventPayload.event || 'charge.success';
+    if (providerEventId == null) {
+      throw new ServiceError('Payment webhook event ID is required.', 400);
+    }
 
     // Check duplicate idempotent processing
     const existingEvent = await db.paymentWebhookEvent.findUnique({
-      where: { providerEventId },
+      where: { providerEventId: String(providerEventId) },
     });
 
     if (existingEvent) {
@@ -203,7 +244,7 @@ export class PaymentService {
       await tx.paymentWebhookEvent.create({
         data: {
           provider: 'PAYSTACK',
-          providerEventId,
+          providerEventId: String(providerEventId),
           eventType,
           payload: eventPayload,
           processedAt: new Date(),
@@ -221,24 +262,28 @@ export class PaymentService {
       if (!payment) return;
 
       if (eventType === 'charge.success' || eventType === 'payment.funded') {
-        await tx.engagementPayment.update({
-          where: { id: payment.id },
+        if (eventPayload.data?.amount != null) {
+          const reportedAmount = new Prisma.Decimal(eventPayload.data.amount).div(100);
+          if (!reportedAmount.equals(payment.amount)) {
+            throw new ServiceError('Webhook amount does not match the initialized payment.', 400);
+          }
+        }
+        if (eventPayload.data?.currency && eventPayload.data.currency !== payment.currency) {
+          throw new ServiceError('Webhook currency does not match the initialized payment.', 400);
+        }
+
+        const funded = await tx.engagementPayment.updateMany({
+          where: { id: payment.id, state: 'FUNDING_PENDING' },
           data: {
             state: 'FUNDED',
             fundedAt: new Date(),
           },
         });
+        if (funded.count === 0) return;
 
-        await tx.paymentTransaction.create({
-          data: {
-            engagementPaymentId: payment.id,
-            type: 'FUNDING',
-            amount: payment.amount,
-            currency: payment.currency,
-            status: 'SUCCESS',
-            providerReference: reference,
-            rawPayload: eventPayload,
-          },
+        await tx.paymentTransaction.updateMany({
+          where: { engagementPaymentId: payment.id, type: 'FUNDING', status: 'PENDING' },
+          data: { status: 'SUCCESS', rawPayload: eventPayload },
         });
 
         // Record Activity
@@ -260,6 +305,9 @@ export class PaymentService {
    * Helper method for preview/sandbox mode to simulate funding completion instantly
    */
   async simulateSandboxFunding(clientUserId: string, paymentId: string) {
+    if (!isPaymentSandboxEnabled()) {
+      throw new ServiceError('Sandbox payment simulation is disabled.', 403);
+    }
     const payment = await db.engagementPayment.findUnique({
       where: { id: paymentId },
       include: { engagement: true },
@@ -274,23 +322,18 @@ export class PaymentService {
     }
 
     return db.$transaction(async (tx) => {
-      const updatedPayment = await tx.engagementPayment.update({
-        where: { id: paymentId },
+      const claimed = await tx.engagementPayment.updateMany({
+        where: { id: paymentId, state: 'FUNDING_PENDING' },
         data: {
           state: 'FUNDED',
           fundedAt: new Date(),
         },
       });
+      if (claimed.count === 0) throw new ServiceError('Only pending funding can be simulated.', 409);
 
-      await tx.paymentTransaction.create({
-        data: {
-          engagementPaymentId: paymentId,
-          type: 'FUNDING',
-          amount: payment.amount,
-          currency: payment.currency,
-          status: 'SUCCESS',
-          providerReference: payment.providerReference,
-        },
+      await tx.paymentTransaction.updateMany({
+        where: { engagementPaymentId: paymentId, type: 'FUNDING', status: 'PENDING' },
+        data: { status: 'SUCCESS' },
       });
 
       await tx.engagementActivity.create({
@@ -302,7 +345,7 @@ export class PaymentService {
         },
       });
 
-      return updatedPayment;
+      return tx.engagementPayment.findUniqueOrThrow({ where: { id: paymentId } });
     });
   }
 
@@ -316,10 +359,11 @@ export class PaymentService {
         engagement: {
           include: {
             professionalProfile: {
-              include: { paymentAccounts: true },
+              include: { paymentAccounts: { where: { isVerified: true }, orderBy: { createdAt: 'desc' }, take: 1 } },
             },
           },
         },
+        milestone: { select: { status: true } },
       },
     });
 
@@ -334,25 +378,45 @@ export class PaymentService {
     if (payment.state !== 'FUNDED') {
       throw new ServiceError(`Cannot release payment in state '${payment.state}'. Must be FUNDED.`, 400);
     }
+    if (payment.milestoneId && payment.milestone?.status !== 'APPROVED') {
+      throw new ServiceError('Milestone payment can be released only after milestone approval.', 409);
+    }
 
     const professionalAccount = payment.engagement.professionalProfile.paymentAccounts[0];
-    const recipientCode = professionalAccount?.accountCode || 'RCP_SANDBOX';
+    if (!professionalAccount) {
+      throw new ServiceError('The professional must connect a verified payout account before release.', 409);
+    }
+
+    const claimed = await db.engagementPayment.updateMany({
+      where: { id: paymentId, state: 'FUNDED' },
+      data: { state: 'RELEASE_PENDING' },
+    });
+    if (claimed.count === 0) {
+      throw new ServiceError('This payment is already being released or is no longer funded.', 409);
+    }
 
     // Execute provider transfer
-    const payoutResult = await this.provider.releasePayout({
-      engagementPaymentId: paymentId,
-      recipientAccountCode: recipientCode,
-      amount: Number(payment.netAmount),
-      currency: payment.currency,
-      reason: `Payout for engagement milestone on Flowdek`,
-    });
+    let payoutResult;
+    try {
+      payoutResult = await this.provider.releasePayout({
+        engagementPaymentId: paymentId,
+        recipientAccountCode: professionalAccount.accountCode,
+        amount: Number(payment.netAmount),
+        currency: payment.currency,
+        reason: 'Payout for an approved Flowdek engagement milestone',
+      });
+    } catch {
+      // Keep RELEASE_PENDING because a network failure can occur after the
+      // provider accepted the transfer. Operations can reconcile by reference.
+      throw new ServiceError('Payout status is pending provider reconciliation.', 502);
+    }
 
     return db.$transaction(async (tx) => {
       const releasedPayment = await tx.engagementPayment.update({
         where: { id: paymentId },
         data: {
-          state: 'RELEASED',
-          releasedAt: new Date(),
+          state: payoutResult.status === 'SUCCESS' ? 'RELEASED' : 'RELEASE_PENDING',
+          releasedAt: payoutResult.status === 'SUCCESS' ? new Date() : null,
         },
       });
 
@@ -362,7 +426,7 @@ export class PaymentService {
           type: 'RELEASE',
           amount: payment.netAmount,
           currency: payment.currency,
-          status: 'SUCCESS',
+          status: payoutResult.status,
           providerReference: payoutResult.transferReference,
         },
       });
@@ -373,9 +437,9 @@ export class PaymentService {
           engagementPaymentId: paymentId,
           amount: payment.netAmount,
           currency: payment.currency,
-          status: 'SUCCESS',
+          status: payoutResult.status,
           providerReference: payoutResult.transferReference,
-          transferredAt: new Date(),
+          transferredAt: payoutResult.status === 'SUCCESS' ? new Date() : null,
         },
       });
 
@@ -409,6 +473,26 @@ export class PaymentService {
       throw new ServiceError('Unauthorized to request refund', 403);
     }
 
+    if (payment.state !== 'FUNDED' || !payment.providerReference) {
+      throw new ServiceError('Only a funded, unreleased payment can be refunded.', 409);
+    }
+
+    const claimed = await db.engagementPayment.updateMany({
+      where: { id: input.paymentId, state: 'FUNDED' },
+      data: { state: 'REFUND_PENDING' },
+    });
+    if (claimed.count === 0) throw new ServiceError('This payment is already being processed.', 409);
+
+    let providerRefund;
+    try {
+      providerRefund = await this.provider.processRefund({
+        providerReference: payment.providerReference,
+        amount: Number(payment.amount),
+      });
+    } catch {
+      throw new ServiceError('Refund status is pending provider reconciliation.', 502);
+    }
+
     return db.$transaction(async (tx) => {
       const refund = await tx.refund.create({
         data: {
@@ -416,16 +500,20 @@ export class PaymentService {
           requestedById: userId,
           amount: payment.amount,
           reason: input.reason,
-          status: 'APPROVED',
-          processedAt: new Date(),
+          status: providerRefund.status,
+          processedAt: providerRefund.status === 'APPROVED' ? new Date() : null,
         },
       });
 
       await tx.engagementPayment.update({
         where: { id: input.paymentId },
         data: {
-          state: 'REFUNDED',
-          refundedAt: new Date(),
+          state: providerRefund.status === 'APPROVED'
+            ? 'REFUNDED'
+            : providerRefund.status === 'REJECTED'
+              ? 'FUNDED'
+              : 'REFUND_PENDING',
+          refundedAt: providerRefund.status === 'APPROVED' ? new Date() : null,
         },
       });
 
@@ -435,7 +523,8 @@ export class PaymentService {
           type: 'REFUND',
           amount: payment.amount,
           currency: payment.currency,
-          status: 'SUCCESS',
+          status: providerRefund.status === 'APPROVED' ? 'SUCCESS' : 'PENDING',
+          providerReference: providerRefund.refundReference,
         },
       });
 
@@ -490,7 +579,7 @@ export class PaymentService {
     let totalReleased = 0;
     let totalNetPayout = 0;
 
-    payments.forEach((p: any) => {
+    payments.forEach((p) => {
       if (p.state === 'FUNDED' || p.state === 'RELEASED') {
         totalFunded += Number(p.amount);
       }
@@ -508,6 +597,7 @@ export class PaymentService {
         totalNetPayout,
         currency: payments[0]?.currency || 'NGN',
         platformFeeRate: getPlatformFeePercentage(),
+        sandboxEnabled: isPaymentSandboxEnabled(),
       },
     };
   }
