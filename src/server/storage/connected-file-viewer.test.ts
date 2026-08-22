@@ -85,7 +85,7 @@ describe('Connected file URL mapping (behavioral regression)', () => {
 });
 
 describe('FileViewerModal — connected file handling', () => {
-  test('modal does NOT iframe connected-provider files', () => {
+  test('modal never iframes the metadata download endpoint', () => {
     const source = readSrc('src/features/flowdeck/components/modals/FileViewerModal.tsx');
 
     // The modal must check if a file is connected before iframing.
@@ -94,10 +94,15 @@ describe('FileViewerModal — connected file handling', () => {
       'modal must check if a file is connected before rendering an iframe',
     );
 
-    // The canIframe function must return false for connected files.
+    // Connected files use the provider preview or Flowdek document workspace,
+    // never the legacy download route that responds with metadata JSON.
     assert.ok(
       source.includes('if (isConnectedFile(file)) return false'),
-      'canIframe must return false for connected-provider files',
+      'legacy iframe handling must reject connected-provider files',
+    );
+    assert.ok(
+      !source.includes('/download'),
+      'the modal must never iframe or link to the connected-file metadata download route',
     );
   });
 
@@ -139,6 +144,26 @@ describe('FileViewerModal — connected file handling', () => {
     );
   });
 
+  test('Google Docs and Sheets open in the shared Flowdek document workspace', () => {
+    const source = readSrc('src/features/flowdeck/components/modals/FileViewerModal.tsx');
+
+    assert.ok(source.includes('FLOWDEK_EDITABLE_MIME_TYPES'));
+    assert.ok(source.includes('<DocumentWorkspace'));
+    assert.ok(source.includes('contentEndpoint={`/api/files/${file.id}/content`}'));
+    assert.ok(
+      source.includes("file.storageProvider === 'GOOGLE_DRIVE'"),
+      'in-app content editing must currently be limited to the implemented Google provider',
+    );
+  });
+
+  test('other Google Drive files use the provider embeddable preview', () => {
+    const source = readSrc('src/features/flowdeck/components/modals/FileViewerModal.tsx');
+
+    assert.ok(source.includes('function googleDrivePreviewUrl'));
+    assert.ok(source.includes("'/preview'"));
+    assert.ok(source.includes('src={providerPreviewUrl}'));
+  });
+
   test('modal uses providerWebUrl for the "Open in" link (not /api/files/:id/download)', () => {
     const source = readSrc('src/features/flowdeck/components/modals/FileViewerModal.tsx');
 
@@ -148,10 +173,27 @@ describe('FileViewerModal — connected file handling', () => {
       'modal must use file.providerWebUrl for connected file links',
     );
     // Must NOT reference the download endpoint as a URL.
-    assert.ok(
-      !source.includes('/api/files/') || !source.includes('download'),
-      'modal must not use /api/files/:id/download as a URL',
-    );
+    assert.ok(!source.includes('/download'), 'modal must not use /api/files/:id/download as a URL');
+  });
+});
+
+describe('Attached Google document content API', () => {
+  test('content route authorizes project access and validates writes', () => {
+    const source = readSrc('src/app/api/files/[fileId]/content/route.ts');
+
+    assert.ok(source.includes("requireProjectCapability(userId, file.projectId, 'VIEW_PROJECT')"));
+    assert.ok(source.includes('updateProjectDocumentContentSchema.safeParse'));
+    assert.ok(source.includes('getFileContent'));
+    assert.ok(source.includes('updateFileContent'));
+  });
+
+  test('content service reads and updates the provider file without storing a copy', () => {
+    const source = readSrc('src/server/files/file-content.service.ts');
+
+    assert.ok(source.includes('provider.readContent('));
+    assert.ok(source.includes('provider.updateContent('));
+    assert.ok(!source.includes('db.file.update('), 'content must remain in the user\'s cloud drive');
+    assert.ok(source.includes("action: 'file_content_updated'"));
   });
 });
 
