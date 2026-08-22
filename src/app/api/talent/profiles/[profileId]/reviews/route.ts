@@ -1,20 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+
+import { requireAuthenticatedUser } from '@/server/auth/authorization';
+import { apiError } from '@/server/http/responses';
 import { reviewService } from '@/server/talent/review.service';
-import { ServiceError } from '@/server/http/errors';
 
 export async function GET(
-  req: NextRequest,
+  _request: Request,
   { params }: { params: Promise<{ profileId: string }> }
 ) {
-  const { profileId } = await params;
-
   try {
-    const data = await reviewService.getProfileReviewsAndMetrics(profileId);
+    const user = await requireAuthenticatedUser();
+    const { profileId } = await params;
+    const data = await reviewService.getProfileReviewsAndMetrics(user.id, profileId);
     return NextResponse.json(data);
-  } catch (error: any) {
-    if (error instanceof ServiceError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    return NextResponse.json({ error: 'Failed to fetch profile reviews and metrics' }, { status: 500 });
+  } catch (error) {
+    return apiError(error, 'GET /api/talent/profiles/:profileId/reviews');
   }
 }

@@ -1607,7 +1607,7 @@ model ClientReview {
   clarityRating         Int
   communicationRating   Int
   professionalismRating Int
-  paymentRating         Int
+  paymentRating         Int?
   wouldWorkAgain        Boolean             @default(true)
   writtenFeedback       String?
   engagement            Engagement          @relation(fields: [engagementId], references: [id], onDelete: Cascade)
