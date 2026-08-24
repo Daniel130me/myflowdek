@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { COLORS, FF } from '@/features/flowdeck/model';
+import { useAuth } from '@/features/flowdeck/components/auth';
 
 /**
  * Invitation accept/decline page — the recipient arrives here after
@@ -17,6 +18,7 @@ import { COLORS, FF } from '@/features/flowdeck/model';
  */
 export default function InvitationPage({ params }: { params: Promise<{ token: string }> }) {
   const router = useRouter();
+  const auth = useAuth();
   const [token, setToken] = useState<string | null>(null);
   const [invitation, setInvitation] = useState<{
     workspace: { name: string };
@@ -149,6 +151,16 @@ export default function InvitationPage({ params }: { params: Promise<{ token: st
         {error && (
           <div style={{ padding: '10px 12px', borderRadius: 8, background: '#FEF2F2', color: '#DC2626', fontSize: 13, marginBottom: 16, fontFamily: FF }}>
             {error}
+            {error.includes('different email address') && invitation?.email && (
+              <div style={{ marginTop: 6, color: COLORS.gray }}>
+                This invitation is for <strong style={{ color: COLORS.ink }}>{invitation.email}</strong>.
+                {auth.user?.email && (
+                  <>
+                    <br />You are signed in as <strong style={{ color: COLORS.ink }}>{auth.user.email}</strong>.
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 

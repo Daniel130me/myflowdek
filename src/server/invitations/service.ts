@@ -7,6 +7,8 @@ import { INVITATION_TTL_HOURS, INVITATION_TOKEN_LENGTH } from './constants';
 import type { CreateInvitationInput } from './schemas';
 import { sendInvitationEmail } from '@/server/email/service';
 import { APP_BASE_URL } from '@/server/email/constants';
+import { createNotification } from '@/server/notifications/notification.service';
+import { NOTIFICATION_TYPES } from '@/server/notifications/constants';
 
 type InvitationEmailSender = typeof sendInvitationEmail;
 
@@ -144,6 +146,27 @@ export async function createInvitation(
     );
   }
 
+  // Notify the recipient and sender in the bell as well as by email. New users
+  // do not have a user record yet, so their email link remains the source of truth.
+  const recipient = await db.user.findFirst({
+    where: { email: { equals: input.email, mode: 'insensitive' } },
+    select: { id: true },
+  });
+  if (recipient) {
+    await createNotification(
+      recipient.id,
+      NOTIFICATION_TYPES.INVITATION,
+      `You've been invited to join "${invitation.workspace.name}" as ${invitation.role}.`,
+    );
+  }
+  if (invitedById !== recipient?.id) {
+    await createNotification(
+      invitedById,
+      NOTIFICATION_TYPES.INVITATION,
+      `Invitation sent to ${input.email} for "${invitation.workspace.name}".`,
+    );
+  }
+
   // Return the invitation WITHOUT the raw token — the caller never sees it.
   return invitation;
 }
@@ -235,7 +258,7 @@ export async function acceptInvitation(token: string, userId: string, userEmail:
       throw new AuthError('Invitation not found', 404);
     }
 
-    if (invitation.email !== userEmail) {
+    if (invitation.email.trim().toLowerCase() !== userEmail.trim().toLowerCase()) {
       throw new AuthError(
         'This invitation was sent to a different email address. Sign in with the invited email.',
         403,
