@@ -38,7 +38,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   // When the API returns a real project, upsert it into the store so the
   // sidebar / panels render real data instead of the mock seed.
   useEffect(() => {
-    if (projectId && project) {
+    if (projectId && project && !projectExistsInStore) {
       upsertProject(project);
     }
   }, [projectId, project, upsertProject]);

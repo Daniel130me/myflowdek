@@ -7,7 +7,7 @@ import { useCloseOverlay } from '@/shared/navigation/useCloseOverlay';
 import { routes } from '@/shared/navigation/routes';
 
 export default function InterceptedNewProjectPage() {
-  const { createBlank, createFromTemplate, creating } = useProjectCreation();
+  const { createBlank, createFromTemplate, creating } = useProjectCreation({ navigateOnTemplateCreate: false });
   const close = useCloseOverlay(routes.projects());
 
   return (
@@ -15,6 +15,7 @@ export default function InterceptedNewProjectPage() {
       onClose={close}
       onCreate={createBlank}
       onCreateFromTemplate={createFromTemplate}
+      onCreated={close}
       submitting={creating}
     />
   );

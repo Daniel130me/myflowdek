@@ -1,14 +1,19 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { COLORS, STATUS_META, STATUS_ORDER, TODAY, dayMs, fmtDate, fmtRange, addDays, type Task, type Project, type FileItem, type ProjectStatusUpdate } from '@/features/flowdeck/model';
+import { COLORS, PROJECT_COLORS, STATUS_META, STATUS_ORDER, TODAY, dayMs, fmtDate, fmtRange, addDays, type Task, type Project, type FileItem, type ProjectStatusUpdate } from '@/features/flowdeck/model';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import { Users, AlertTriangle, CheckCircle2, TrendingUp, Star, Archive, Save, Plus, X, UserPlus, Trash2 } from 'lucide-react';
+import { Users, AlertTriangle, CheckCircle2, TrendingUp, Star, Archive, Save, Plus, X, UserPlus, Trash2, Pencil } from 'lucide-react';
 import { Avatar, StatusPill, PriorityFlag, Card, SectionHeader, StatCard, FileThumbnailGrid, FF, useMemberDirectory, useProjectMembers } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 
 const STATUS_COLORS: Record<string, string> = { green: '#16A34A', yellow: '#D97706', red: '#DC2626' };
 const STATUS_LABELS: Record<string, string> = { green: 'On Track', yellow: 'At Risk', red: 'Off Track' };
+
+function dateInputValue(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+}
 
 export function DashboardView({ project, tasks, files = [], statusUpdates = [], onUpdateProject, onToggleFavorite, onArchive, onSetMembers, onAddStatusUpdate, onDeleteStatusUpdate, onSaveAsTemplate, onOpenTask }: {
   project: Project; tasks: Task[]; files?: FileItem[];
@@ -36,7 +41,9 @@ export function DashboardView({ project, tasks, files = [], statusUpdates = [], 
   const dueSoon = tasks.filter(t => t.status !== 'done').sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()).slice(0, isMobile ? 4 : 5);
   const members = project.members || [];
   const workload = projectMembers.filter(m => members.includes(m.id)).map(m => ({ name: m.name.split(' ')[0], tasks: tasks.filter(t => t.assignee === m.id && t.status !== 'done').length })).filter(w => w.tasks > 0);
-  const daysLeft = Math.max(0, Math.ceil((new Date(project.end).getTime() - TODAY.getTime()) / dayMs));
+  const projectEnd = new Date(project.end);
+  const hasValidEndDate = !Number.isNaN(projectEnd.getTime());
+  const daysLeft = hasValidEndDate ? Math.max(0, Math.ceil((projectEnd.getTime() - TODAY.getTime()) / dayMs)) : null;
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'status'>('overview');
   const [editingDesc, setEditingDesc] = useState(false);
@@ -47,7 +54,25 @@ export function DashboardView({ project, tasks, files = [], statusUpdates = [], 
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [templateIncludeTasks, setTemplateIncludeTasks] = useState(true);
+  const [showEditProject, setShowEditProject] = useState(false);
+  const [editName, setEditName] = useState(project.name);
+  const [editDescription, setEditDescription] = useState(project.description || '');
+  const [editColor, setEditColor] = useState(project.color);
+  const [editStart, setEditStart] = useState(dateInputValue(project.start));
+  const [editEnd, setEditEnd] = useState(dateInputValue(project.end));
   useEffect(() => { setMounted(true); }, []);
+
+  function openEditProject() {
+    setEditName(project.name);
+    setEditDescription(project.description || '');
+    setEditColor(project.color);
+    setEditStart(dateInputValue(project.start));
+    setEditEnd(dateInputValue(project.end));
+    setShowEditProject(true);
+  }
+
+  const editDatesValid = Boolean(editStart && editEnd && new Date(editEnd) > new Date(editStart));
+  const editValid = Boolean(editName.trim() && editDatesValid);
 
   const filesByTask = useMemo(() => {
     const map: Record<string, FileItem[]> = {};
@@ -70,9 +95,14 @@ export function DashboardView({ project, tasks, files = [], statusUpdates = [], 
               </button>
             )}
           </div>
-          <div style={{ fontSize: 13, color: COLORS.gray, fontFamily: FF }}>{fmtDate(project.start)} – {fmtDate(project.end)} · {daysLeft} days remaining</div>
+          <div style={{ fontSize: 13, color: COLORS.gray, fontFamily: FF }}>{fmtDate(project.start)} – {fmtDate(project.end)} · {daysLeft === null ? 'Timeline not set' : `${daysLeft} days remaining`}</div>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
+          {onUpdateProject && (
+            <button onClick={openEditProject} title='Edit project' style={{ border: 'none', background: COLORS.paper, cursor: 'pointer', color: COLORS.gray, padding: '6px 10px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontFamily: FF, fontWeight: 600 }}>
+              <Pencil size={14} /> Edit project
+            </button>
+          )}
           {onSaveAsTemplate && (
             <button onClick={() => { setTemplateName(project.name + ' Template'); setShowSaveTemplate(true); }} title='Save as template' style={{ border: 'none', background: COLORS.paper, cursor: 'pointer', color: COLORS.gray, padding: '6px 10px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontFamily: FF, fontWeight: 600 }}>
               <Save size={14} /> Save as template
@@ -284,6 +314,49 @@ export function DashboardView({ project, tasks, files = [], statusUpdates = [], 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setShowSaveTemplate(false)} style={{ border: `1px solid ${COLORS.line}`, background: 'none', cursor: 'pointer', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: FF, color: COLORS.gray }}>Cancel</button>
               <button onClick={() => { if (templateName.trim()) { onSaveAsTemplate(templateName.trim(), templateIncludeTasks); setShowSaveTemplate(false); } }} disabled={!templateName.trim()} style={{ border: 'none', background: templateName.trim() ? COLORS.accent : COLORS.line, color: '#FFFFFF', cursor: templateName.trim() ? 'pointer' : 'not-allowed', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: FF }}>Save Template</button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {showEditProject && onUpdateProject && (
+        <>
+          <div onClick={() => setShowEditProject(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 49 }} />
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: '#FFFFFF', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.15)', zIndex: 50, padding: isMobile ? 20 : 24, width: 'min(480px, 92vw)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <h3 style={{ fontSize: 17, fontWeight: 700, fontFamily: FF, margin: 0 }}>Edit project</h3>
+              <button onClick={() => setShowEditProject(false)} title='Close' style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 4 }}><X size={18} /></button>
+            </div>
+            <div style={{ display: 'grid', gap: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
+                Project name
+                <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 5, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, fontFamily: FF, outline: 'none' }} />
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
+                Description
+                <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3} placeholder='Add a short project description' style={{ display: 'block', width: '100%', marginTop: 5, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 13.5, fontFamily: FF, lineHeight: 1.5, resize: 'vertical', outline: 'none' }} />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
+                  Start date
+                  <input type='date' value={editStart} onChange={e => setEditStart(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 5, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: FF, outline: 'none' }} />
+                </label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
+                  End date
+                  <input type='date' value={editEnd} onChange={e => setEditEnd(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 5, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: FF, outline: 'none' }} />
+                </label>
+              </div>
+              {editName.trim() && !editDatesValid && <div style={{ fontSize: 12, color: COLORS.red, marginTop: -6, fontFamily: FF }}>Choose an end date after the start date.</div>}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF, marginBottom: 7 }}>Project colour</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {PROJECT_COLORS.map(color => <button key={color} type='button' onClick={() => setEditColor(color)} title={`Use ${color}`} style={{ width: 26, height: 26, borderRadius: 9, background: color, cursor: 'pointer', border: editColor === color ? `2.5px solid ${COLORS.ink}` : '2.5px solid transparent' }} />)}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 22 }}>
+              <button onClick={() => setShowEditProject(false)} style={{ border: `1px solid ${COLORS.line}`, background: 'none', cursor: 'pointer', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: FF, color: COLORS.gray }}>Cancel</button>
+              <button onClick={() => { if (!editValid) return; onUpdateProject(project.id, { name: editName.trim(), description: editDescription.trim() || undefined, color: editColor, start: editStart, end: editEnd }); setShowEditProject(false); }} disabled={!editValid} style={{ border: 'none', background: editValid ? COLORS.accent : COLORS.line, color: '#FFFFFF', cursor: editValid ? 'pointer' : 'not-allowed', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: FF }}>Save changes</button>
             </div>
           </div>
         </>

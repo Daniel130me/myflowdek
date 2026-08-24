@@ -13,7 +13,9 @@ export function addDays(dateStr: string, n: number): Date {
 }
 
 export function fmtDate(d: string | Date): string {
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const date = new Date(d);
+  if (Number.isNaN(date.getTime())) return "Date not set";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export function fmtRange(startStr: string, duration: number): string {

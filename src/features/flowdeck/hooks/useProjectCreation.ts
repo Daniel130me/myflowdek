@@ -17,17 +17,18 @@ interface ProjectFormInput {
 }
 
 /** Shared persistence flow used by both full-page and intercepted modals. */
-export function useProjectCreation() {
+export function useProjectCreation(options: { navigateOnTemplateCreate?: boolean } = {}) {
   const router = useRouter();
   const { selectedWorkspaceId } = useWorkspaces();
   const { upsertProject } = useFlowDeck();
   const [creating, setCreating] = useState(false);
 
-  const finish = useCallback((apiProject: ApiProject) => {
+  const finish = useCallback((apiProject: ApiProject, navigate = true) => {
     const project = mapProject(apiProject);
     upsertProject(project);
     toast.success('Project created', { description: project.name });
-    router.push(routes.projectOverview(project.id));
+    if (navigate) router.push(routes.projectOverview(project.id));
+    return true;
   }, [router, upsertProject]);
 
   const createBlank = useCallback(async (input: ProjectFormInput) => {
@@ -43,11 +44,12 @@ export function useProjectCreation() {
       if (!result.ok || !result.data?.project) {
         throw new Error(result.error ?? 'Failed to create project');
       }
-      finish(result.data.project as unknown as ApiProject);
+      return finish(result.data.project as unknown as ApiProject);
     } catch (error) {
       toast.error('Failed to create project', {
         description: error instanceof Error ? error.message : 'Unknown error',
       });
+      return false;
     } finally {
       setCreating(false);
     }
@@ -73,15 +75,16 @@ export function useProjectCreation() {
       if (!result.ok || !result.data?.project) {
         throw new Error(result.error ?? 'Failed to create project from template');
       }
-      finish(result.data.project as unknown as ApiProject);
+      return finish(result.data.project as unknown as ApiProject, options.navigateOnTemplateCreate !== false);
     } catch (error) {
       toast.error('Failed to create project from template', {
         description: error instanceof Error ? error.message : 'Unknown error',
       });
+      return false;
     } finally {
       setCreating(false);
     }
-  }, [creating, finish, selectedWorkspaceId]);
+  }, [creating, finish, options.navigateOnTemplateCreate, selectedWorkspaceId]);
 
   return { createBlank, createFromTemplate, creating };
 }

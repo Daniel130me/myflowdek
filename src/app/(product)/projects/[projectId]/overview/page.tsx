@@ -49,8 +49,8 @@ export default function ProjectOverviewPage() {
 
   // Fall back to the mock store project if the API hasn't loaded yet (keeps
   // the UI responsive during the transition to fully real data).
-  const mockProject = projectId ? state.projects[projectId] : undefined;
-  const project = apiProject ?? mockProject;
+  const storedProject = projectId ? state.projects[projectId] : undefined;
+  const project = storedProject ?? apiProject;
   if (!project) {
     notFound();
   }
