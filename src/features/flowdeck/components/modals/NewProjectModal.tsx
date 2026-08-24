@@ -1,12 +1,23 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, LayoutTemplate, Sparkles, Loader2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, LayoutTemplate, Sparkles, Loader2, Trash2 } from 'lucide-react';
 import { COLORS, PROJECT_COLORS, TODAY, addDays, PROJECT_TEMPLATES } from '@/features/flowdeck/model';
+import { loadCustomTemplates, saveCustomTemplates } from '@/data/local-storage/storageAdapter';
 import { useViewport } from '../../hooks/useViewport';
 import { Field } from '../ui/Field';
 import { selectStyle, FF } from '../ui/styles';
 import type { Tag, CustomColumn, Task } from '@/features/flowdeck/model';
+
+type SavedProjectTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  taskCount: number;
+  tags: { name: string; color: string }[];
+};
 
 export function NewProjectModal({
   onClose,
@@ -27,18 +38,38 @@ export function NewProjectModal({
   const [start, setStart] = useState(TODAY.toISOString().slice(0, 10));
   const [end, setEnd] = useState(addDays(TODAY.toISOString().slice(0, 10), 30).toISOString().slice(0, 10));
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [customTemplates, setCustomTemplates] = useState<SavedProjectTemplate[]>([]);
+  const [templateToDelete, setTemplateToDelete] = useState<SavedProjectTemplate | null>(null);
+
+  useEffect(() => {
+    setCustomTemplates(loadCustomTemplates() as SavedProjectTemplate[]);
+  }, []);
+
+  const availableTemplates = [...PROJECT_TEMPLATES, ...customTemplates];
 
   const valid = name.trim() && new Date(end) > new Date(start);
   const tplValid = name.trim() && new Date(end) > new Date(start) && selectedTemplate;
 
-  function submitBlank() {
+  async function submitBlank() {
     if (!valid || submitting) return;
-    onCreate({ name: name.trim(), color, start, end });
+    if (await onCreate({ name: name.trim(), color, start, end })) onCreated?.();
   }
 
   async function submitTemplate() {
     if (!tplValid || !onCreateFromTemplate || !selectedTemplate || submitting) return;
-    if (await onCreateFromTemplate(selectedTemplate, name.trim(), color, start, end)) onCreated?.();
+    const selectedCustomTemplate = customTemplates.find(template => template.id === selectedTemplate);
+    const created = selectedCustomTemplate
+      ? await onCreate({ name: name.trim(), color: selectedCustomTemplate.color ?? color, start, end })
+      : await onCreateFromTemplate(selectedTemplate, name.trim(), color, start, end);
+    if (created) onCreated?.();
+  }
+
+  function deleteCustomTemplate(templateId: string, templateName: string) {
+    const remaining = customTemplates.filter(template => template.id !== templateId);
+    saveCustomTemplates(remaining);
+    setCustomTemplates(remaining);
+    if (selectedTemplate === templateId) setSelectedTemplate(null);
+    setTemplateToDelete(null);
   }
 
   const { isMobile } = useViewport();
@@ -65,6 +96,21 @@ export function NewProjectModal({
     cursor: 'pointer',
     transition: 'all 0.15s',
   });
+
+  const deleteDialog = templateToDelete && (
+    <div role="dialog" aria-modal="true" aria-labelledby="delete-template-title" style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div onClick={() => setTemplateToDelete(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)' }} />
+      <div style={{ position: 'relative', width: 'min(400px, 100%)', background: '#FFFFFF', borderRadius: 16, padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.15)', fontFamily: FF }}>
+        <button type="button" onClick={() => setTemplateToDelete(null)} title="Close" aria-label="Close" style={{ position: 'absolute', top: 16, right: 16, border: 'none', background: 'none', color: COLORS.gray, cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+        <h3 id="delete-template-title" style={{ margin: '0 32px 8px 0', fontSize: 17, fontWeight: 700, color: COLORS.ink }}>Delete saved template?</h3>
+        <p style={{ margin: '0 0 22px', color: COLORS.gray, fontSize: 13.5, lineHeight: 1.5 }}>“{templateToDelete.name}” will be permanently removed from your saved templates.</p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button type="button" onClick={() => setTemplateToDelete(null)} style={{ border: `1px solid ${COLORS.line}`, background: '#FFFFFF', color: COLORS.gray, cursor: 'pointer', padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>Cancel</button>
+          <button type="button" onClick={() => deleteCustomTemplate(templateToDelete.id, templateToDelete.name)} style={{ border: 'none', background: COLORS.red, color: '#FFFFFF', cursor: 'pointer', padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}>Delete template</button>
+        </div>
+      </div>
+    </div>
+  );
 
   const formContent = (
     <>
@@ -98,7 +144,7 @@ export function NewProjectModal({
       </Field>
       <Field label="Choose a template">
         <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 10 : 8, maxHeight: isMobile ? 280 : 260, overflowY: 'auto' }}>
-          {PROJECT_TEMPLATES.map(tpl => (
+          {availableTemplates.map(tpl => (
             <div key={tpl.id} onClick={() => setSelectedTemplate(tpl.id)} style={templateCardStyle(selectedTemplate === tpl.id)}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: isMobile ? 24 : 22, lineHeight: 1 }}>{tpl.icon}</span>
@@ -114,6 +160,20 @@ export function NewProjectModal({
                     </div>
                   </div>
                 </div>
+                {customTemplates.some(template => template.id === tpl.id) && (
+                  <button
+                    type="button"
+                    title="Delete saved template"
+                    aria-label={`Delete saved template ${tpl.name}`}
+                    onClick={event => {
+                      event.stopPropagation();
+                      setTemplateToDelete(tpl);
+                    }}
+                    style={{ border: 'none', background: 'transparent', color: COLORS.gray, cursor: 'pointer', padding: 4, display: 'flex' }}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
                 <div style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${selectedTemplate === tpl.id ? COLORS.accent : COLORS.line}`, background: selectedTemplate === tpl.id ? COLORS.accent : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {selectedTemplate === tpl.id && <span style={{ color: '#FFFFFF', fontSize: 10, lineHeight: 1 }}>&#10003;</span>}
                 </div>
@@ -130,6 +190,7 @@ export function NewProjectModal({
 
   if (isMobile) {
     return (
+      <>
       <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
         <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)' }} />
         <div style={{ position: 'relative', background: '#FFFFFF', borderRadius: '20px 20px 0 0', padding: '8px 20px 32px', maxHeight: '92vh', overflowY: 'auto' }}>
@@ -161,10 +222,13 @@ export function NewProjectModal({
           )}
         </div>
       </div>
+      {deleteDialog}
+      </>
     );
   }
 
   return (
+    <>
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)' }} />
       <div style={{ position: 'relative', background: '#FFFFFF', borderRadius: 16, padding: 24, width: 'min(480px, 92vw)', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04)' }}>
@@ -189,5 +253,7 @@ export function NewProjectModal({
         )}
       </div>
     </div>
+    {deleteDialog}
+    </>
   );
 }

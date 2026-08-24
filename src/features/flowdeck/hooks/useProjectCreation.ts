@@ -17,7 +17,7 @@ interface ProjectFormInput {
 }
 
 /** Shared persistence flow used by both full-page and intercepted modals. */
-export function useProjectCreation(options: { navigateOnTemplateCreate?: boolean } = {}) {
+export function useProjectCreation(options: { navigateOnCreate?: boolean; navigateOnTemplateCreate?: boolean } = {}) {
   const router = useRouter();
   const { selectedWorkspaceId } = useWorkspaces();
   const { upsertProject } = useFlowDeck();
@@ -44,7 +44,7 @@ export function useProjectCreation(options: { navigateOnTemplateCreate?: boolean
       if (!result.ok || !result.data?.project) {
         throw new Error(result.error ?? 'Failed to create project');
       }
-      return finish(result.data.project as unknown as ApiProject);
+      return finish(result.data.project as unknown as ApiProject, options.navigateOnCreate !== false);
     } catch (error) {
       toast.error('Failed to create project', {
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -53,7 +53,7 @@ export function useProjectCreation(options: { navigateOnTemplateCreate?: boolean
     } finally {
       setCreating(false);
     }
-  }, [creating, finish, selectedWorkspaceId]);
+  }, [creating, finish, options.navigateOnCreate, selectedWorkspaceId]);
 
   const createFromTemplate = useCallback(async (
     templateId: string,

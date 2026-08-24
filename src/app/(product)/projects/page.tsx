@@ -23,13 +23,13 @@ export default function ProjectsPortfolioPage() {
   const state = useFlowDeck();
   const wsHook = useWorkspaces();
   const {
-    projects,
     loading,
     deleteProject,
     setFavorite,
     archiveProject,
     restoreProject,
   } = useProjects(wsHook.selectedWorkspaceId);
+  const projects = state.projects;
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
 
