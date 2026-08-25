@@ -5,6 +5,7 @@ import { BriefcaseBusiness, ChevronDown, Globe, Search, Trash2, UserPlus } from 
 
 import { PublishOpportunityModal } from './PublishOpportunityModal';
 import { readApiMessage, type ProfessionalDirectoryResponse, type PublicOpportunity, type SkillOption } from './types';
+import { PlatformDropdown } from '@/components/ui/platform-dropdown';
 import styles from './task-talent.module.css';
 
 type Requirement = {
@@ -253,29 +254,27 @@ export function TaskTalentPanel({
               {requirements.map((item, index) => (
                 <div className={styles.requirement} key={item.skill.id}>
                   <strong>{item.skill.name}</strong>
-                  <select
-                    aria-label={`Minimum proficiency for ${item.skill.name}`}
+                  <PlatformDropdown
+                    ariaLabel={`Minimum proficiency for ${item.skill.name}`}
                     value={item.minimumProficiency}
+                    compact
                     disabled={!canManage}
-                    onChange={(event) =>
+                    onChange={(value) =>
                       setRequirements(
                         requirements.map((candidate, candidateIndex) =>
                           candidateIndex === index
-                            ? {
-                                ...candidate,
-                                minimumProficiency: event.target
-                                  .value as Requirement['minimumProficiency'],
-                              }
+                            ? { ...candidate, minimumProficiency: value as Requirement['minimumProficiency'] }
                             : candidate,
                         ),
                       )
                     }
-                  >
-                    <option value="BEGINNER">Beginner</option>
-                    <option value="INTERMEDIATE">Intermediate</option>
-                    <option value="ADVANCED">Advanced</option>
-                    <option value="EXPERT">Expert</option>
-                  </select>
+                    options={[
+                      { value: 'BEGINNER', label: 'Beginner' },
+                      { value: 'INTERMEDIATE', label: 'Intermediate' },
+                      { value: 'ADVANCED', label: 'Advanced' },
+                      { value: 'EXPERT', label: 'Expert' },
+                    ]}
+                  />
                   <label>
                     <input
                       type="checkbox"
@@ -313,20 +312,19 @@ export function TaskTalentPanel({
 
           {canManage && (
             <div className={styles.addRow}>
-              <select
-                aria-label="Add competency"
+              <PlatformDropdown
+                ariaLabel="Add competency"
                 value={skillId}
-                onChange={(event) => setSkillId(event.target.value)}
-              >
-                <option value="">Choose a skill</option>
-                {skills
-                  .filter((skill) => !requirements.some((item) => item.skill.id === skill.id))
-                  .map((skill) => (
-                    <option key={skill.id} value={skill.id}>
-                      {skill.name}
-                    </option>
-                  ))}
-              </select>
+                placeholder="Choose a skill"
+                searchable
+                onChange={setSkillId}
+                options={[
+                  { value: '', label: 'Choose a skill' },
+                  ...skills
+                    .filter((skill) => !requirements.some((item) => item.skill.id === skill.id))
+                    .map((skill) => ({ value: skill.id, label: skill.name })),
+                ]}
+              />
               <button type="button" disabled={!skillId} onClick={addRequirement}>
                 Add skill
               </button>
@@ -361,18 +359,21 @@ export function TaskTalentPanel({
 
               {professionals.length > 0 && (
                 <form className={styles.inviteForm} onSubmit={invite}>
-                  <select
-                    required
+                  <PlatformDropdown
+                    ariaLabel="Select a professional"
                     value={professionalId}
-                    onChange={(event) => setProfessionalId(event.target.value)}
-                  >
-                    <option value="">Select a professional</option>
-                    {professionals.map((profile) => (
-                      <option key={profile.id} value={profile.id}>
-                        {profile.displayName} — {profile.professionalTitle ?? 'Professional'}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select a professional"
+                    searchable
+                    onChange={setProfessionalId}
+                    options={[
+                      { value: '', label: 'Select a professional' },
+                      ...professionals.map((profile) => ({
+                        value: profile.id,
+                        label: profile.displayName,
+                        description: profile.professionalTitle ?? 'Professional',
+                      })),
+                    ]}
+                  />
                   <textarea
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}

@@ -86,6 +86,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
   // Extract route parameters & current view without fallbacks
   const routeProjectId = getSingleParam(params?.projectId);
   const activeView = getViewFromPathname(pathname);
+  const isTalentRoute = pathname.startsWith('/talent');
 
   // Fetch real project members for the current route so the BulkActionBar
   // assign popover + the TopBar avatar stack + assignee selectors all see
@@ -240,8 +241,8 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
           display: 'flex',
           flexDirection: 'column',
           minHeight: 0,
-          padding: isMobile ? '18px 14px 0' : '28px 32px 40px',
-          paddingBottom: isMobile ? bottomNavHeight : 40,
+          padding: isTalentRoute ? 0 : isMobile ? '18px 14px 0' : '28px 32px 40px',
+          paddingBottom: isTalentRoute ? 0 : isMobile ? bottomNavHeight : 40,
         }}>
           {children}
         </div>

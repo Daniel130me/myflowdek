@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 import { routes } from '@/shared/navigation/routes';
+import { PlatformDropdown } from '@/components/ui/platform-dropdown';
 import styles from './talent.module.css';
 import type {
   OpportunityDirectoryResponse,
@@ -117,7 +118,7 @@ export function TalentOpportunitiesDirectory() {
               matching your skills and experience.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className={styles.headerActions}>
             <Link href={routes.talentEngagements()} className={styles.secondaryButton}>
               <Briefcase className="w-4 h-4 mr-1.5 inline" />
               My Contracts
@@ -153,36 +154,29 @@ export function TalentOpportunitiesDirectory() {
             <div className={styles.filterGrid}>
               <div>
                 <label className={styles.fieldLabel}>Budget Type</label>
-                <select
+                <PlatformDropdown
+                  ariaLabel="Budget type"
                   value={budgetType}
-                  onChange={(e) => {
-                    setBudgetType(e.target.value);
+                  placeholder="All Budget Types"
+                  onChange={(value) => {
+                    setBudgetType(value);
                     setPage(1);
                   }}
-                  className={styles.selectInput}
-                >
-                  <option value="">All Budget Types</option>
-                  <option value="FIXED">Fixed Price</option>
-                  <option value="HOURLY">Hourly Rate</option>
-                  <option value="NEGOTIABLE">Negotiable</option>
-                </select>
+                  options={[{ value: '', label: 'All Budget Types' }, { value: 'FIXED', label: 'Fixed Price' }, { value: 'HOURLY', label: 'Hourly Rate' }, { value: 'NEGOTIABLE', label: 'Negotiable' }]}
+                />
               </div>
 
               <div>
                 <label className={styles.fieldLabel}>Sort By</label>
-                <select
+                <PlatformDropdown
+                  ariaLabel="Sort opportunities"
                   value={sort}
-                  onChange={(e) => {
-                    setSort(e.target.value as OpportunityDirectorySort);
+                  onChange={(value) => {
+                    setSort(value as OpportunityDirectorySort);
                     setPage(1);
                   }}
-                  className={styles.selectInput}
-                >
-                  <option value="NEWEST">Newest Published</option>
-                  <option value="BUDGET_HIGH_TO_LOW">Highest Budget</option>
-                  <option value="BUDGET_LOW_TO_HIGH">Lowest Budget</option>
-                  <option value="DEADLINE_SOONEST">Deadline Soonest</option>
-                </select>
+                  options={[{ value: 'NEWEST', label: 'Newest Published' }, { value: 'BUDGET_HIGH_TO_LOW', label: 'Highest Budget' }, { value: 'BUDGET_LOW_TO_HIGH', label: 'Lowest Budget' }, { value: 'DEADLINE_SOONEST', label: 'Deadline Soonest' }]}
+                />
               </div>
             </div>
 

@@ -13,6 +13,7 @@ import { TagPill, TagPills, CommentsSection, FollowersSection, TimeTrackingSecti
 import { selectStyle, FF } from '../ui/styles';
 import { CloudFilePickerModal } from './CloudFilePickerModal';
 import { TaskTalentPanel } from '@/features/talent/TaskTalentPanel';
+import { PlatformDropdown } from '@/components/ui/platform-dropdown';
 
 interface TaskDetailPanelProps {
   task: Task;
@@ -317,16 +318,12 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
   /* Shared: recurrence picker */
   const recurrenceField = (
     <Field label="Recurrence">
-      <select
+      <PlatformDropdown
+        ariaLabel="Recurrence"
         value={task.recurrence || ''}
-        onChange={e => onUpdate({ recurrence: (e.target.value || undefined) as string | undefined })}
-        style={selectStyle}
-      >
-        <option value="">None</option>
-        <option value="daily">Daily</option>
-        <option value="weekly">Weekly</option>
-        <option value="monthly">Monthly</option>
-      </select>
+        onChange={value => onUpdate({ recurrence: (value || undefined) as string | undefined })}
+        options={[{ value: '', label: 'None' }, { value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }]}
+      />
     </Field>
   );
 
@@ -422,10 +419,10 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
           {tagsSection}
           {parentTaskField}
           {subtasksSection}
-          <Field label="Status"><select value={task.status} onChange={e => onUpdate({ status: e.target.value as TaskStatus, progress: e.target.value === 'done' ? 100 : task.progress })} style={selectStyle}>{['backlog', 'in_progress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select></Field>
-          <Field label="Assignee"><select value={task.assignee} onChange={e => onUpdate({ assignee: e.target.value })} style={selectStyle}>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
+          <Field label="Status"><PlatformDropdown ariaLabel="Status" value={task.status} onChange={value => onUpdate({ status: value as TaskStatus, progress: value === 'done' ? 100 : task.progress })} options={['backlog', 'in_progress', 'review', 'done'].map(s => ({ value: s, label: STATUS_META[s]?.label || s }))} /></Field>
+          <Field label="Assignee"><PlatformDropdown ariaLabel="Assignee" value={task.assignee} onChange={value => onUpdate({ assignee: value })} searchable options={members.map(member => ({ value: member.id, label: member.name }))} /></Field>
           <TaskTalentPanel taskId={task.id} taskTitle={task.name} projectId={currentProjectId ?? ''} />
-          <Field label="Priority"><select value={task.priority} onChange={e => onUpdate({ priority: e.target.value as TaskPriority })} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
+          <Field label="Priority"><PlatformDropdown ariaLabel="Priority" value={task.priority} onChange={value => onUpdate({ priority: value as TaskPriority })} options={Object.entries(PRIORITY_META).map(([value, option]) => ({ value, label: option.label }))} /></Field>
           {dueDateField}
           {recurrenceField}
           {sectionField}
@@ -516,10 +513,10 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
         {tagsSection}
         {parentTaskField}
         {subtasksSection}
-        <Field label="Status"><select value={task.status} onChange={e => onUpdate({ status: e.target.value as TaskStatus, progress: e.target.value === 'done' ? 100 : task.progress })} style={selectStyle}>{['backlog', 'in_progress', 'review', 'done'].map(s => <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>)}</select></Field>
-        <Field label="Assignee"><select value={task.assignee} onChange={e => onUpdate({ assignee: e.target.value })} style={selectStyle}>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field>
+        <Field label="Status"><PlatformDropdown ariaLabel="Status" value={task.status} onChange={value => onUpdate({ status: value as TaskStatus, progress: value === 'done' ? 100 : task.progress })} options={['backlog', 'in_progress', 'review', 'done'].map(s => ({ value: s, label: STATUS_META[s]?.label || s }))} /></Field>
+        <Field label="Assignee"><PlatformDropdown ariaLabel="Assignee" value={task.assignee} onChange={value => onUpdate({ assignee: value })} searchable options={members.map(member => ({ value: member.id, label: member.name }))} /></Field>
         <TaskTalentPanel taskId={task.id} taskTitle={task.name} projectId={currentProjectId ?? ''} />
-        <Field label="Priority"><select value={task.priority} onChange={e => onUpdate({ priority: e.target.value as TaskPriority })} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
+        <Field label="Priority"><PlatformDropdown ariaLabel="Priority" value={task.priority} onChange={value => onUpdate({ priority: value as TaskPriority })} options={Object.entries(PRIORITY_META).map(([value, option]) => ({ value, label: option.label }))} /></Field>
         {dueDateField}
         {recurrenceField}
         {sectionField}

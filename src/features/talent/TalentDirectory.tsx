@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { BriefcaseBusiness, MapPin, Search, SlidersHorizontal } from 'lucide-react';
 
 import { routes } from '@/shared/navigation/routes';
+import { PlatformDropdown } from '@/components/ui/platform-dropdown';
 import { formatRate, humanizeTalentEnum } from './format';
 import type {
   ProfessionalDirectoryResponse,
@@ -109,16 +110,16 @@ export function TalentDirectory() {
           <input value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Search name, title, role or skill" />
         </label>
         <div className={styles.filterGrid}>
-          <select aria-label="Role" value={filters.roleId} onChange={(event) => setFilters({ ...filters, roleId: event.target.value })}><option value="">All roles</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
-          <select aria-label="Skill" value={filters.skillId} onChange={(event) => setFilters({ ...filters, skillId: event.target.value })}><option value="">All skills</option>{skills.map((skill) => <option key={skill.id} value={skill.id}>{skill.name}</option>)}</select>
-          <select aria-label="Availability" value={filters.availability} onChange={(event) => setFilters({ ...filters, availability: event.target.value })}><option value="">Any availability</option><option value="AVAILABLE_NOW">Available now</option><option value="AVAILABLE_SOON">Available soon</option><option value="LIMITED">Limited</option><option value="UNAVAILABLE">Unavailable</option></select>
-          <select aria-label="Remote preference" value={filters.remotePreference} onChange={(event) => setFilters({ ...filters, remotePreference: event.target.value })}><option value="">Any work style</option><option value="REMOTE_ONLY">Remote only</option><option value="HYBRID">Hybrid</option><option value="ONSITE">On-site</option><option value="FLEXIBLE">Flexible</option></select>
+          <PlatformDropdown ariaLabel="Role" value={filters.roleId} onChange={(value) => setFilters({ ...filters, roleId: value })} searchable placeholder="All roles" options={[{ value: '', label: 'All roles' }, ...roles.map((role) => ({ value: role.id, label: role.name }))]} />
+          <PlatformDropdown ariaLabel="Skill" value={filters.skillId} onChange={(value) => setFilters({ ...filters, skillId: value })} searchable placeholder="All skills" options={[{ value: '', label: 'All skills' }, ...skills.map((skill) => ({ value: skill.id, label: skill.name }))]} />
+          <PlatformDropdown ariaLabel="Availability" value={filters.availability} onChange={(value) => setFilters({ ...filters, availability: value })} placeholder="Any availability" options={[{ value: '', label: 'Any availability' }, { value: 'AVAILABLE_NOW', label: 'Available now' }, { value: 'AVAILABLE_SOON', label: 'Available soon' }, { value: 'LIMITED', label: 'Limited' }, { value: 'UNAVAILABLE', label: 'Unavailable' }]} />
+          <PlatformDropdown ariaLabel="Remote preference" value={filters.remotePreference} onChange={(value) => setFilters({ ...filters, remotePreference: value })} placeholder="Any work style" options={[{ value: '', label: 'Any work style' }, { value: 'REMOTE_ONLY', label: 'Remote only' }, { value: 'HYBRID', label: 'Hybrid' }, { value: 'ONSITE', label: 'On-site' }, { value: 'FLEXIBLE', label: 'Flexible' }]} />
           <input aria-label="Location" value={filters.location} onChange={(event) => setFilters({ ...filters, location: event.target.value })} placeholder="Location" />
           <input aria-label="Timezone" value={filters.timezone} onChange={(event) => setFilters({ ...filters, timezone: event.target.value })} placeholder="Timezone" />
-          <select aria-label="Rate type" value={filters.rateType} onChange={(event) => setFilters({ ...filters, rateType: event.target.value })}><option value="">Any rate type</option><option value="HOURLY">Hourly</option><option value="FIXED">Fixed</option><option value="NEGOTIABLE">Negotiable</option></select>
+          <PlatformDropdown ariaLabel="Rate type" value={filters.rateType} onChange={(value) => setFilters({ ...filters, rateType: value })} placeholder="Any rate type" options={[{ value: '', label: 'Any rate type' }, { value: 'HOURLY', label: 'Hourly' }, { value: 'FIXED', label: 'Fixed' }, { value: 'NEGOTIABLE', label: 'Negotiable' }]} />
           <input aria-label="Minimum rate" type="number" min="0" value={filters.minimumRate} onChange={(event) => setFilters({ ...filters, minimumRate: event.target.value })} placeholder="Minimum rate" />
           <input aria-label="Maximum rate" type="number" min="0" value={filters.maximumRate} onChange={(event) => setFilters({ ...filters, maximumRate: event.target.value })} placeholder="Maximum rate" />
-          <select aria-label="Sort professionals" value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value as ProfessionalDirectorySort })}><option value="RELEVANCE">Relevance</option><option value="NEWEST">Newest</option><option value="RATE_LOW_TO_HIGH">Rate: low to high</option><option value="RATE_HIGH_TO_LOW">Rate: high to low</option></select>
+          <PlatformDropdown ariaLabel="Sort professionals" value={filters.sort} onChange={(value) => setFilters({ ...filters, sort: value as ProfessionalDirectorySort })} options={[{ value: 'RELEVANCE', label: 'Relevance' }, { value: 'NEWEST', label: 'Newest' }, { value: 'RATE_LOW_TO_HIGH', label: 'Rate: low to high' }, { value: 'RATE_HIGH_TO_LOW', label: 'Rate: high to low' }]} />
         </div>
         <div className={styles.filterActions}><button className={styles.primaryButton} type="submit"><SlidersHorizontal size={16} />Apply filters</button><button className={styles.textButton} type="button" onClick={clearFilters}>Clear</button></div>
       </form>

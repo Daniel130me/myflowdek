@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle,
   Briefcase,
   CheckCircle,
   Clock,
+  ChevronDown,
   DollarSign,
   Globe,
   Loader2,
@@ -28,6 +29,68 @@ interface PublishOpportunityModalProps {
   projectId: string;
   isOpen: boolean;
   onClose: () => void;
+}
+
+function OptionDropdown({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+  compact = false,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+  ariaLabel: string;
+  compact?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const selected = options.find((option) => option.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!dropdownRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [open]);
+
+  return (
+    <div ref={dropdownRef} className={`${styles.optionMenuWrap} ${compact ? styles.optionMenuCompact : ''}`}>
+      <button
+        type="button"
+        className={styles.skillMenuTrigger}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        onClick={() => setOpen((isOpen) => !isOpen)}
+      >
+        <span>{selected?.label ?? 'Select an option'}</span>
+        <ChevronDown className={styles.skillMenuChevron} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className={styles.skillMenu} role="listbox" aria-label={ariaLabel}>
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="option"
+              aria-selected={option.value === value}
+              className={styles.skillMenuOption}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function PublishOpportunityModal({
@@ -59,6 +122,9 @@ export function PublishOpportunityModal({
   >([]);
 
   const [availableSkills, setAvailableSkills] = useState<SkillOption[]>([]);
+  const [skillMenuOpen, setSkillMenuOpen] = useState(false);
+  const [skillSearch, setSkillSearch] = useState('');
+  const skillMenuRef = useRef<HTMLDivElement>(null);
 
   // Load skills taxonomy
   useEffect(() => {
@@ -116,6 +182,17 @@ export function PublishOpportunityModal({
   useEffect(() => {
     loadOpportunity();
   }, [loadOpportunity]);
+
+  useEffect(() => {
+    if (!skillMenuOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!skillMenuRef.current?.contains(event.target as Node)) {
+        setSkillMenuOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [skillMenuOpen]);
 
   const handleSaveDraft = async () => {
     setSaving(true);
@@ -326,15 +403,16 @@ export function PublishOpportunityModal({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className={styles.fieldLabel}>Budget Type</label>
-                <select
+                <OptionDropdown
                   value={budgetType}
-                  onChange={(e) => setBudgetType(e.target.value as RateType)}
-                  className={styles.selectInput}
-                >
-                  <option value="FIXED">Fixed Price</option>
-                  <option value="HOURLY">Hourly Rate</option>
-                  <option value="NEGOTIABLE">Negotiable</option>
-                </select>
+                  onChange={(value) => setBudgetType(value as RateType)}
+                  ariaLabel="Budget type"
+                  options={[
+                    { value: 'FIXED', label: 'Fixed Price' },
+                    { value: 'HOURLY', label: 'Hourly Rate' },
+                    { value: 'NEGOTIABLE', label: 'Negotiable' },
+                  ]}
+                />
               </div>
               <div>
                 <label className={styles.fieldLabel}>Min Budget ({currency})</label>
@@ -388,30 +466,57 @@ export function PublishOpportunityModal({
                 <label className={styles.fieldLabel}>Required Skills & Proficiencies</label>
               </div>
 
-              {/* Add skill selector */}
-              <div className="flex gap-2 mb-3">
-                <select
+              {/* Add skill menu */}
+              <div ref={skillMenuRef} className={styles.skillMenuWrap}>
+                <button
                   id="add-opportunity-skill"
-                  className={styles.selectInput}
-                  defaultValue=""
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      handleAddSkill(e.target.value);
-                      e.target.value = '';
-                    }
+                  type="button"
+                  className={styles.skillMenuTrigger}
+                  aria-haspopup="listbox"
+                  aria-expanded={skillMenuOpen}
+                  onClick={() => {
+                    setSkillMenuOpen((open) => !open);
+                    setSkillSearch('');
                   }}
                 >
-                  <option value="" disabled>
-                    + Add required skill...
-                  </option>
-                  {availableSkills
-                    .filter((s) => !requiredSkills.some((r) => r.skillId === s.id))
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.category})
-                      </option>
-                    ))}
-                </select>
+                  <span>+ Add required skill</span>
+                  <ChevronDown className={styles.skillMenuChevron} aria-hidden="true" />
+                </button>
+                {skillMenuOpen && (
+                  <div className={styles.skillMenu} role="listbox" aria-label="Required skills">
+                    <input
+                      type="search"
+                      value={skillSearch}
+                      onChange={(event) => setSkillSearch(event.target.value)}
+                      placeholder="Search skills..."
+                      aria-label="Search required skills"
+                      className={styles.skillSearch}
+                    />
+                    {availableSkills
+                      .filter((skill) => !requiredSkills.some((required) => required.skillId === skill.id))
+                      .filter((skill) => `${skill.name} ${skill.category}`.toLowerCase().includes(skillSearch.toLowerCase()))
+                      .map((skill) => (
+                        <button
+                          key={skill.id}
+                          type="button"
+                          role="option"
+                          className={styles.skillMenuOption}
+                          onClick={() => {
+                            handleAddSkill(skill.id);
+                            setSkillMenuOpen(false);
+                          }}
+                        >
+                          <span>{skill.name}</span>
+                          <span className={styles.skillCategory}>{skill.category.replaceAll('_', ' ')}</span>
+                        </button>
+                      ))}
+                    {availableSkills
+                      .filter((skill) => !requiredSkills.some((required) => required.skillId === skill.id))
+                      .filter((skill) => `${skill.name} ${skill.category}`.toLowerCase().includes(skillSearch.toLowerCase())).length === 0 && (
+                      <span className={styles.skillMenuEmpty}>{skillSearch ? 'No matching skills' : 'All available skills added'}</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Selected skills list */}
@@ -426,24 +531,26 @@ export function PublishOpportunityModal({
                       <span className="font-semibold text-xs flex-1">
                         {skillObj?.name ?? 'Skill'}
                       </span>
-                      <select
+                      <OptionDropdown
                         value={req.minimumProficiency}
-                        onChange={(e) =>
+                        onChange={(value) =>
                           setRequiredSkills((prev) =>
-                            prev.map((s) =>
-                              s.skillId === req.skillId
-                                ? { ...s, minimumProficiency: e.target.value as ProficiencyLevel }
-                                : s,
+                            prev.map((skill) =>
+                              skill.skillId === req.skillId
+                                ? { ...skill, minimumProficiency: value as ProficiencyLevel }
+                                : skill,
                             ),
                           )
                         }
-                        className="text-xs p-1 border rounded bg-background"
-                      >
-                        <option value="BEGINNER">Beginner</option>
-                        <option value="INTERMEDIATE">Intermediate</option>
-                        <option value="ADVANCED">Advanced</option>
-                        <option value="EXPERT">Expert</option>
-                      </select>
+                        ariaLabel={`Minimum proficiency for ${skillObj?.name ?? 'skill'}`}
+                        compact
+                        options={[
+                          { value: 'BEGINNER', label: 'Beginner' },
+                          { value: 'INTERMEDIATE', label: 'Intermediate' },
+                          { value: 'ADVANCED', label: 'Advanced' },
+                          { value: 'EXPERT', label: 'Expert' },
+                        ]}
+                      />
                       <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
                         <input
                           type="checkbox"
