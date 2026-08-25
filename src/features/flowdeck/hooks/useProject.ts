@@ -37,12 +37,22 @@ function mapProject(api: ApiProject): Project {
  */
 export function useProject(projectId: string | null) {
   const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState(false);
+  // A hard refresh starts with an empty client store. Mark the request as
+  // loading immediately so pages do not call notFound() before the effect's
+  // first API request has started.
+  const [loading, setLoading] = useState(Boolean(projectId));
+  const [requestedProjectId, setRequestedProjectId] = useState<string | null>(projectId);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId) {
+      setProject(null);
+      setRequestedProjectId(null);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
+    setRequestedProjectId(projectId);
     setLoading(true);
     setError(null);
     (async () => {
@@ -64,5 +74,12 @@ export function useProject(projectId: string | null) {
     return () => { cancelled = true; };
   }, [projectId]);
 
-  return { project, loading, error };
+  // During a project-to-project route change, the effect has not run yet but
+  // the requested ID has changed. Keep the page in its loading state for that
+  // render rather than briefly treating the new project as missing.
+  return {
+    project,
+    loading: Boolean(projectId) && (loading || requestedProjectId !== projectId),
+    error,
+  };
 }

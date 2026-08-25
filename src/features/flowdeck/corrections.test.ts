@@ -39,6 +39,17 @@ test('new task opens inline without navigating away from the current project pag
   assert.ok(layout.includes('<NewTaskModal'));
   assert.ok(commandPalette.includes('state.setShowNewTask(true)'));
   assert.ok(!commandPalette.includes('router.replace(routes.newTask(pid))'));
+
+  const modal = readFileSync(join(process.cwd(), 'src/features/flowdeck/components/modals/NewTaskModal.tsx'), 'utf8');
+  assert.ok(modal.includes('Cancel'));
+});
+
+test('project overview waits for the first project request before notFound', () => {
+  const hook = readFileSync(join(process.cwd(), 'src/features/flowdeck/hooks/useProject.ts'), 'utf8');
+
+  assert.ok(hook.includes('useState(Boolean(projectId))'));
+  assert.ok(hook.includes('requestedProjectId !== projectId'));
+  assert.ok(hook.includes('setLoading(true)'));
 });
 
 // 3. New task navigation does not guess a project
