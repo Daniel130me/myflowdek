@@ -70,3 +70,11 @@ test('getRouteForView with project ID generates project-scoped routes', () => {
   assert.strictEqual(getRouteForView('tasks', 'p1'), '/projects/p1/tasks');
   assert.strictEqual(getRouteForView('sheet', 'p1'), '/projects/p1/sheet');
 });
+
+test('timeline refresh waits for project-store hydration and fetches its tasks', () => {
+  const layout = readFileSync(join(process.cwd(), 'src/app/(product)/projects/[projectId]/layout.tsx'), 'utf8');
+  const timeline = readFileSync(join(process.cwd(), 'src/app/(product)/projects/[projectId]/timeline/page.tsx'), 'utf8');
+
+  assert.ok(layout.includes('!projectExistsInStore && (loading || project)'));
+  assert.ok(timeline.includes('useProjectTasks(projectId)'));
+});

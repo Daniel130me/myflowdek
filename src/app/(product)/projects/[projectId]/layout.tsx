@@ -64,10 +64,11 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
     notFound();
   }
 
-  // While the API is still loading and we don't have a local copy, show a
-  // spinner instead of a 404 — direct navigation from external links lands
-  // here before the project list has been fetched.
-  if (!projectExistsInStore && loading) {
+  // Keep child routes suspended until the successful API result has also been
+  // upserted into the shared store. The upsert happens in an effect, so there
+  // is otherwise one render where a child can mistake the missing store entry
+  // for a real 404 during a hard refresh.
+  if (!projectExistsInStore && (loading || project)) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF', fontFamily: FF }}>
         Loading project…

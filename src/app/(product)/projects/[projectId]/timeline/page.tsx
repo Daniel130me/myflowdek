@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter, useParams, notFound } from 'next/navigation';
 import { TimelineView } from '@/features/flowdeck/components/views';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
 
@@ -12,6 +13,10 @@ export default function ProjectTimelinePage() {
   const params = useParams();
   const projectId = getSingleParam(params.projectId);
   const state = useFlowDeck();
+
+  // Direct timeline URLs do not pass through the task list or board, so they
+  // must hydrate their own task data before rendering the timeline.
+  useProjectTasks(projectId);
 
   if (!projectId) {
     notFound();
