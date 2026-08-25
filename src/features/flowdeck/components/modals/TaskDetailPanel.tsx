@@ -402,7 +402,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
   if (isMobile) {
     return (
       <>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', background: '#FFFFFF' }}>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', flexDirection: 'column', background: '#FFFFFF' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: `1px solid ${COLORS.line}`, background: '#FFFFFF', flexShrink: 0 }}>
           <button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.ink, padding: 6, borderRadius: 10, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ArrowLeft size={20} /></button>
           <span style={{ fontSize: 15, fontWeight: 700, fontFamily: FF, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Task details</span>
@@ -491,7 +491,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
   /* Desktop: slide-over panel */
   return (
     <>
-    <div style={{ position: 'fixed', inset: 0, zIndex: 40, display: 'flex', justifyContent: 'flex-end' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', justifyContent: 'flex-end' }}>
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)' }} />
       <div style={{ position: 'relative', width: 'min(440px, 100vw)', background: '#FFFFFF', height: '100%', padding: 22, overflowY: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.12)', borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>

@@ -4,7 +4,6 @@ import React from 'react';
 import { useRouter, useParams, notFound } from 'next/navigation';
 import { DashboardView } from '@/features/flowdeck/components/views';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
-import { useProject } from '@/features/flowdeck/hooks/useProject';
 import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { useProjectComments } from '@/features/flowdeck/hooks/useProjectComments';
 import { useProjectFiles } from '@/features/flowdeck/hooks/useProjectFiles';
@@ -24,10 +23,11 @@ export default function ProjectOverviewPage() {
   const params = useParams();
   const projectId = getSingleParam(params.projectId);
   const state = useFlowDeck();
-  const { project: apiProject, loading } = useProject(projectId);
+  const projectFromStore = projectId ? state.projects[projectId] : undefined;
 
   // Fetch real tasks, comments, files, members, and status updates from the
-  // API and sync into the store.
+  // API and sync into the store. The project itself is hydrated once at the
+  // project layout level so this page does not make a redundant request.
   useProjectTasks(projectId);
   useProjectComments(projectId);
   useProjectFiles(projectId);
@@ -38,8 +38,9 @@ export default function ProjectOverviewPage() {
     notFound();
   }
 
-  // While loading, show a placeholder.
-  if (loading && !apiProject) {
+  // If the project has not reached the store yet, keep the page in a brief
+  // loading state instead of fetching it again.
+  if (!projectFromStore) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF' }}>
         Loading project…
@@ -47,13 +48,7 @@ export default function ProjectOverviewPage() {
     );
   }
 
-  // Fall back to the mock store project if the API hasn't loaded yet (keeps
-  // the UI responsive during the transition to fully real data).
-  const storedProject = projectId ? state.projects[projectId] : undefined;
-  const project = storedProject ?? apiProject;
-  if (!project) {
-    notFound();
-  }
+  const project = projectFromStore;
 
   const tasks = state.tasksByProject[projectId!] ?? [];
   const files = state.filesByProject[projectId!] ?? [];

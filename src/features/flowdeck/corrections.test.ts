@@ -52,6 +52,33 @@ test('project overview waits for the first project request before notFound', () 
   assert.ok(hook.includes('setLoading(true)'));
 });
 
+test('project overview page does not re-fetch the project already loaded by the layout', () => {
+  const overview = readFileSync(join(process.cwd(), 'src/app/(product)/projects/[projectId]/overview/page.tsx'), 'utf8');
+
+  assert.ok(!overview.includes('useProject(projectId)'));
+  assert.ok(overview.includes('state.projects[projectId]'));
+});
+
+test('projects portfolio page reads the workspace list from the hook instead of the global store', () => {
+  const page = readFileSync(join(process.cwd(), 'src/app/(product)/projects/page.tsx'), 'utf8');
+
+  assert.ok(page.includes('projects: workspaceProjects'));
+  assert.ok(!page.includes('const projects = state.projects'));
+});
+
+test('task detail route keeps loading until the task fetch resolves and stays above the bottom nav', () => {
+  const page = readFileSync(join(process.cwd(), 'src/app/(product)/projects/[projectId]/tasks/[taskId]/page.tsx'), 'utf8');
+  const panel = readFileSync(join(process.cwd(), 'src/features/flowdeck/components/modals/TaskDetailPanel.tsx'), 'utf8');
+  const hook = readFileSync(join(process.cwd(), 'src/features/flowdeck/hooks/useTasks.ts'), 'utf8');
+
+  assert.ok(page.includes('tasksLoading'));
+  assert.ok(page.includes('Loading task…'));
+  assert.ok(page.includes('!tasksLoading && !taskDataUnavailable'));
+  assert.ok(hook.includes('useState(Boolean(projectId))'));
+  assert.ok(hook.includes('requestedProjectId !== projectId'));
+  assert.ok(panel.includes('zIndex: 70'));
+});
+
 // 3. New task navigation does not guess a project
 test('New task navigation without project ID defaults to projects page', () => {
   // Simulating the logic in CommandPalette onNewTask

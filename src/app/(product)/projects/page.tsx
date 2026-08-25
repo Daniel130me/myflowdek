@@ -28,8 +28,9 @@ export default function ProjectsPortfolioPage() {
     setFavorite,
     archiveProject,
     restoreProject,
+    projects: workspaceProjects,
   } = useProjects(wsHook.selectedWorkspaceId);
-  const projects = state.projects;
+  const projects = workspaceProjects;
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
 
