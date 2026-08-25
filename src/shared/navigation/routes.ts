@@ -60,6 +60,16 @@ export const routes = {
   file: (projectId: string, fileId: string) => `/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}`,
 };
 
+export function replaceProjectInPath(pathname: string, projectId: string): string {
+  const parts = pathname.split('/');
+  if (parts[1] !== 'projects' || parts.length < 3 || !parts[2]) {
+    return routes.projectOverview(projectId);
+  }
+
+  parts[2] = encodeURIComponent(projectId);
+  return parts.join('/');
+}
+
 export function getRouteForView(viewId: string, projectId?: string): string {
   switch (viewId) {
     case 'projects':

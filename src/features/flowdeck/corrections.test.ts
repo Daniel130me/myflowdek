@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { migrateState } from '../../data/local-storage/storageAdapter';
-import { routes, getRouteForView } from '../../shared/navigation/routes';
+import { routes, getRouteForView, replaceProjectInPath } from '../../shared/navigation/routes';
 
 // 1. Legacy task migration enforces collection projectId
 test('Legacy task migration enforces collection projectId', () => {
@@ -23,6 +23,12 @@ test('getRouteForView for dashboard without project does not guess p1', () => {
 
 test('routes.task generates correct path with pId and taskId', () => {
   assert.strictEqual(routes.task('p-alpha', 't-omega'), '/projects/p-alpha/tasks/t-omega');
+});
+
+test('project switching preserves the current project subroute', () => {
+  assert.strictEqual(replaceProjectInPath('/projects/old-project/board', 'new-project'), '/projects/new-project/board');
+  assert.strictEqual(replaceProjectInPath('/projects/old-project/tasks/task-1', 'new-project'), '/projects/new-project/tasks/task-1');
+  assert.strictEqual(replaceProjectInPath('/projects/old-project', 'new-project'), '/projects/new-project');
 });
 
 test('new task opens inline without navigating away from the current project page', () => {

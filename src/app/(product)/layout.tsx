@@ -17,7 +17,7 @@ import {
 import { BulkActionBar } from '@/features/flowdeck/components/ui';
 import { NewTaskModal } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
-import { routes, getRouteForView, getViewFromPathname } from '@/shared/navigation/routes';
+import { routes, getRouteForView, getViewFromPathname, replaceProjectInPath } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
 import type { TopBarHandle } from '@/features/flowdeck/components/layout/TopBar';
 import { Toaster } from '@/components/ui/sonner';
@@ -135,7 +135,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
   const handleOpenProject = (projId: string) => {
     state.openProject(projId);
     state.setProjectMenuOpen(false);
-    router.push(routes.projectOverview(projId));
+    router.push(replaceProjectInPath(pathname, projId));
   };
 
   const bottomNavHeight = isMobile ? 64 : 0;
