@@ -15,6 +15,7 @@ import {
   Sidebar, MobileSidebar, TopBar, MobileSearchRow, BottomNav, MoreMenu,
 } from '@/features/flowdeck/components/layout';
 import { BulkActionBar } from '@/features/flowdeck/components/ui';
+import { NewTaskModal } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { routes, getRouteForView, getViewFromPathname } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
@@ -104,7 +105,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
     onUndo: gridActions.onUndo,
     onRedo: gridActions.onRedo,
     onShowNewTask: () => {
-      if (routeProjectId) router.push(routes.newTask(routeProjectId));
+      if (routeProjectId) state.setShowNewTask(true);
     },
     onSearchFocus: () => topBarRef.current?.focusSearch(),
     onShowShortcuts: () => router.push(routes.shortcuts()),
@@ -216,7 +217,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
           onToggleProjectMenu={() => state.setProjectMenuOpen(o => !o)}
           onOpenProject={handleOpenProject}
           onShowNewTask={() => {
-            if (routeProjectId) router.push(routes.newTask(routeProjectId));
+            if (routeProjectId) state.setShowNewTask(true);
           }}
           onShowNewProject={() => router.push(routes.newProject())}
           onSearchChange={state.setSearchQuery}
@@ -244,6 +245,19 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
         }}>
           {children}
         </div>
+        {state.showNewTask && routeProjectId && (
+          <NewTaskModal
+            projectStart={state.projects[routeProjectId]?.start || ''}
+            tasks={state.tasksByProject[routeProjectId] || []}
+            tags={state.tagsByProject[routeProjectId] || []}
+            members={routeProjectMembers}
+            onClose={() => state.setShowNewTask(false)}
+            onCreate={(input) => {
+              state.addTask(routeProjectId, input);
+              state.setShowNewTask(false);
+            }}
+          />
+        )}
         {modal}
 
         {isMobile && (

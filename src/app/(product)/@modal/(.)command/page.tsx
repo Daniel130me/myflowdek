@@ -39,7 +39,11 @@ export default function InterceptedCommandPalettePage() {
       }}
       onNewTask={pid => {
         if (pid) {
-          router.replace(routes.newTask(pid));
+          // Keep the current project mounted when launching the task form from
+          // the command palette; the shell renders this modal in memory.
+          state.openProject(pid);
+          state.setShowNewTask(true);
+          close();
         } else {
           router.replace(routes.projects());
         }

@@ -1,5 +1,7 @@
 import assert from 'node:assert';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { migrateState } from '../../data/local-storage/storageAdapter';
 import { routes, getRouteForView } from '../../shared/navigation/routes';
 
@@ -21,6 +23,22 @@ test('getRouteForView for dashboard without project does not guess p1', () => {
 
 test('routes.task generates correct path with pId and taskId', () => {
   assert.strictEqual(routes.task('p-alpha', 't-omega'), '/projects/p-alpha/tasks/t-omega');
+});
+
+test('new task opens inline without navigating away from the current project page', () => {
+  const layout = readFileSync(join(process.cwd(), 'src/app/(product)/layout.tsx'), 'utf8');
+  const commandPalette = readFileSync(join(process.cwd(), 'src/app/(product)/@modal/(.)command/page.tsx'), 'utf8');
+  const newTaskHandlers = layout
+    .split('onShowNewTask')
+    .slice(1)
+    .map((section) => section.slice(0, section.indexOf('onSearchFocus') >= 0 ? section.indexOf('onSearchFocus') : 450));
+
+  assert.ok(newTaskHandlers.length >= 2, 'keyboard and top-bar handlers should both be present');
+  assert.ok(newTaskHandlers.every((handler) => handler.includes('setShowNewTask(true)')));
+  assert.ok(!newTaskHandlers.some((handler) => handler.includes('routes.newTask')));
+  assert.ok(layout.includes('<NewTaskModal'));
+  assert.ok(commandPalette.includes('state.setShowNewTask(true)'));
+  assert.ok(!commandPalette.includes('router.replace(routes.newTask(pid))'));
 });
 
 // 3. New task navigation does not guess a project
