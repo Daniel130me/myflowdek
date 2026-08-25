@@ -81,11 +81,16 @@ function mapTask(api: ApiTask): Task {
  */
 export function useTasks(projectId: string | null) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(false);
+  // A direct task URL starts with an empty store. Mark the request as loading
+  // immediately so consumers do not interpret that first empty render as a
+  // confirmed missing task before the effect can fetch the project tasks.
+  const [loading, setLoading] = useState(Boolean(projectId));
+  const [requestedProjectId, setRequestedProjectId] = useState<string | null>(projectId);
   const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
     if (!projectId) return;
+    setRequestedProjectId(projectId);
     setLoading(true);
     setError(null);
     try {
@@ -121,5 +126,11 @@ export function useTasks(projectId: string | null) {
     [projectId],
   );
 
-  return { tasks, loading, error, refetch, createTask };
+  return {
+    tasks,
+    loading: Boolean(projectId) && (loading || requestedProjectId !== projectId),
+    error,
+    refetch,
+    createTask,
+  };
 }

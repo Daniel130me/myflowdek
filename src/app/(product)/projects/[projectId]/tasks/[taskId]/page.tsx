@@ -22,7 +22,7 @@ export default function TaskDetailRoutePage() {
   const fileMutations = useConnectedFileMutations(projectId);
 
   // Fetch real tasks + comments from the API and sync into the store.
-  useProjectTasks(projectId);
+  const { loading: tasksLoading } = useProjectTasks(projectId);
   useProjectComments(projectId);
   // Real project members for the assignee <select> in the detail panel.
   const { members } = useProjectMembers(projectId);
@@ -52,9 +52,18 @@ export default function TaskDetailRoutePage() {
     return () => { cancelled = true; };
   }, [taskId]);
 
+  const taskDataUnavailable = !projectId || !taskId || !state.tasksByProject[projectId];
   const task = getTaskForProject(state.tasksByProject, projectId, taskId);
-  if (!task) {
+  if (!task && !tasksLoading && !taskDataUnavailable) {
     notFound();
+  }
+
+  if (!task) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF' }}>
+        Loading task…
+      </div>
+    );
   }
 
   const projectTasks = state.tasksByProject[projectId] ?? [];
