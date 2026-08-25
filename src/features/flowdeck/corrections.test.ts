@@ -85,6 +85,14 @@ test('task detail route keeps loading until the task fetch resolves and stays ab
   assert.ok(panel.includes('zIndex: 70'));
 });
 
+test('mobile task cards open when clicking anywhere on the card', () => {
+  const taskList = readFileSync(join(process.cwd(), 'src/features/flowdeck/components/views/TaskListView.tsx'), 'utf8');
+
+  assert.ok(taskList.includes('role="button"'));
+  assert.ok(taskList.includes('onClick={() => onOpenTask(t.id)}'));
+  assert.ok(taskList.includes("e.key === 'Enter' || e.key === ' '"));
+});
+
 // 3. New task navigation does not guess a project
 test('New task navigation without project ID defaults to projects page', () => {
   // Simulating the logic in CommandPalette onNewTask

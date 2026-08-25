@@ -314,7 +314,18 @@ export function TaskListView({ tasks, tags = [], projects, currentProjectId, all
         sections={sections}
         onSetTaskSection={onSetTaskSection}
       >
-        <div style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: 12, padding: '14px 16px', cursor: 'pointer' }}>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onOpenTask(t.id)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onOpenTask(t.id);
+            }
+          }}
+          style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: 12, padding: '14px 16px', cursor: 'pointer' }}
+        >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: t.description ? 6 : 8 }}>
             <TaskCheckbox done={isDone} onToggle={e => { e.stopPropagation(); onToggleComplete(t.id); }} size={20} />
             <div style={{ flex: 1, minWidth: 0 }}>
