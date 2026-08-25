@@ -52,7 +52,7 @@ export function KeyboardShortcutsModal({ open, onClose }: { open: boolean; onClo
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
         <div ref={overlayRef} onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)' }} />
-        <div style={{ position: 'relative', background: '#FFFFFF', borderRadius: '20px 20px 0 0', padding: '8px 20px 32px', maxHeight: '85vh', overflowY: 'auto' }}>
+        <div style={{ position: 'relative', background: '#FFFFFF', borderRadius: '20px 20px 0 0', padding: '8px 20px 90px', maxHeight: '85vh', overflowY: 'auto' }}>
           <div style={{ width: 36, height: 4, borderRadius: 2, background: COLORS.line, margin: '4px auto 16px' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <h3 style={{ fontFamily: FF, fontSize: 18, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>

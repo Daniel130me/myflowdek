@@ -14,7 +14,7 @@ export function BottomNav({ activeView, onNav }: { activeView: string; onNav: (i
       position: 'fixed', bottom: 0, left: 0, right: 0,
       height: BOTTOM_NAV_HEIGHT, background: layout.topbar.bg, borderTop: `1px solid ${layout.topbar.border}`,
       display: 'flex', alignItems: 'center', justifyContent: 'space-around',
-      zIndex: 50, paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      zIndex: 40, paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       boxShadow: '0 -1px 3px rgba(0,0,0,0.04)',
     }}>
       {BOTTOM_NAV.map(item => {

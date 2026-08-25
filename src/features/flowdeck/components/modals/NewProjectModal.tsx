@@ -193,7 +193,7 @@ export function NewProjectModal({
       <>
       <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
         <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)' }} />
-        <div style={{ position: 'relative', background: '#FFFFFF', borderRadius: '20px 20px 0 0', padding: '8px 20px 32px', maxHeight: '92vh', overflowY: 'auto' }}>
+        <div style={{ position: 'relative', background: '#FFFFFF', borderRadius: '20px 20px 0 0', padding: '8px 20px 90px', maxHeight: '92vh', overflowY: 'auto' }}>
           <div style={{ width: 36, height: 4, borderRadius: 2, background: COLORS.line, margin: '4px auto 16px' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <h3 style={{ fontFamily: FF, fontSize: 18, margin: 0 }}>New project</h3>
@@ -214,7 +214,7 @@ export function NewProjectModal({
           ) : (
             <>
               {templateContent}
-              <button onClick={submitTemplate} disabled={!tplValid || submitting} aria-busy={submitting} style={{ marginTop: 6, marginBottom: 80, width: '100%', background: tplValid && !submitting ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 12, padding: '14px 0', fontSize: 15, fontWeight: 700, cursor: tplValid && !submitting ? 'pointer' : 'not-allowed', fontFamily: FF, boxShadow: tplValid && !submitting ? '0 1px 3px rgba(254,128,41,0.2)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <button onClick={submitTemplate} disabled={!tplValid || submitting} aria-busy={submitting} style={{ marginTop: 6, width: '100%', background: tplValid && !submitting ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 12, padding: '14px 0', fontSize: 15, fontWeight: 700, cursor: tplValid && !submitting ? 'pointer' : 'not-allowed', fontFamily: FF, boxShadow: tplValid && !submitting ? '0 1px 3px rgba(254,128,41,0.2)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 {submitting && <Loader2 size={16} className="animate-spin" />}
                 {submitting ? 'Creating project...' : 'Create from template'}
               </button>
@@ -243,12 +243,12 @@ export function NewProjectModal({
         {mode === 'blank' ? (
           <>
             {formContent}
-            <button onClick={submitBlank} disabled={!valid || submitting} aria-busy={submitting} style={{ marginTop: 6, marginBottom: 80, width: '100%', background: valid && !submitting ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 10, padding: '11px 0', fontSize: 13.5, fontWeight: 700, cursor: valid && !submitting ? 'pointer' : 'not-allowed', fontFamily: FF, boxShadow: valid && !submitting ? '0 1px 3px rgba(254,128,41,0.2)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><>{submitting && <Loader2 size={15} className="animate-spin" />}{submitting ? 'Creating project...' : 'Create project'}</></button>
+            <button onClick={submitBlank} disabled={!valid || submitting} aria-busy={submitting} style={{ marginTop: 6, width: '100%', background: valid && !submitting ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 10, padding: '11px 0', fontSize: 13.5, fontWeight: 700, cursor: valid && !submitting ? 'pointer' : 'not-allowed', fontFamily: FF, boxShadow: valid && !submitting ? '0 1px 3px rgba(254,128,41,0.2)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><>{submitting && <Loader2 size={15} className="animate-spin" />}{submitting ? 'Creating project...' : 'Create project'}</></button>
           </>
         ) : (
           <>
             {templateContent}
-            <button onClick={submitTemplate} disabled={!tplValid || submitting} aria-busy={submitting} style={{ marginTop: 6, marginBottom: 80, width: '100%', background: tplValid && !submitting ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 10, padding: '11px 0', fontSize: 13.5, fontWeight: 700, cursor: tplValid && !submitting ? 'pointer' : 'not-allowed', fontFamily: FF, boxShadow: tplValid && !submitting ? '0 1px 3px rgba(254,128,41,0.2)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><>{submitting && <Loader2 size={15} className="animate-spin" />}{submitting ? 'Creating project...' : 'Create from template'}</></button>
+            <button onClick={submitTemplate} disabled={!tplValid || submitting} aria-busy={submitting} style={{ marginTop: 6, width: '100%', background: tplValid && !submitting ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 10, padding: '11px 0', fontSize: 13.5, fontWeight: 700, cursor: tplValid && !submitting ? 'pointer' : 'not-allowed', fontFamily: FF, boxShadow: tplValid && !submitting ? '0 1px 3px rgba(254,128,41,0.2)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><>{submitting && <Loader2 size={15} className="animate-spin" />}{submitting ? 'Creating project...' : 'Create from template'}</></button>
           </>
         )}
       </div>

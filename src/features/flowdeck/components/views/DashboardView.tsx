@@ -296,70 +296,133 @@ export function DashboardView({ project, tasks, files = [], statusUpdates = [], 
 
       {/* #41: Save as Template modal */}
       {showSaveTemplate && onSaveAsTemplate && (
-        <>
-          <div onClick={() => setShowSaveTemplate(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 49 }} />
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: '#FFFFFF', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.15)', zIndex: 50, padding: 24, width: 'min(420px, 90vw)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, fontFamily: FF }}>Save as Template</h3>
-              <button onClick={() => setShowSaveTemplate(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray }}><X size={18} /></button>
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, marginBottom: 4, display: 'block', fontFamily: FF }}>Template name</label>
-              <input value={templateName} onChange={e => setTemplateName(e.target.value)} style={{ width: '100%', border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 14px', fontSize: 14, fontFamily: FF, outline: 'none' }} />
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', fontFamily: FF, marginBottom: 16 }}>
-              <input type='checkbox' checked={templateIncludeTasks} onChange={e => setTemplateIncludeTasks(e.target.checked)} style={{ width: 16, height: 16, accentColor: COLORS.accent }} />
-              Include task structure
-            </label>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowSaveTemplate(false)} style={{ border: `1px solid ${COLORS.line}`, background: 'none', cursor: 'pointer', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: FF, color: COLORS.gray }}>Cancel</button>
-              <button onClick={() => { if (templateName.trim()) { onSaveAsTemplate(templateName.trim(), templateIncludeTasks); setShowSaveTemplate(false); } }} disabled={!templateName.trim()} style={{ border: 'none', background: templateName.trim() ? COLORS.accent : COLORS.line, color: '#FFFFFF', cursor: templateName.trim() ? 'pointer' : 'not-allowed', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: FF }}>Save Template</button>
+        isMobile ? (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+            <div onClick={() => setShowSaveTemplate(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)' }} />
+            <div style={{ position: 'relative', background: '#FFFFFF', borderRadius: '20px 20px 0 0', padding: '8px 20px 32px', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: COLORS.line, margin: '4px auto 16px' }} />
+              <h3 style={{ fontFamily: FF, fontSize: 18, margin: '0 0 18px' }}>Save as Template</h3>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.gray, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: FF }}>Template name</div>
+                <input autoFocus value={templateName} onChange={e => setTemplateName(e.target.value)} style={{ width: '100%', border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#F3F4F6', fontFamily: FF, minHeight: 44, boxSizing: 'border-box', outline: 'none' }} />
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', fontFamily: FF, marginBottom: 16 }}>
+                <input type='checkbox' checked={templateIncludeTasks} onChange={e => setTemplateIncludeTasks(e.target.checked)} style={{ width: 16, height: 16, accentColor: COLORS.accent }} />
+                Include task structure
+              </label>
+              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                <button onClick={() => setShowSaveTemplate(false)} style={{ flex: 1, background: '#F3F4F6', color: COLORS.ink, border: 'none', borderRadius: 12, padding: '14px 0', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>Cancel</button>
+                <button onClick={() => { if (templateName.trim()) { onSaveAsTemplate(templateName.trim(), templateIncludeTasks); setShowSaveTemplate(false); } }} disabled={!templateName.trim()} style={{ flex: 2, background: templateName.trim() ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 12, padding: '14px 0', fontSize: 15, fontWeight: 700, cursor: templateName.trim() ? 'pointer' : 'not-allowed', fontFamily: FF, boxShadow: templateName.trim() ? '0 1px 3px rgba(254,128,41,0.2)' : 'none' }}>Save Template</button>
+              </div>
             </div>
           </div>
-        </>
+        ) : (
+          <>
+            <div onClick={() => setShowSaveTemplate(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 49 }} />
+            <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: '#FFFFFF', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.15)', zIndex: 50, padding: 24, width: 'min(420px, 90vw)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, fontFamily: FF }}>Save as Template</h3>
+                <button onClick={() => setShowSaveTemplate(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray }}><X size={18} /></button>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, marginBottom: 4, display: 'block', fontFamily: FF }}>Template name</label>
+                <input value={templateName} onChange={e => setTemplateName(e.target.value)} style={{ width: '100%', border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 14px', fontSize: 14, fontFamily: FF, outline: 'none' }} />
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', fontFamily: FF, marginBottom: 16 }}>
+                <input type='checkbox' checked={templateIncludeTasks} onChange={e => setTemplateIncludeTasks(e.target.checked)} style={{ width: 16, height: 16, accentColor: COLORS.accent }} />
+                Include task structure
+              </label>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button onClick={() => setShowSaveTemplate(false)} style={{ border: `1px solid ${COLORS.line}`, background: 'none', cursor: 'pointer', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: FF, color: COLORS.gray }}>Cancel</button>
+                <button onClick={() => { if (templateName.trim()) { onSaveAsTemplate(templateName.trim(), templateIncludeTasks); setShowSaveTemplate(false); } }} disabled={!templateName.trim()} style={{ border: 'none', background: templateName.trim() ? COLORS.accent : COLORS.line, color: '#FFFFFF', cursor: templateName.trim() ? 'pointer' : 'not-allowed', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: FF }}>Save Template</button>
+              </div>
+            </div>
+          </>
+        )
       )}
 
       {showEditProject && onUpdateProject && (
-        <>
-          <div onClick={() => setShowEditProject(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 49 }} />
-          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: '#FFFFFF', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.15)', zIndex: 50, padding: isMobile ? 20 : 24, width: 'min(480px, 92vw)', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-              <h3 style={{ fontSize: 17, fontWeight: 700, fontFamily: FF, margin: 0 }}>Edit project</h3>
-              <button onClick={() => setShowEditProject(false)} title='Close' style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 4 }}><X size={18} /></button>
-            </div>
-            <div style={{ display: 'grid', gap: 14 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
-                Project name
-                <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 5, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, fontFamily: FF, outline: 'none' }} />
-              </label>
-              <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
-                Description
-                <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3} placeholder='Add a short project description' style={{ display: 'block', width: '100%', marginTop: 5, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 13.5, fontFamily: FF, lineHeight: 1.5, resize: 'vertical', outline: 'none' }} />
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        isMobile ? (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+            <div onClick={() => setShowEditProject(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)' }} />
+            <div style={{ position: 'relative', background: '#FFFFFF', borderRadius: '20px 20px 0 0', padding: '8px 20px 32px', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: COLORS.line, margin: '4px auto 16px' }} />
+              <h3 style={{ fontFamily: FF, fontSize: 18, margin: '0 0 18px' }}>Edit project</h3>
+              <div style={{ display: 'grid', gap: 14 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
-                  Start date
-                  <input type='date' value={editStart} onChange={e => setEditStart(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 5, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: FF, outline: 'none' }} />
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.gray, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: FF }}>Project name</div>
+                  <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} style={{ display: 'block', width: '100%', border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#F3F4F6', fontFamily: FF, minHeight: 44, boxSizing: 'border-box', outline: 'none' }} />
                 </label>
                 <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
-                  End date
-                  <input type='date' value={editEnd} onChange={e => setEditEnd(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 5, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: FF, outline: 'none' }} />
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.gray, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: FF }}>Description</div>
+                  <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3} placeholder='Add a short project description' style={{ display: 'block', width: '100%', border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 14px', fontSize: 13.5, fontFamily: FF, lineHeight: 1.5, resize: 'vertical', outline: 'none', background: '#FFFFFF' }} />
                 </label>
-              </div>
-              {editName.trim() && !editDatesValid && <div style={{ fontSize: 12, color: COLORS.red, marginTop: -6, fontFamily: FF }}>Choose an end date after the start date.</div>}
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF, marginBottom: 7 }}>Project colour</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {PROJECT_COLORS.map(color => <button key={color} type='button' onClick={() => setEditColor(color)} title={`Use ${color}`} style={{ width: 26, height: 26, borderRadius: 9, background: color, cursor: 'pointer', border: editColor === color ? `2.5px solid ${COLORS.ink}` : '2.5px solid transparent' }} />)}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.gray, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: FF }}>Start date</div>
+                    <input type='date' value={editStart} onChange={e => setEditStart(e.target.value)} style={{ display: 'block', width: '100%', border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#F3F4F6', fontFamily: FF, minHeight: 44, boxSizing: 'border-box', outline: 'none' }} />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.gray, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: FF }}>End date</div>
+                    <input type='date' value={editEnd} onChange={e => setEditEnd(e.target.value)} style={{ display: 'block', width: '100%', border: `1px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, background: '#F3F4F6', fontFamily: FF, minHeight: 44, boxSizing: 'border-box', outline: 'none' }} />
+                  </label>
+                </div>
+                {editName.trim() && !editDatesValid && <div style={{ fontSize: 12, color: COLORS.red, marginTop: -6, fontFamily: FF }}>Choose an end date after the start date.</div>}
+                <div>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.gray, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: FF }}>Project colour</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {PROJECT_COLORS.map(color => <button key={color} type='button' onClick={() => setEditColor(color)} title={`Use ${color}`} style={{ width: 28, height: 28, borderRadius: 9, background: color, cursor: 'pointer', border: editColor === color ? `2.5px solid ${COLORS.ink}` : '2.5px solid transparent' }} />)}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 22 }}>
-              <button onClick={() => setShowEditProject(false)} style={{ border: `1px solid ${COLORS.line}`, background: 'none', cursor: 'pointer', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: FF, color: COLORS.gray }}>Cancel</button>
-              <button onClick={() => { if (!editValid) return; onUpdateProject(project.id, { name: editName.trim(), description: editDescription.trim() || undefined, color: editColor, start: editStart, end: editEnd }); setShowEditProject(false); }} disabled={!editValid} style={{ border: 'none', background: editValid ? COLORS.accent : COLORS.line, color: '#FFFFFF', cursor: editValid ? 'pointer' : 'not-allowed', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: FF }}>Save changes</button>
+              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                <button onClick={() => setShowEditProject(false)} style={{ flex: 1, background: '#F3F4F6', color: COLORS.ink, border: 'none', borderRadius: 12, padding: '14px 0', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>Cancel</button>
+                <button onClick={() => { if (!editValid) return; onUpdateProject(project.id, { name: editName.trim(), description: editDescription.trim() || undefined, color: editColor, start: editStart, end: editEnd }); setShowEditProject(false); }} disabled={!editValid} style={{ flex: 2, background: editValid ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 12, padding: '14px 0', fontSize: 15, fontWeight: 700, cursor: editValid ? 'pointer' : 'not-allowed', fontFamily: FF, boxShadow: editValid ? '0 1px 3px rgba(254,128,41,0.2)' : 'none' }}>Save changes</button>
+              </div>
             </div>
           </div>
-        </>
+        ) : (
+          <>
+            <div onClick={() => setShowEditProject(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 49 }} />
+            <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: '#FFFFFF', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.15)', zIndex: 50, padding: isMobile ? 20 : 24, width: 'min(480px, 92vw)', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+                <h3 style={{ fontSize: 17, fontWeight: 700, fontFamily: FF, margin: 0 }}>Edit project</h3>
+                <button onClick={() => setShowEditProject(false)} title='Close' style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 4 }}><X size={18} /></button>
+              </div>
+              <div style={{ display: 'grid', gap: 14 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
+                  Project name
+                  <input autoFocus value={editName} onChange={e => setEditName(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 5, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, fontFamily: FF, outline: 'none' }} />
+                </label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
+                  Description
+                  <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3} placeholder='Add a short project description' style={{ display: 'block', width: '100%', marginTop: 5, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 13.5, fontFamily: FF, lineHeight: 1.5, resize: 'vertical', outline: 'none' }} />
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
+                    Start date
+                    <input type='date' value={editStart} onChange={e => setEditStart(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 5, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: FF, outline: 'none' }} />
+                  </label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF }}>
+                    End date
+                    <input type='date' value={editEnd} onChange={e => setEditEnd(e.target.value)} style={{ display: 'block', width: '100%', marginTop: 5, border: `1.5px solid ${COLORS.line}`, borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: FF, outline: 'none' }} />
+                  </label>
+                </div>
+                {editName.trim() && !editDatesValid && <div style={{ fontSize: 12, color: COLORS.red, marginTop: -6, fontFamily: FF }}>Choose an end date after the start date.</div>}
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, fontFamily: FF, marginBottom: 7 }}>Project colour</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {PROJECT_COLORS.map(color => <button key={color} type='button' onClick={() => setEditColor(color)} title={`Use ${color}`} style={{ width: 26, height: 26, borderRadius: 9, background: color, cursor: 'pointer', border: editColor === color ? `2.5px solid ${COLORS.ink}` : '2.5px solid transparent' }} />)}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 22 }}>
+                <button onClick={() => setShowEditProject(false)} style={{ border: `1px solid ${COLORS.line}`, background: 'none', cursor: 'pointer', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: FF, color: COLORS.gray }}>Cancel</button>
+                <button onClick={() => { if (!editValid) return; onUpdateProject(project.id, { name: editName.trim(), description: editDescription.trim() || undefined, color: editColor, start: editStart, end: editEnd }); setShowEditProject(false); }} disabled={!editValid} style={{ border: 'none', background: editValid ? COLORS.accent : COLORS.line, color: '#FFFFFF', cursor: editValid ? 'pointer' : 'not-allowed', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, fontFamily: FF }}>Save changes</button>
+              </div>
+            </div>
+          </>
+        )
       )}
     </div>
   );
