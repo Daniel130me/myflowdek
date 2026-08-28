@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { useAuth, OnboardingFlow } from '@/features/flowdeck/components/auth';
 import { ThemeProvider } from '@/features/flowdeck/hooks/useTheme';
 import { routes } from '@/shared/navigation/routes';
+import { AuthPageSkeleton } from '@/components/ui/skeleton';
 
 export default function AuthOnboardingPage() {
   const auth = useAuth();
@@ -25,11 +26,7 @@ export default function AuthOnboardingPage() {
   }, [auth.ready, auth.isAuthenticated, auth.isOnboarded, router]);
 
   if (!auth.ready || !auth.user) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F7F7F7', color: '#9CA3AF' }}>
-        Loading Flowdek…
-      </div>
-    );
+    return <AuthPageSkeleton />;
   }
 
   // Persist onboarding server-side, then refresh the session so the JWT

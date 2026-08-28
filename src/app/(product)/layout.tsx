@@ -21,6 +21,7 @@ import { routes, getRouteForView, getViewFromPathname, replaceProjectInPath } fr
 import { getSingleParam } from '@/shared/utils/routeParams';
 import type { TopBarHandle } from '@/features/flowdeck/components/layout/TopBar';
 import { Toaster } from '@/components/ui/sonner';
+import { ProductShellSkeleton } from '@/components/ui/skeleton';
 
 export default function ProductLayout({ children, modal }: { children: React.ReactNode; modal?: React.ReactNode }) {
   const auth = useAuth();
@@ -37,11 +38,7 @@ export default function ProductLayout({ children, modal }: { children: React.Rea
   }, [auth.ready, auth.isAuthenticated, auth.isOnboarded, router]);
 
   if (!auth.ready || !auth.isAuthenticated || !auth.isOnboarded) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F7F7F7', fontFamily: FF, color: '#9CA3AF' }}>
-        Loading Flowdek…
-      </div>
-    );
+    return <ProductShellSkeleton fontFamily={FF} />;
   }
 
   return (
@@ -154,9 +151,14 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
 
   if (!mounted) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: theme.layout.content.bg, fontFamily: FF, color: theme.colors.gray }}>
-        Loading Flowdek…
-      </div>
+      <ProductShellSkeleton
+        contentBg={theme.layout.content.bg}
+        sidebarBg={theme.layout.sidebar.bg}
+        topbarBg={theme.layout.topbar.bg}
+        sidebarWidth={theme.layout.sidebar.width}
+        topbarHeight={theme.layout.topbar.height}
+        fontFamily={FF}
+      />
     );
   }
 

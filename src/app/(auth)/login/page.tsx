@@ -3,6 +3,7 @@
 import React, { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth, LoginPage } from '@/features/flowdeck/components/auth';
+import { AuthPageSkeleton } from '@/components/ui/skeleton';
 import { routes } from '@/shared/navigation/routes';
 
 /**
@@ -63,11 +64,7 @@ function AuthLoginPageInner() {
   }, [auth.ready, auth.isAuthenticated, auth.isOnboarded, router, safeRedirect]);
 
   if (!auth.ready) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F7F7F7', color: '#9CA3AF' }}>
-        Loading Flowdek…
-      </div>
-    );
+    return <AuthPageSkeleton />;
   }
 
   // Decide where to send the browser after a successful sign-in OR sign-up.
@@ -100,11 +97,7 @@ function AuthLoginPageInner() {
 export default function AuthLoginPage() {
   return (
     <Suspense
-      fallback={
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F7F7F7', color: '#9CA3AF' }}>
-          Loading Flowdek…
-        </div>
-      }
+      fallback={<AuthPageSkeleton />}
     >
       <AuthLoginPageInner />
     </Suspense>

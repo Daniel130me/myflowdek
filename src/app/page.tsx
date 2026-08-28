@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/features/flowdeck/components/auth';
 import { routes } from '@/shared/navigation/routes';
-import { FONT_FAMILY as FF } from '@/features/flowdeck/model';
+import { RootPageSkeleton } from '@/components/ui/skeleton';
 
 export default function RootEntryPage() {
   const auth = useAuth();
@@ -21,9 +21,5 @@ export default function RootEntryPage() {
     }
   }, [auth.ready, auth.isAuthenticated, auth.isOnboarded, router]);
 
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F7F7F7', fontFamily: FF, color: '#9CA3AF' }}>
-      Loading Flowdek…
-    </div>
-  );
+  return <RootPageSkeleton />;
 }
