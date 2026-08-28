@@ -7,6 +7,7 @@ import { useBudgets } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { getSingleParam } from '@/shared/utils/routeParams';
 import { toast } from 'sonner';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import type { Budget, Expense } from '@/features/flowdeck/model';
 import { apiUpdateBudget, apiListExpenses, apiDeleteExpense } from '@/lib/api-client';
 
@@ -176,7 +177,7 @@ export default function ProjectBudgetsPage() {
     [projectId, expenses, refetch],
   );
 
-  if (loading) return <div style={{ padding: 40, color: '#9CA3AF' }}>Loading budgets…</div>;
+  if (loading) return <TableSkeleton />;
 
   return (
     <BudgetView

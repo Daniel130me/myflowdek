@@ -7,6 +7,7 @@ import { useAutomations } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { getSingleParam } from '@/shared/utils/routeParams';
 import { toast } from 'sonner';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import type { AutomationRule } from '@/features/flowdeck/model';
 
 export default function ProjectAutomationsPage() {
@@ -88,7 +89,7 @@ export default function ProjectAutomationsPage() {
     [projectId, refetch],
   );
 
-  if (loading) return <div style={{ padding: 40, color: '#9CA3AF' }}>Loading automations…</div>;
+  if (loading) return <TableSkeleton />;
 
   return (
     <AutomationsView

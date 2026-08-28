@@ -5,6 +5,7 @@ import { ApprovalsView } from '@/features/flowdeck/components/views';
 import { useApprovals } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { toast } from 'sonner';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import type { ApprovalRequest } from '@/features/flowdeck/model';
 
 export default function ApprovalsRoutePage() {
@@ -49,7 +50,7 @@ export default function ApprovalsRoutePage() {
     } catch { toast.error('Failed to resolve approval'); }
   }, [refetch]);
 
-  if (loading) return <div style={{ padding: 40, color: '#9CA3AF' }}>Loading approvals…</div>;
+  if (loading) return <TableSkeleton />;
 
   return (
     <ApprovalsView

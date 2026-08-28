@@ -11,6 +11,7 @@ import { useProjectMembers } from '@/features/flowdeck/hooks/useProjectMembers';
 import { useProjectStatusUpdates } from '@/features/flowdeck/hooks/useProjectStatusUpdates';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
+import { ProjectOverviewSkeleton } from '@/components/ui/skeleton';
 
 /**
  * Project overview page — the project details, tasks, files, members, and
@@ -41,11 +42,7 @@ export default function ProjectOverviewPage() {
   // If the project has not reached the store yet, keep the page in a brief
   // loading state instead of fetching it again.
   if (!projectFromStore) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF' }}>
-        Loading project…
-      </div>
-    );
+    return <ProjectOverviewSkeleton />;
   }
 
   const project = projectFromStore;

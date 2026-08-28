@@ -11,6 +11,7 @@ import { useConnectedFileMutations } from '@/features/flowdeck/hooks/useConnecte
 import { useProjectMembers } from '@/features/flowdeck/components/ui';
 import { getTaskForProject } from '@/features/tasks/selectors/getTaskForProject';
 import { routes } from '@/shared/navigation/routes';
+import { TaskDetailSkeleton } from '@/components/ui/skeleton';
 import type { ActivityEntry } from '@/features/flowdeck/model';
 
 export default function TaskDetailRoutePage() {
@@ -59,11 +60,7 @@ export default function TaskDetailRoutePage() {
   }
 
   if (!task) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF' }}>
-        Loading task…
-      </div>
-    );
+    return <TaskDetailSkeleton />;
   }
 
   const projectTasks = state.tasksByProject[projectId] ?? [];

@@ -8,6 +8,7 @@ import { useAuth } from '@/features/flowdeck/components/auth';
 import { getSingleParam } from '@/shared/utils/routeParams';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { toast } from 'sonner';
+import { TableSkeleton } from '@/components/ui/skeleton';
 
 interface ProjectMember {
   userId: string;
@@ -90,7 +91,7 @@ export default function ProjectTeamPage() {
   const timeLogs = state.timeLogsByProject[projectId!] ?? [];
 
   if (loading) {
-    return <div style={{ padding: 40, color: COLORS.gray, fontFamily: FF }}>Loading team…</div>;
+    return <TableSkeleton />;
   }
 
   return (

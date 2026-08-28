@@ -7,6 +7,7 @@ import { useApprovals } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { getSingleParam } from '@/shared/utils/routeParams';
 import { toast } from 'sonner';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import type { ApprovalRequest } from '@/features/flowdeck/model';
 
 export default function ProjectApprovalsPage() {
@@ -93,7 +94,7 @@ export default function ProjectApprovalsPage() {
     [refetch],
   );
 
-  if (loading) return <div style={{ padding: 40, color: '#9CA3AF' }}>Loading approvals…</div>;
+  if (loading) return <TableSkeleton />;
 
   return (
     <ApprovalsView

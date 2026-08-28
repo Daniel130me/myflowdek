@@ -5,6 +5,7 @@ import { AutomationsView } from '@/features/flowdeck/components/views';
 import { useAutomations } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { toast } from 'sonner';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import type { AutomationRule } from '@/features/flowdeck/model';
 
 export default function AutomationsRoutePage() {
@@ -55,7 +56,7 @@ export default function AutomationsRoutePage() {
     } catch { toast.error('Failed to delete automation'); }
   }, [projectId, refetch]);
 
-  if (loading) return <div style={{ padding: 40, color: '#9CA3AF' }}>Loading automations…</div>;
+  if (loading) return <TableSkeleton />;
 
   return (
     <AutomationsView

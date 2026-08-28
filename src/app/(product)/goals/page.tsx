@@ -5,6 +5,7 @@ import { GoalsView } from '@/features/flowdeck/components/views';
 import { useWorkspaces } from '@/features/flowdeck/hooks/useWorkspaces';
 import { useGoals } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { toast } from 'sonner';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import type { Goal, KeyResult } from '@/features/flowdeck/model';
 import { apiUpdateKeyResult, apiDeleteKeyResult } from '@/lib/api-client';
 
@@ -131,7 +132,7 @@ export default function GoalsRoutePage() {
     toast.error('Failed to delete key result', { description: res.error });
   }, [ws.selectedWorkspaceId, keyResults]);
 
-  if (loading) return <div style={{ padding: 40, color: '#9CA3AF' }}>Loading goals…</div>;
+  if (loading) return <TableSkeleton />;
 
   return (
     <GoalsView

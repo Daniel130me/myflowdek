@@ -5,7 +5,7 @@ import { useParams, notFound } from 'next/navigation';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useProject } from '@/features/flowdeck/hooks/useProject';
 import { useProjectCustomFields } from '@/features/flowdeck/hooks/useProjectCustomFields';
-import { FONT_FAMILY as FF } from '@/features/flowdeck/model';
+import { ProjectOverviewSkeleton } from '@/components/ui/skeleton';
 
 /**
  * Project-scoped layout.
@@ -69,11 +69,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   // is otherwise one render where a child can mistake the missing store entry
   // for a real 404 during a hard refresh.
   if (!projectExistsInStore && (loading || project)) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF', fontFamily: FF }}>
-        Loading project…
-      </div>
-    );
+    return <ProjectOverviewSkeleton />;
   }
 
   return <>{children}</>;

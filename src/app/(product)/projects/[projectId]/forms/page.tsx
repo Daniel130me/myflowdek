@@ -7,6 +7,7 @@ import { useForms } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { getSingleParam } from '@/shared/utils/routeParams';
 import { toast } from 'sonner';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import type { Form, FormSubmission } from '@/features/flowdeck/model';
 import { apiUpdateForm, apiListFormSubmissions } from '@/lib/api-client';
 
@@ -125,7 +126,7 @@ export default function ProjectFormsPage() {
     [projectId, refetch],
   );
 
-  if (loading) return <div style={{ padding: 40, color: '#9CA3AF' }}>Loading forms…</div>;
+  if (loading) return <TableSkeleton />;
 
   return (
     <FormsView

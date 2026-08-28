@@ -39,11 +39,12 @@ function useSkeletonKeyframe() {
 // 1. Skeleton — base building block
 // ---------------------------------------------------------------------------
 
-interface SkeletonProps {
+export interface SkeletonProps {
   width?: string | number;
   height?: string | number;
   borderRadius?: string | number;
   style?: React.CSSProperties;
+  className?: string;
 }
 
 /**
@@ -55,16 +56,18 @@ export function Skeleton({
   height,
   borderRadius = 8,
   style,
+  className,
 }: SkeletonProps) {
   useSkeletonKeyframe();
 
   return (
     <div
+      className={className}
       style={{
         width,
         height,
         borderRadius,
-        backgroundColor: '#E5E5E5',
+        backgroundColor: '#E5E7EB',
         animation: 'skeletonPulse 1.5s ease-in-out infinite',
         ...style,
       }}
@@ -73,13 +76,9 @@ export function Skeleton({
 }
 
 // ---------------------------------------------------------------------------
-// 2. AuthPageSkeleton — full-page skeleton for login / onboarding
+// 2. AuthPageSkeleton — full-page skeleton for login / onboarding / invitation
 // ---------------------------------------------------------------------------
 
-/**
- * Renders a centered card with placeholder shapes that mirror a typical
- * auth form (logo, title, subtitle, inputs, button).
- */
 export function AuthPageSkeleton() {
   useSkeletonKeyframe();
 
@@ -128,7 +127,7 @@ export function AuthPageSkeleton() {
           />
         ))}
 
-        {/* Button skeleton — slightly darker to hint at an action */}
+        {/* Button skeleton */}
         <Skeleton
           width="100%"
           height={44}
@@ -141,7 +140,7 @@ export function AuthPageSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
-// 3. ProductShellSkeleton — full app shell skeleton (sidebar + topbar)
+// 3. ProductShellSkeleton — full app shell skeleton (sidebar + topbar + content)
 // ---------------------------------------------------------------------------
 
 interface ProductShellSkeletonProps {
@@ -153,11 +152,6 @@ interface ProductShellSkeletonProps {
   fontFamily?: string;
 }
 
-/**
- * Mimics the main product layout: dark sidebar, light topbar, and content
- * area with placeholder cards. Useful as a loading shell before the real
- * layout mounts.
- */
 export function ProductShellSkeleton({
   sidebarWidth = 248,
   topbarHeight = 56,
@@ -168,7 +162,6 @@ export function ProductShellSkeleton({
 }: ProductShellSkeletonProps) {
   useSkeletonKeyframe();
 
-  // Sidebar nav item — a light translucent bar on the dark sidebar bg
   const SidebarItem = ({ width }: { width: number | string }) => (
     <Skeleton
       width={width}
@@ -176,26 +169,6 @@ export function ProductShellSkeleton({
       borderRadius={8}
       style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
     />
-  );
-
-  // Content card with inner "text" lines
-  const ContentCard = () => (
-    <div
-      style={{
-        width: '100%',
-        height: 80,
-        background: '#FFFFFF',
-        borderRadius: 16,
-        padding: '16px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        boxSizing: 'border-box',
-      }}
-    >
-      <Skeleton width="40%" height={12} borderRadius={6} />
-      <Skeleton width="70%" height={12} borderRadius={6} />
-    </div>
   );
 
   return (
@@ -221,7 +194,6 @@ export function ProductShellSkeleton({
           boxSizing: 'border-box',
         }}
       >
-        {/* Logo placeholder */}
         <Skeleton
           width={32}
           height={32}
@@ -229,12 +201,10 @@ export function ProductShellSkeleton({
           style={{ backgroundColor: 'rgba(255,255,255,0.12)', marginBottom: 16 }}
         />
 
-        {/* Primary nav items (varied widths for realism) */}
         {[140, 120, 160, 110, 150].map((w, i) => (
           <SidebarItem key={`nav-${i}`} width={w} />
         ))}
 
-        {/* Divider */}
         <div
           style={{
             height: 1,
@@ -243,7 +213,6 @@ export function ProductShellSkeleton({
           }}
         />
 
-        {/* Secondary nav items */}
         {[130, 100, 145].map((w, i) => (
           <SidebarItem key={`sec-${i}`} width={w} />
         ))}
@@ -251,7 +220,6 @@ export function ProductShellSkeleton({
 
       {/* ---- Main area (topbar + content) ---- */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Top bar */}
         <div
           style={{
             height: topbarHeight,
@@ -265,23 +233,16 @@ export function ProductShellSkeleton({
             boxSizing: 'border-box',
           }}
         >
-          {/* Search bar placeholder */}
           <Skeleton width={200} height={32} borderRadius={8} />
 
-          {/* Avatar circles */}
           <div style={{ display: 'flex', gap: 12 }}>
             {[1, 2, 3].map((i) => (
-              <Skeleton
-                key={i}
-                width={32}
-                height={32}
-                borderRadius="50%"
-              />
+              <Skeleton key={i} width={32} height={32} borderRadius="50%" />
             ))}
           </div>
         </div>
 
-        {/* Content area */}
+        {/* Content area placeholder */}
         <div
           style={{
             flex: 1,
@@ -293,13 +254,7 @@ export function ProductShellSkeleton({
             overflowY: 'auto',
           }}
         >
-          {/* Page title */}
-          <Skeleton width={200} height={24} borderRadius={6} />
-
-          {/* Card placeholders */}
-          {[1, 2, 3, 4].map((i) => (
-            <ContentCard key={i} />
-          ))}
+          <ProjectOverviewSkeleton />
         </div>
       </div>
     </div>
@@ -310,10 +265,6 @@ export function ProductShellSkeleton({
 // 4. RootPageSkeleton — centered pulsing logo for root redirect page
 // ---------------------------------------------------------------------------
 
-/**
- * A minimal full-screen placeholder with a single pulsing circle.
- * Shown while the root route decides where to redirect.
- */
 export function RootPageSkeleton() {
   useSkeletonKeyframe();
 
@@ -329,6 +280,288 @@ export function RootPageSkeleton() {
       }}
     >
       <Skeleton width={48} height={48} borderRadius="50%" />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 5. ProjectOverviewSkeleton / ViewContentSkeleton — project dashboard / overview
+// ---------------------------------------------------------------------------
+
+export function ProjectOverviewSkeleton() {
+  useSkeletonKeyframe();
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%' }}>
+      {/* Header row: Title + Actions */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Skeleton width={28} height={28} borderRadius={8} />
+          <Skeleton width={220} height={28} borderRadius={6} />
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Skeleton width={90} height={36} borderRadius={8} />
+          <Skeleton width={110} height={36} borderRadius={8} />
+        </div>
+      </div>
+
+      {/* KPI / Metric Stat cards row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 14,
+              padding: '18px 20px',
+              border: '1px solid #F0F0F0',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+            }}
+          >
+            <Skeleton width="45%" height={14} borderRadius={4} />
+            <Skeleton width="60%" height={26} borderRadius={6} />
+          </div>
+        ))}
+      </div>
+
+      {/* Main Section Content Card */}
+      <div
+        style={{
+          background: '#FFFFFF',
+          borderRadius: 16,
+          padding: '24px',
+          border: '1px solid #F0F0F0',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <Skeleton width={160} height={20} borderRadius={6} />
+          <Skeleton width={80} height={28} borderRadius={6} />
+        </div>
+
+        {/* Task rows */}
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 14px',
+              borderRadius: 10,
+              background: '#F9FAFB',
+              gap: 16,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+              <Skeleton width={18} height={18} borderRadius={4} />
+              <Skeleton width={`${40 + (i % 3) * 20}%`} height={14} borderRadius={4} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <Skeleton width={60} height={22} borderRadius={12} />
+              <Skeleton width={26} height={26} borderRadius="50%" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 6. ProjectListSkeleton / PortfolioSkeleton — list/grid of project cards
+// ---------------------------------------------------------------------------
+
+export function ProjectListSkeleton() {
+  useSkeletonKeyframe();
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%' }}>
+      {/* Title & action */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Skeleton width={180} height={28} borderRadius={6} />
+        <Skeleton width={120} height={36} borderRadius={8} />
+      </div>
+
+      {/* Grid of project cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div
+            key={i}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 16,
+              padding: '20px 22px',
+              border: '1px solid #F0F0F0',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Skeleton width={12} height={12} borderRadius={3} />
+              <Skeleton width="65%" height={18} borderRadius={4} />
+            </div>
+            <Skeleton width="90%" height={12} borderRadius={4} />
+            <Skeleton width="70%" height={12} borderRadius={4} />
+            <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Skeleton width="40%" height={8} borderRadius={4} />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <Skeleton width={24} height={24} borderRadius="50%" />
+                <Skeleton width={24} height={24} borderRadius="50%" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 7. TableSkeleton — generic data table skeleton
+// ---------------------------------------------------------------------------
+
+export function TableSkeleton({ rows = 6 }: { rows?: number }) {
+  useSkeletonKeyframe();
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
+      {/* Search and filter controls */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <Skeleton width={240} height={36} borderRadius={8} />
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Skeleton width={80} height={36} borderRadius={8} />
+          <Skeleton width={100} height={36} borderRadius={8} />
+        </div>
+      </div>
+
+      {/* Table container */}
+      <div
+        style={{
+          background: '#FFFFFF',
+          borderRadius: 16,
+          border: '1px solid #F0F0F0',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Table header */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '14px 20px',
+            borderBottom: '1px solid #F0F0F0',
+            background: '#FAFAFA',
+          }}
+        >
+          <Skeleton width={120} height={14} borderRadius={4} />
+          <Skeleton width={80} height={14} borderRadius={4} />
+          <Skeleton width={80} height={14} borderRadius={4} />
+          <Skeleton width={60} height={14} borderRadius={4} />
+        </div>
+
+        {/* Table rows */}
+        {Array.from({ length: rows }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '16px 20px',
+              borderBottom: i === rows - 1 ? 'none' : '1px solid #F7F7F7',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 2 }}>
+              <Skeleton width={16} height={16} borderRadius={4} />
+              <Skeleton width="60%" height={14} borderRadius={4} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Skeleton width={70} height={22} borderRadius={12} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <Skeleton width={60} height={14} borderRadius={4} />
+            </div>
+            <div style={{ flex: 0.5, display: 'flex', justifyContent: 'flex-end' }}>
+              <Skeleton width={26} height={26} borderRadius="50%" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 8. TaskDetailSkeleton — task modal / standalone task page skeleton
+// ---------------------------------------------------------------------------
+
+export function TaskDetailSkeleton() {
+  useSkeletonKeyframe();
+
+  return (
+    <div
+      style={{
+        background: '#FFFFFF',
+        borderRadius: 16,
+        padding: '28px 32px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 24,
+        width: '100%',
+        maxWidth: 900,
+        margin: '0 auto',
+        boxSizing: 'border-box',
+      }}
+    >
+      {/* Breadcrumb / Top row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Skeleton width={180} height={16} borderRadius={4} />
+        <Skeleton width={80} height={30} borderRadius={6} />
+      </div>
+
+      {/* Task title */}
+      <Skeleton width="75%" height={32} borderRadius={8} />
+
+      {/* Properties grid */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+          gap: 16,
+          padding: '16px 0',
+          borderTop: '1px solid #F0F0F0',
+          borderBottom: '1px solid #F0F0F0',
+        }}
+      >
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skeleton width={50} height={12} borderRadius={3} />
+            <Skeleton width={100} height={24} borderRadius={6} />
+          </div>
+        ))}
+      </div>
+
+      {/* Description box */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <Skeleton width={90} height={14} borderRadius={4} />
+        <Skeleton width="100%" height={80} borderRadius={8} />
+      </div>
+
+      {/* Comments section */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+        <Skeleton width={100} height={16} borderRadius={4} />
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <Skeleton width={32} height={32} borderRadius="50%" />
+          <Skeleton width="100%" height={60} borderRadius={8} />
+        </div>
+      </div>
     </div>
   );
 }

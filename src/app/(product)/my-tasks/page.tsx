@@ -6,6 +6,7 @@ import { MyTasksView } from '@/features/flowdeck/components/views';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useMyTasks } from '@/features/flowdeck/hooks/useMyTasks';
 import { routes } from '@/shared/navigation/routes';
+import { TableSkeleton } from '@/components/ui/skeleton';
 
 /**
  * My Tasks page.
@@ -26,11 +27,7 @@ export default function MyTasksRoutePage() {
   const { tasks, loading, toggleComplete } = useMyTasks();
 
   if (loading && tasks.length === 0) {
-    return (
-      <div style={{ padding: 32, color: '#9CA3AF', fontFamily: 'inherit' }}>
-        Loading your tasks…
-      </div>
-    );
+    return <TableSkeleton />;
   }
 
   return (

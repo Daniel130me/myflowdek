@@ -10,6 +10,7 @@ import { AlertTriangle, X } from 'lucide-react';
 import { COLORS, type Project } from '@/features/flowdeck/model';
 import { routes } from '@/shared/navigation/routes';
 import { toast } from 'sonner';
+import { ProjectListSkeleton } from '@/components/ui/skeleton';
 
 /**
  * Projects portfolio page — backed by the real API.
@@ -58,11 +59,7 @@ export default function ProjectsPortfolioPage() {
   };
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9CA3AF' }}>
-        Loading projects…
-      </div>
-    );
+    return <ProjectListSkeleton />;
   }
 
   return (

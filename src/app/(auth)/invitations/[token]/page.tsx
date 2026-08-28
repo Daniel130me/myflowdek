@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { COLORS, FF } from '@/features/flowdeck/model';
 import { useAuth } from '@/features/flowdeck/components/auth';
+import { AuthPageSkeleton } from '@/components/ui/skeleton';
 
 /**
  * Invitation accept/decline page — the recipient arrives here after
@@ -95,11 +96,7 @@ export default function InvitationPage({ params }: { params: Promise<{ token: st
   };
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#F7F7F7', color: COLORS.gray, fontFamily: FF }}>
-        Loading invitation…
-      </div>
-    );
+    return <AuthPageSkeleton />;
   }
 
   if (error && !invitation) {

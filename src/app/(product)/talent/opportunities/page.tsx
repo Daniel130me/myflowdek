@@ -8,14 +8,14 @@ export const metadata: Metadata = {
   description: 'Browse and apply for open task opportunities posted by Flowdek project teams.',
 };
 
+import { TableSkeleton } from '@/components/ui/skeleton';
+
 export default function OpportunitiesPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen p-8 flex items-center justify-center">
-          <div className="animate-pulse text-muted-foreground font-medium">
-            Loading opportunities...
-          </div>
+        <div className="min-h-screen p-8">
+          <TableSkeleton />
         </div>
       }
     >

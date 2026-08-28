@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Building2, Activity, Heart, AlertTriangle, HardDrive, TrendingUp, Shield } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
+import { TableSkeleton } from '@/components/ui/skeleton';
 
 /**
  * Internal Flowdeck Admin Dashboard.
@@ -90,7 +91,11 @@ export default function AdminDashboardPage() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   if (loading) {
-    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#9CA3AF', fontFamily: FF }}>Loading admin dashboard…</div>;
+    return (
+      <div style={{ padding: 40 }}>
+        <TableSkeleton />
+      </div>
+    );
   }
 
   if (error) {

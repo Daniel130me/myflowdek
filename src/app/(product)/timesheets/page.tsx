@@ -5,6 +5,7 @@ import { TimesheetView } from '@/features/flowdeck/components/views';
 import { useTimesheets } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { toast } from 'sonner';
+import { TableSkeleton } from '@/components/ui/skeleton';
 import type { TimesheetEntry } from '@/features/flowdeck/model';
 import {
   apiUpdateTimesheetEntry,
@@ -91,7 +92,7 @@ export default function TimesheetsRoutePage() {
     throw new Error(res.error);
   }, []);
 
-  if (loading) return <div style={{ padding: 40, color: '#9CA3AF' }}>Loading timesheets…</div>;
+  if (loading) return <TableSkeleton />;
 
   return (
     <TimesheetView
