@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { apiCreateProject, apiCreateProjectFromTemplate } from '@/lib/api-client';
 import { routes } from '@/shared/navigation/routes';
 import { useWorkspaces } from './useWorkspaces';
-import { mapProject, type ApiProject } from './useProjects';
+import { mapProject, PROJECT_CREATED_EVENT, type ApiProject } from './useProjects';
 import { useFlowDeck } from '../store/useFlowDeck';
 
 interface ProjectFormInput {
@@ -23,9 +23,14 @@ export function useProjectCreation(options: { navigateOnCreate?: boolean; naviga
   const { upsertProject } = useFlowDeck();
   const [creating, setCreating] = useState(false);
 
-  const finish = useCallback((apiProject: ApiProject, navigate = true) => {
+  const finish = useCallback((apiProject: ApiProject, workspaceId: string, navigate = true) => {
     const project = mapProject(apiProject);
     upsertProject(project);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(PROJECT_CREATED_EVENT, {
+        detail: { workspaceId, project },
+      }));
+    }
     toast.success('Project created', { description: project.name });
     if (navigate) router.push(routes.projectOverview(project.id));
     return true;
@@ -44,7 +49,7 @@ export function useProjectCreation(options: { navigateOnCreate?: boolean; naviga
       if (!result.ok || !result.data?.project) {
         throw new Error(result.error ?? 'Failed to create project');
       }
-      return finish(result.data.project as unknown as ApiProject, options.navigateOnCreate !== false);
+      return finish(result.data.project as unknown as ApiProject, selectedWorkspaceId, options.navigateOnCreate !== false);
     } catch (error) {
       toast.error('Failed to create project', {
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -75,7 +80,7 @@ export function useProjectCreation(options: { navigateOnCreate?: boolean; naviga
       if (!result.ok || !result.data?.project) {
         throw new Error(result.error ?? 'Failed to create project from template');
       }
-      return finish(result.data.project as unknown as ApiProject, options.navigateOnTemplateCreate !== false);
+      return finish(result.data.project as unknown as ApiProject, selectedWorkspaceId, options.navigateOnTemplateCreate !== false);
     } catch (error) {
       toast.error('Failed to create project from template', {
         description: error instanceof Error ? error.message : 'Unknown error',

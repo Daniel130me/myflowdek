@@ -6,6 +6,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -49,6 +50,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const hasFetchedRef = useRef(false);
 
   const fetchWorkspaces = useCallback(async () => {
     try {
@@ -87,7 +89,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetchWorkspaces();
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+    void fetchWorkspaces();
   }, [fetchWorkspaces]);
 
   const setSelectedWorkspace = useCallback((id: string) => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Project } from '@/features/flowdeck/model';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import {
@@ -26,6 +26,13 @@ export interface ApiProject {
   isFavorite: boolean;
   members?: string[];
   portfolio?: NonNullable<Project['portfolio']>;
+}
+
+export const PROJECT_CREATED_EVENT = 'flowdeck:project-created';
+
+interface ProjectCreatedEventDetail {
+  workspaceId: string;
+  project: Project;
 }
 
 /** Map the API project shape to the frontend Project type. */
@@ -58,6 +65,7 @@ export function useProjects(workspaceId: string | null) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { syncProjects, upsertProject, removeProjectFromCache } = useFlowDeck();
+  const initialFetchWorkspaceRef = useRef<string | null>(null);
 
   const refetch = useCallback(async () => {
     if (!workspaceId) return;
@@ -83,8 +91,21 @@ export function useProjects(workspaceId: string | null) {
   }, [workspaceId, syncProjects]);
 
   useEffect(() => {
-    refetch();
-  }, [refetch]);
+    if (!workspaceId || initialFetchWorkspaceRef.current === workspaceId) return;
+    initialFetchWorkspaceRef.current = workspaceId;
+    void refetch();
+  }, [workspaceId, refetch]);
+
+  useEffect(() => {
+    function handleProjectCreated(event: Event) {
+      const detail = (event as CustomEvent<ProjectCreatedEventDetail>).detail;
+      if (!detail || detail.workspaceId !== workspaceId) return;
+      setProjects((previous) => ({ ...previous, [detail.project.id]: detail.project }));
+    }
+
+    window.addEventListener(PROJECT_CREATED_EVENT, handleProjectCreated);
+    return () => window.removeEventListener(PROJECT_CREATED_EVENT, handleProjectCreated);
+  }, [workspaceId]);
 
   /** Create a new project via the API and add it to the local + shared store. */
   const createProject = useCallback(

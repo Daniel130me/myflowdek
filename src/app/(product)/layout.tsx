@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { usePathname, useRouter, useParams } from 'next/navigation';
 import { FONT_FAMILY as FF, type TaskPriority } from '@/features/flowdeck/model';
 import { useViewport } from '@/features/flowdeck/hooks/useViewport';
@@ -65,13 +65,8 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
   const theme = useTheme();
   const { isMobile } = useViewport();
   const wsHook = useWorkspaces();
-  const [mounted, setMounted] = useState(false);
 
   const topBarRef = useRef<TopBarHandle>(null);
-
-  useEffect(() => {
-    requestAnimationFrame(() => setMounted(true));
-  }, []);
 
   const state = useFlowDeck();
   const {
@@ -147,19 +142,6 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
     const targetRoute = getRouteForView(id, routeProjectId || undefined);
     router.push(targetRoute);
     state.setMoreMenuOpen(false);
-  }
-
-  if (!mounted) {
-    return (
-      <ProductShellSkeleton
-        contentBg={theme.layout.content.bg}
-        sidebarBg={theme.layout.sidebar.bg}
-        topbarBg={theme.layout.topbar.bg}
-        sidebarWidth={theme.layout.sidebar.width}
-        topbarHeight={theme.layout.topbar.height}
-        fontFamily={FF}
-      />
-    );
   }
 
   return (
