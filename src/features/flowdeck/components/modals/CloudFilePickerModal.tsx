@@ -30,6 +30,7 @@ interface CloudFilePickerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onFileAttached: () => void;
+  inline?: boolean;
 }
 
 const PROVIDER_NAMES: Record<string, string> = {
@@ -63,6 +64,7 @@ export function CloudFilePickerModal({
   isOpen,
   onClose,
   onFileAttached,
+  inline = false,
 }: CloudFilePickerModalProps) {
   const { isMobile } = useViewport();
   const [connections, setConnections] = useState<StorageConnection[]>([]);
@@ -202,24 +204,24 @@ export function CloudFilePickerModal({
   return (
     <div
       style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 60,
+        position: inline ? 'relative' : 'fixed',
+        inset: inline ? 'auto' : 0,
+        zIndex: inline ? 'auto' : 60,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(31,33,36,0.5)',
-        backdropFilter: 'blur(4px)',
-        padding: isMobile ? 12 : 24,
+        background: inline ? '#F9FAFB' : 'rgba(31,33,36,0.5)',
+        backdropFilter: inline ? 'none' : 'blur(4px)',
+        padding: inline ? 0 : isMobile ? 12 : 24,
       }}
     >
       <div
         style={{
-          width: 720,
+          width: inline ? '100%' : 720,
           maxWidth: '100%',
-          maxHeight: '90vh',
+          maxHeight: inline ? 'none' : '90vh',
           background: '#FFFFFF',
-          borderRadius: 16,
+          borderRadius: inline ? 10 : 16,
           boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
           display: 'flex',
           flexDirection: 'column',

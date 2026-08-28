@@ -112,6 +112,7 @@ export default function TaskDetailRoutePage() {
         customCols={projectCustomFields}
         onViewFile={fileId => router.push(routes.file(projectId, fileId))}
         onRemoveFile={fileMutations.removeFile}
+        onFileAttached={() => void fileMutations.refetch()}
         onAddFiles={(files) => fileMutations.uploadFiles(files, taskId)}
         onDuplicateTaskWithOptions={(taskId, opts) => state.duplicateTaskWithOptions(projectId, taskId, opts)}
         onMoveToProject={(taskId, targetProjectId) => state.moveTaskToProject(projectId, taskId, targetProjectId)}

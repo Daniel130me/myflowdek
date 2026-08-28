@@ -128,6 +128,7 @@ export function GooglePickerButton({
         .setAppId(config.appId)
         .setOAuthToken(config.accessToken)
         .setDeveloperKey(config.developerKey)
+        .setOrigin(window.location.origin)
         .addView(docsView)
         .addView(sharedView)
         .addView(google.picker.ViewId.RECENTLY_PICKED)

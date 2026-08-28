@@ -43,6 +43,7 @@ interface TaskDetailPanelProps {
   onViewFile?: (fileId: string) => void;
   onRemoveFile?: (fileId: string) => void;
   onAddFiles?: (files: File[]) => void;
+  onFileAttached?: () => void;
   /* #30: Duplicate with options */
   onDuplicateTaskWithOptions?: (id: string, opts: { includeSubtasks: boolean; includeComments: boolean; includeAttachments: boolean }) => void;
   /* #32: Move to project */
@@ -150,7 +151,7 @@ function TagPicker({ tags, taskTags, onToggle, onAddTag, onRemoveTag }: { tags: 
   );
 }
 
-export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comments = [], activity = [], parentTask, onClose, onUpdate, onAddSubtask, onNavigateToTask, onToggleTaskTag, onAddTag, onRemoveTag, onAddComment, onDeleteComment, onEditComment, onToggleReaction, onToggleFollower, timeLogs = [], onAddTimeLog, onDeleteTimeLog, currentUserId, customCols, onViewFile, onRemoveFile, onAddFiles, onDuplicateTaskWithOptions, onMoveToProject, projects, currentProjectId, onPromoteSubtask, onDemoteToSubtask, onSetTaskSection, sections = [], members = [] }: TaskDetailPanelProps) {
+export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comments = [], activity = [], parentTask, onClose, onUpdate, onAddSubtask, onNavigateToTask, onToggleTaskTag, onAddTag, onRemoveTag, onAddComment, onDeleteComment, onEditComment, onToggleReaction, onToggleFollower, timeLogs = [], onAddTimeLog, onDeleteTimeLog, currentUserId, customCols, onViewFile, onRemoveFile, onAddFiles, onFileAttached, onDuplicateTaskWithOptions, onMoveToProject, projects, currentProjectId, onPromoteSubtask, onDemoteToSubtask, onSetTaskSection, sections = [], members = [] }: TaskDetailPanelProps) {
   const { isMobile } = useViewport();
   const deps = task.deps.map(id => allTasks.find(t => t.id === id)).filter(Boolean) as Task[];
   const taskFiles = files.filter(f => f.linkedTaskId === task.id);
@@ -221,6 +222,17 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
         </button>
       </div>
     </Field>
+  );
+
+  const cloudPickerSection = (
+    <CloudFilePickerModal
+      projectId={task.projectId}
+      taskId={task.id}
+      isOpen={cloudPickerOpen}
+      inline
+      onClose={() => setCloudPickerOpen(false)}
+      onFileAttached={() => onFileAttached?.()}
+    />
   );
 
   /* Shared: parent task field */
@@ -475,6 +487,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
             </div>
           )}
           {filesSection}
+          {cloudPickerSection}
           {timeTrackingSection}
           {followersSection}
           {commentsSection}
@@ -549,21 +562,13 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
           </div>
         )}
         {filesSection}
+        {cloudPickerSection}
         {timeTrackingSection}
         {followersSection}
         {commentsSection}
       </div>
     </div>
     {actionDialogs}
-    <CloudFilePickerModal
-      projectId={task.projectId}
-      taskId={task.id}
-      isOpen={cloudPickerOpen}
-      onClose={() => setCloudPickerOpen(false)}
-      onFileAttached={() => {
-        // Trigger parent state refresh if needed
-      }}
-    />
   </>
   );
 }
