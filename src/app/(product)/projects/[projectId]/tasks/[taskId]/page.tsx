@@ -13,6 +13,7 @@ import { useProjectMembers } from '@/features/flowdeck/components/ui';
 import { getTaskForProject } from '@/features/tasks/selectors/getTaskForProject';
 import { routes } from '@/shared/navigation/routes';
 import { TaskDetailSkeleton } from '@/components/ui/skeleton';
+import { TaskLoadError } from '@/components/ui/task-load-error';
 import { useTaskActivity } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 
 export default function TaskDetailRoutePage() {
@@ -27,24 +28,26 @@ export default function TaskDetailRoutePage() {
   useProjectFiles(projectId);
 
   // Fetch real tasks + comments from the API and sync into the store.
-  const { loading: tasksLoading } = useProjectTasks(projectId);
+  const { tasks: fetchedTasks, loading: tasksLoading, error: tasksError, refetch: refetchTasks } = useProjectTasks(projectId);
   useProjectComments(projectId);
   // Real project members for the assignee <select> in the detail panel.
   const { members } = useProjectMembers(projectId);
 
   const { activity: taskActivity } = useTaskActivity(taskId || null);
 
-  const taskDataUnavailable = !projectId || !taskId || !state.tasksByProject[projectId];
-  const task = getTaskForProject(state.tasksByProject, projectId, taskId);
-  if (!task && !tasksLoading && !taskDataUnavailable) {
+  const cachedTask = getTaskForProject(state.tasksByProject, projectId, taskId);
+  const task = cachedTask ?? fetchedTasks.find(candidate => candidate.id === taskId) ?? null;
+  if (!task && !tasksLoading && !tasksError) {
     notFound();
   }
 
   if (!task) {
-    return <TaskDetailSkeleton />;
+    return tasksError
+      ? <TaskLoadError onRetry={() => void refetchTasks()} />
+      : <TaskDetailSkeleton />;
   }
 
-  const projectTasks = state.tasksByProject[projectId] ?? [];
+  const projectTasks = fetchedTasks.length > 0 ? fetchedTasks : (state.tasksByProject[projectId] ?? []);
   const projectFiles = state.filesByProject[projectId] ?? [];
   const projectTags = state.tagsByProject[projectId] ?? [];
   const projectComments = state.commentsByProject[projectId] ?? [];

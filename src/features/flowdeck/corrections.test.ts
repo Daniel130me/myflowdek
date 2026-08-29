@@ -79,7 +79,8 @@ test('task detail route keeps loading until the task fetch resolves and stays ab
 
   assert.ok(page.includes('tasksLoading'));
   assert.ok(page.includes('<TaskDetailSkeleton />'));
-  assert.ok(page.includes('!tasksLoading && !taskDataUnavailable'));
+  assert.ok(page.includes('cachedTask ?? fetchedTasks.find'));
+  assert.ok(page.includes('!tasksLoading && !tasksError'));
   assert.ok(hook.includes('useState(Boolean(projectId))'));
   assert.ok(hook.includes('requestedProjectId !== projectId'));
   assert.ok(panel.includes('zIndex: 70'));
@@ -89,9 +90,10 @@ test('intercepted task route waits for hydration instead of falling through to a
   const modalRoute = readFileSync(join(process.cwd(), 'src/app/(product)/@modal/(.)projects/[projectId]/tasks/[taskId]/page.tsx'), 'utf8');
 
   assert.ok(modalRoute.includes('useProjectTasks(cachedTask ? null : projectId)'));
-  assert.ok(modalRoute.includes('!task && !tasksLoading && taskListHydrated'));
+  assert.ok(modalRoute.includes('cachedTask ?? fetchedTasks.find'));
+  assert.ok(modalRoute.includes('!task && !tasksLoading && !tasksError'));
   assert.ok(modalRoute.includes('<TaskDetailSkeleton />'));
-  assert.ok(modalRoute.indexOf('if (!task && !tasksLoading && taskListHydrated)') < modalRoute.indexOf('notFound();'));
+  assert.ok(modalRoute.indexOf('if (!task && !tasksLoading && !tasksError)') < modalRoute.indexOf('notFound();'));
 });
 
 test('mobile task cards open when clicking anywhere on the card', () => {
