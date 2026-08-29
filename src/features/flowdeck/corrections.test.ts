@@ -139,7 +139,9 @@ test('project files can be linked to several tasks through the authenticated end
   const taskPanel = readFileSync(join(process.cwd(), 'src/features/flowdeck/components/modals/TaskDetailPanel.tsx'), 'utf8');
 
   assert.ok(schema.includes('model TaskFile'));
-  assert.ok(fileService.includes('tx.taskFile.upsert'));
+  assert.ok(fileService.includes('db.taskFile.upsert'));
+  assert.ok(fileService.includes('await db.$transaction(['));
+  assert.ok(!fileService.includes('db.$transaction(async'));
   assert.ok(store.includes('apiLinkFile(id, taskId, linked)'));
   assert.ok(store.includes("toast.error('Failed to update task attachment'"));
   assert.ok(fileRoute.includes('export async function PATCH'));

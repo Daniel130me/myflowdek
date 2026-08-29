@@ -59,48 +59,59 @@ export async function updateFileTaskLink(
   taskId: string,
   linked: boolean,
 ) {
-  const task = await db.task.findFirst({
-    where: { id: taskId, projectId },
-    select: { id: true },
-  });
-  if (!task) throw new AuthError('Task not found in this project', 404);
-
-  return db.$transaction(async tx => {
-    const file = await tx.file.findFirst({
+  const [task, file] = await Promise.all([
+    db.task.findFirst({
+      where: { id: taskId, projectId },
+      select: { id: true },
+    }),
+    db.file.findFirst({
       where: { id: fileId, projectId },
       select: { id: true, taskId: true },
-    });
-    if (!file) throw new AuthError('File not found in this project', 404);
+    }),
+  ]);
+  if (!task) throw new AuthError('Task not found in this project', 404);
+  if (!file) throw new AuthError('File not found in this project', 404);
 
-    if (linked) {
-      await tx.taskFile.upsert({
+  if (linked) {
+    // Use a batch transaction rather than an interactive callback. Neon's
+    // pooled connections can take longer than Prisma's 5-second interactive
+    // timeout to complete several sequential round trips.
+    await db.$transaction([
+      db.taskFile.upsert({
         where: { taskId_fileId: { taskId, fileId } },
         create: { taskId, fileId },
         update: {},
-      });
-      // Keep the first association populated for legacy file views.
-      if (!file.taskId) {
-        await tx.file.update({ where: { id: fileId }, data: { taskId } });
-      }
-    } else {
-      await tx.taskFile.deleteMany({ where: { taskId, fileId } });
-      if (file.taskId === taskId) {
-        const replacement = await tx.taskFile.findFirst({
-          where: { fileId },
+      }),
+      // Keep the first association populated for legacy file views without
+      // replacing an existing primary association.
+      db.file.updateMany({
+        where: { id: fileId, taskId: null },
+        data: { taskId },
+      }),
+    ]);
+  } else {
+    const replacement = file.taskId === taskId
+      ? await db.taskFile.findFirst({
+          where: { fileId, taskId: { not: taskId } },
           select: { taskId: true },
           orderBy: { createdAt: 'asc' },
-        });
-        await tx.file.update({
+        })
+      : null;
+
+    await db.$transaction([
+      db.taskFile.deleteMany({ where: { taskId, fileId } }),
+      ...(file.taskId === taskId
+        ? [db.file.update({
           where: { id: fileId },
           data: { taskId: replacement?.taskId ?? null },
-        });
-      }
-    }
+        })]
+        : []),
+    ]);
+  }
 
-    return tx.file.findUniqueOrThrow({
-      where: { id: fileId },
-      select: { ...fileSelect, uploadedBy: { select: { id: true, name: true, avatarColor: true } } },
-    });
+  return db.file.findUniqueOrThrow({
+    where: { id: fileId },
+    select: { ...fileSelect, uploadedBy: { select: { id: true, name: true, avatarColor: true } } },
   });
 }
 
