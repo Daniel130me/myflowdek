@@ -44,7 +44,17 @@ export async function GET() {
     }
 
     // Get a valid (potentially refreshed) access token.
-    const accessToken = await getValidAccessToken(connection);
+    let accessToken: string;
+    try {
+      accessToken = await getValidAccessToken(connection);
+    } catch {
+      return NextResponse.json(
+        {
+          error: 'Google Drive access has expired or does not match the current signed-in account. Reconnect Google Drive in Settings using the same Google account and try again.',
+        },
+        { status: 401 },
+      );
+    }
 
     // The client ID is the same OAuth client used for the connection.
     const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;

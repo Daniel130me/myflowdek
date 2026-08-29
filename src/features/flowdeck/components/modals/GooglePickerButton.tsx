@@ -43,6 +43,7 @@ interface GooglePickerButtonProps {
   projectId: string;
   taskId?: string | null;
   onFileSelected: (file: SelectedFile) => void;
+  onStatusChange?: (status: { type: 'error'; message: string } | null) => void;
   disabled?: boolean;
 }
 
@@ -80,17 +81,28 @@ export function GooglePickerButton({
   projectId,
   taskId,
   onFileSelected,
+  onStatusChange,
   disabled,
 }: GooglePickerButtonProps) {
   const [loading, setLoading] = useState(false);
 
   const handleOpenPicker = useCallback(async () => {
+    onStatusChange?.(null);
     setLoading(true);
     try {
       // 1. Fetch the picker config (access token + client ID).
       const configRes = await fetch('/api/storage/picker/config');
       if (configRes.status === 409) {
-        toast.error('Google Drive is not connected. Connect it in Settings first.');
+        const message = 'Google Drive is not connected. Connect it in Settings first.';
+        onStatusChange?.({ type: 'error', message });
+        toast.error(message);
+        return;
+      }
+      if (configRes.status === 401 || configRes.status === 502) {
+        const data = await configRes.json().catch(() => ({}));
+        const message = data.error ?? 'Google Drive access expired or is linked to a different account. Reconnect it in Settings and try again.';
+        onStatusChange?.({ type: 'error', message });
+        toast.error(message);
         return;
       }
       if (!configRes.ok) {
@@ -162,11 +174,12 @@ export function GooglePickerButton({
       picker.setVisible(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to open Google Picker';
+      onStatusChange?.({ type: 'error', message: msg });
       toast.error(msg);
     } finally {
       setLoading(false);
     }
-  }, [projectId, taskId, onFileSelected]);
+  }, [projectId, taskId, onFileSelected, onStatusChange]);
 
   return (
     <button

@@ -8,6 +8,7 @@ import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useProjectComments } from '@/features/flowdeck/hooks/useProjectComments';
 import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { useConnectedFileMutations } from '@/features/flowdeck/hooks/useConnectedFileMutations';
+import { useProjectFiles } from '@/features/flowdeck/hooks/useProjectFiles';
 import { useProjectMembers } from '@/features/flowdeck/components/ui';
 import { getTaskForProject } from '@/features/tasks/selectors/getTaskForProject';
 import { routes } from '@/shared/navigation/routes';
@@ -21,6 +22,9 @@ export default function TaskDetailRoutePage() {
   const taskId = typeof params.taskId === 'string' ? params.taskId : '';
   const state = useFlowDeck();
   const fileMutations = useConnectedFileMutations(projectId);
+
+  // Keep project files in the store so the task modal reflects real uploads and attachments.
+  useProjectFiles(projectId);
 
   // Fetch real tasks + comments from the API and sync into the store.
   const { loading: tasksLoading } = useProjectTasks(projectId);
@@ -112,6 +116,7 @@ export default function TaskDetailRoutePage() {
         customCols={projectCustomFields}
         onViewFile={fileId => router.push(routes.file(projectId, fileId))}
         onRemoveFile={fileMutations.removeFile}
+        onLinkFile={(fileId, linkedTaskId) => state.linkFile(projectId, fileId, linkedTaskId)}
         onFileAttached={() => void fileMutations.refetch()}
         onAddFiles={(files) => fileMutations.uploadFiles(files, taskId)}
         onDuplicateTaskWithOptions={(taskId, opts) => state.duplicateTaskWithOptions(projectId, taskId, opts)}

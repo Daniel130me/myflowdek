@@ -294,18 +294,54 @@ export function listStorageConnections(userId: string) {
   });
 }
 
+export type StorageDisconnectBlocker = {
+  type: 'file' | 'projectDocument';
+  name: string;
+  projectName: string;
+};
+
+export function formatStorageDisconnectBlockers(blockers: StorageDisconnectBlocker[]): string {
+  if (blockers.length === 0) return 'This connection is not linked to any Flowdek files or project documents.';
+
+  const firstFew = blockers.slice(0, 3).map((blocker) => `${blocker.name} (${blocker.projectName})`);
+  const summary = firstFew.join(', ');
+  const suffix = blockers.length > 3 ? ` and ${blockers.length - 3} more` : '';
+
+  return `This connection is still linked to Flowdek content that must be removed first: ${summary}${suffix}. Open the project Documents or Files tab, remove those items from Flowdek, then disconnect again.`;
+}
+
 export async function disconnectStorage(userId: string, provider: StorageProvider) {
   const connection = await db.storageConnection.findUnique({
     where: { userId_provider: { userId, provider } },
-    select: { id: true, _count: { select: { files: true, projectDocuments: true } } },
+    select: {
+      id: true,
+      files: {
+        select: { id: true, name: true, project: { select: { name: true } } },
+      },
+      projectDocuments: {
+        select: { id: true, name: true, project: { select: { name: true } } },
+      },
+    },
   });
   if (!connection) throw new AuthError('Storage connection not found', 404);
-  if (connection._count.files > 0 || connection._count.projectDocuments > 0) {
-    throw new AuthError(
-      'This connection still owns Flowdek files or project documents and cannot be disconnected',
-      409,
-    );
+
+  const blockers: StorageDisconnectBlocker[] = [
+    ...connection.files.map((file) => ({
+      type: 'file' as const,
+      name: file.name,
+      projectName: file.project.name,
+    })),
+    ...connection.projectDocuments.map((document) => ({
+      type: 'projectDocument' as const,
+      name: document.name,
+      projectName: document.project.name,
+    })),
+  ];
+
+  if (blockers.length > 0) {
+    throw new AuthError(formatStorageDisconnectBlockers(blockers), 409);
   }
+
   await db.storageConnection.delete({ where: { id: connection.id } });
 }
 

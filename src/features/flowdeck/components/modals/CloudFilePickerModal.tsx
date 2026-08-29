@@ -29,7 +29,7 @@ interface CloudFilePickerModalProps {
   taskId?: string | null;
   isOpen: boolean;
   onClose: () => void;
-  onFileAttached: () => void;
+  onFileAttached: () => void | Promise<void>;
   inline?: boolean;
 }
 
@@ -76,6 +76,7 @@ export function CloudFilePickerModal({
   const [connected, setConnected] = useState<boolean>(true);
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [googleDriveIssue, setGoogleDriveIssue] = useState<string | null>(null);
 
   // Check connected storage accounts.
   const loadConnections = useCallback(async () => {
@@ -168,7 +169,7 @@ export function CloudFilePickerModal({
         if (!res.ok) throw new Error(data.error ?? 'Failed to attach file');
 
         toast.success(`Attached "${data.file?.name ?? 'file'}" from ${PROVIDER_NAMES[provider]}`);
-        onFileAttached();
+        await Promise.resolve(onFileAttached());
         onClose();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Could not attach file');
@@ -352,10 +353,44 @@ export function CloudFilePickerModal({
                     Click below to open the Google Drive file picker. Browse your full Drive,
                     select a file, and Flowdek will attach it by reference — no copies stored.
                   </div>
+                  {googleDriveIssue && (
+                    <div
+                      style={{
+                        margin: '0 auto 16px',
+                        maxWidth: 560,
+                        padding: '12px 14px',
+                        borderRadius: 10,
+                        border: `1px solid ${COLORS.accent}`,
+                        background: COLORS.accentSoft,
+                        color: COLORS.ink,
+                        fontSize: 13,
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, marginBottom: 4, color: COLORS.accent }}>Reconnect Google Drive</div>
+                      <div style={{ marginBottom: 8 }}>{googleDriveIssue}</div>
+                      <button
+                        onClick={() => { window.location.href = '/settings'; }}
+                        style={{
+                          background: COLORS.accent,
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: 8,
+                          padding: '7px 12px',
+                          fontWeight: 600,
+                          fontSize: 12.5,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Open Settings
+                      </button>
+                    </div>
+                  )}
                   <GooglePickerButton
                     projectId={projectId}
                     taskId={taskId}
                     onFileSelected={handleGooglePickerFileSelected}
+                    onStatusChange={(status) => setGoogleDriveIssue(status?.type === 'error' ? status.message : null)}
                     disabled={!!attachingId}
                   />
                   {attachingId && (

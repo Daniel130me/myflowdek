@@ -67,5 +67,5 @@ export function useConnectedFileMutations(projectId: string) {
     }
   }, [refetch]);
 
-  return { uploadFiles, removeFile };
+  return { uploadFiles, removeFile, refetch };
 }
