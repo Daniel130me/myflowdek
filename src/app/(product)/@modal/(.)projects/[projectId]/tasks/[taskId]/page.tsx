@@ -10,6 +10,9 @@ import { useCloseOverlay } from '@/shared/navigation/useCloseOverlay';
 import { routes } from '@/shared/navigation/routes';
 import { useConnectedFileMutations } from '@/features/flowdeck/hooks/useConnectedFileMutations';
 import { useProjectFiles } from '@/features/flowdeck/hooks/useProjectFiles';
+import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
+import { useProjectComments } from '@/features/flowdeck/hooks/useProjectComments';
+import { TaskDetailSkeleton } from '@/components/ui/skeleton';
 
 export default function InterceptedTaskDetailPage() {
   const params = useParams();
@@ -23,9 +26,33 @@ export default function InterceptedTaskDetailPage() {
 
   const { members } = useProjectMembers(projectId);
 
+  // A soft navigation can render this intercepted slot before the project
+  // task list has hydrated. Fetch only when the requested task is not already
+  // cached, avoiding both a false 404 and a duplicate request on warm opens.
+  const cachedTask = getTaskForProject(state.tasksByProject, projectId, taskId);
+  const { loading: tasksLoading } = useProjectTasks(cachedTask ? null : projectId);
+  useProjectComments(projectId);
+
   const task = getTaskForProject(state.tasksByProject, projectId, taskId);
-  if (!task) {
+  const taskListHydrated = Boolean(state.tasksByProject[projectId]);
+  if (!task && !tasksLoading && taskListHydrated) {
     notFound();
+  }
+
+  if (!task) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          type="button"
+          onClick={close}
+          aria-label="Close task details"
+          style={{ position: 'absolute', inset: 0, border: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)', cursor: 'pointer' }}
+        />
+        <div style={{ position: 'relative', width: 'min(650px, 100%)', height: '100%', overflowY: 'auto', background: '#FFFFFF' }}>
+          <TaskDetailSkeleton />
+        </div>
+      </div>
+    );
   }
 
   const projectTasks = state.tasksByProject[projectId] ?? [];

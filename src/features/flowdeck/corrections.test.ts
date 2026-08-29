@@ -85,6 +85,15 @@ test('task detail route keeps loading until the task fetch resolves and stays ab
   assert.ok(panel.includes('zIndex: 70'));
 });
 
+test('intercepted task route waits for hydration instead of falling through to a full-page 404', () => {
+  const modalRoute = readFileSync(join(process.cwd(), 'src/app/(product)/@modal/(.)projects/[projectId]/tasks/[taskId]/page.tsx'), 'utf8');
+
+  assert.ok(modalRoute.includes('useProjectTasks(cachedTask ? null : projectId)'));
+  assert.ok(modalRoute.includes('!task && !tasksLoading && taskListHydrated'));
+  assert.ok(modalRoute.includes('<TaskDetailSkeleton />'));
+  assert.ok(modalRoute.indexOf('if (!task && !tasksLoading && taskListHydrated)') < modalRoute.indexOf('notFound();'));
+});
+
 test('mobile task cards open when clicking anywhere on the card', () => {
   const taskList = readFileSync(join(process.cwd(), 'src/features/flowdeck/components/views/TaskListView.tsx'), 'utf8');
 
