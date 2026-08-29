@@ -13,6 +13,7 @@ import { useProjectFiles } from '@/features/flowdeck/hooks/useProjectFiles';
 import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { useProjectComments } from '@/features/flowdeck/hooks/useProjectComments';
 import { TaskDetailSkeleton } from '@/components/ui/skeleton';
+import { useTaskActivity } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 
 export default function InterceptedTaskDetailPage() {
   const params = useParams();
@@ -32,6 +33,7 @@ export default function InterceptedTaskDetailPage() {
   const cachedTask = getTaskForProject(state.tasksByProject, projectId, taskId);
   const { loading: tasksLoading } = useProjectTasks(cachedTask ? null : projectId);
   useProjectComments(projectId);
+  const { activity: taskActivity } = useTaskActivity(taskId || null);
 
   const task = getTaskForProject(state.tasksByProject, projectId, taskId);
   const taskListHydrated = Boolean(state.tasksByProject[projectId]);
@@ -59,15 +61,11 @@ export default function InterceptedTaskDetailPage() {
   const projectFiles = state.filesByProject[projectId] ?? [];
   const projectTags = state.tagsByProject[projectId] ?? [];
   const projectComments = state.commentsByProject[projectId] ?? [];
-  const projectActivity = state.activityByProject[projectId] ?? [];
   const projectTimeLogs = state.timeLogsByProject[projectId] ?? [];
   const projectCustomFields = state.customColsByProject[projectId] ?? [];
 
   const taskComments = projectComments.filter(
     comment => comment.taskId === taskId
-  );
-  const taskActivity = projectActivity.filter(
-    activity => activity.taskId === taskId
   );
   const taskTimeLogs = projectTimeLogs.filter(
     log => log.taskId === taskId
@@ -91,7 +89,7 @@ export default function InterceptedTaskDetailPage() {
       onToggleTaskTag={(taskId, tagId) => state.toggleTaskTag(projectId, taskId, tagId)}
       onAddTag={(tag) => state.addTag(projectId, tag)}
       onRemoveTag={(tagId) => state.removeTag(projectId, tagId)}
-      onAddComment={(taskId, text, parentId, fileIds) => state.addComment(projectId, taskId, text, parentId, fileIds)}
+      onAddComment={(taskId, text, parentId, fileIds, mentionedUserIds) => state.addComment(projectId, taskId, text, parentId, fileIds, mentionedUserIds)}
       onDeleteComment={(commentId) => state.deleteComment(projectId, commentId)}
       onEditComment={(commentId, newText) => state.editComment(projectId, commentId, newText)}
       onToggleReaction={(commentId, emoji) => state.toggleReaction(projectId, commentId, emoji)}
@@ -103,7 +101,7 @@ export default function InterceptedTaskDetailPage() {
       customCols={projectCustomFields}
       onViewFile={fileId => router.push(routes.file(projectId, fileId))}
       onRemoveFile={fileMutations.removeFile}
-      onLinkFile={(fileId, linkedTaskId) => state.linkFile(projectId, fileId, linkedTaskId)}
+      onLinkFile={(fileId, linkedTaskId, linked) => state.linkFile(projectId, fileId, linkedTaskId, linked)}
       onFileAttached={() => void fileMutations.refetch()}
       onAddFiles={(files) => fileMutations.uploadFiles(files, taskId)}
       onDuplicateTaskWithOptions={(taskId, opts) => state.duplicateTaskWithOptions(projectId, taskId, opts)}

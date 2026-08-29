@@ -129,14 +129,21 @@ test('timeline refresh waits for project-store hydration and fetches its tasks',
   assert.ok(timeline.includes('useProjectTasks(projectId)'));
 });
 
-test('task file links persist through the authenticated file endpoint', () => {
+test('project files can be linked to several tasks through the authenticated endpoint', () => {
+  const schema = readFileSync(join(process.cwd(), 'prisma/schema.prisma'), 'utf8');
   const store = readFileSync(join(process.cwd(), 'src/features/flowdeck/store/useFlowDeck.ts'), 'utf8');
   const fileRoute = readFileSync(join(process.cwd(), 'src/app/api/files/[fileId]/route.ts'), 'utf8');
+  const fileService = readFileSync(join(process.cwd(), 'src/server/files/file.service.ts'), 'utf8');
+  const taskPanel = readFileSync(join(process.cwd(), 'src/features/flowdeck/components/modals/TaskDetailPanel.tsx'), 'utf8');
 
-  assert.ok(store.includes('apiLinkFile(id, linkedTaskId)'));
+  assert.ok(schema.includes('model TaskFile'));
+  assert.ok(fileService.includes('tx.taskFile.upsert'));
+  assert.ok(store.includes('apiLinkFile(id, taskId, linked)'));
   assert.ok(store.includes("toast.error('Failed to update task attachment'"));
   assert.ok(fileRoute.includes('export async function PATCH'));
   assert.ok(fileRoute.includes("requireProjectCapability(user.id, file.projectId, 'EDIT_TASK')"));
+  assert.ok(taskPanel.includes('Also used by'));
+  assert.ok(!taskPanel.includes("'In use'"));
 });
 
 test('comments can persist project file references and expose accessible controls', () => {
@@ -150,4 +157,15 @@ test('comments can persist project file references and expose accessible control
   assert.ok(commentsUi.includes('aria-label="Attach project files"'));
   assert.ok(commentsUi.includes('aria-label="Send comment"'));
   assert.ok(commentsUi.includes('width: 44, height: 44'));
+  assert.ok(commentsUi.includes('<MarkdownToolbar'));
+  assert.ok(commentsUi.includes('mentionedUserIds'));
+});
+
+test('both task detail routes load the real activity feed', () => {
+  const fullRoute = readFileSync(join(process.cwd(), 'src/app/(product)/projects/[projectId]/tasks/[taskId]/page.tsx'), 'utf8');
+  const modalRoute = readFileSync(join(process.cwd(), 'src/app/(product)/@modal/(.)projects/[projectId]/tasks/[taskId]/page.tsx'), 'utf8');
+
+  assert.ok(fullRoute.includes('useTaskActivity(taskId || null)'));
+  assert.ok(modalRoute.includes('useTaskActivity(taskId || null)'));
+  assert.ok(!modalRoute.includes('state.activityByProject'));
 });

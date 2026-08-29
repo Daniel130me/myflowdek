@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import type { ActivityEntry } from '@/features/flowdeck/model';
 
 /**
  * Generic API hook factory — fetches data from a URL on mount and exposes
@@ -116,8 +117,29 @@ export function useNotifications() {
 
 /** Activity feed hook — fetches activity for a task. */
 export function useTaskActivity(taskId: string | null) {
-  return useApiFetch(
+  const result = useApiFetch<{
+    activity: Array<{
+      id: string;
+      taskId: string;
+      type: ActivityEntry['type'];
+      description: string;
+      authorId: string | null;
+      createdAt: string;
+    }>;
+  }>(
     taskId ? `/api/tasks/${taskId}/activity` : null,
     { activity: [] },
   );
+
+  return {
+    ...result,
+    activity: result.data.activity.map(entry => ({
+      id: entry.id,
+      taskId: entry.taskId,
+      type: entry.type,
+      description: entry.description,
+      authorId: entry.authorId ?? '',
+      timestamp: entry.createdAt,
+    } satisfies ActivityEntry)),
+  };
 }

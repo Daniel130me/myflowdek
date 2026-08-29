@@ -8,6 +8,7 @@ interface ApiFile {
   id: string;
   projectId: string;
   taskId: string | null;
+  taskLinks?: Array<{ taskId: string }>;
   name: string;
   size: number;
   uploadedById: string | null;
@@ -39,6 +40,7 @@ function mapFile(api: ApiFile): FileItem {
     uploadedBy: api.uploadedById ?? '',
     uploadedAt: api.uploadedAt,
     linkedTaskId: api.taskId,
+    linkedTaskIds: api.taskLinks?.map(link => link.taskId) ?? (api.taskId ? [api.taskId] : []),
     // Connected-provider files use the provider's direct URL.
     // Legacy/local files use the stored URL.
     url: api.providerWebUrl ?? api.url ?? undefined,

@@ -4,7 +4,10 @@ import { db } from '@/server/db/client';
 import { deleteFile, updateFileTaskLink } from '@/server/files/file.service';
 import { z } from 'zod';
 
-const updateFileLinkSchema = z.object({ taskId: z.string().min(1).nullable() });
+const updateFileLinkSchema = z.object({
+  taskId: z.string().min(1),
+  linked: z.boolean().default(true),
+});
 
 export async function PATCH(
   request: Request,
@@ -16,13 +19,13 @@ export async function PATCH(
     const body = await request.json().catch(() => null);
     const parsed = updateFileLinkSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: 'A valid taskId or null is required' }, { status: 400 });
+      return NextResponse.json({ error: 'A valid taskId and link state are required' }, { status: 400 });
     }
 
     const file = await db.file.findUnique({ where: { id: fileId }, select: { projectId: true } });
     if (!file) return NextResponse.json({ error: 'File not found' }, { status: 404 });
     await requireProjectCapability(user.id, file.projectId, 'EDIT_TASK');
-    const updated = await updateFileTaskLink(fileId, file.projectId, parsed.data.taskId);
+    const updated = await updateFileTaskLink(fileId, file.projectId, parsed.data.taskId, parsed.data.linked);
     return NextResponse.json({ file: updated });
   } catch (error) {
     return authErrorResponse(error);

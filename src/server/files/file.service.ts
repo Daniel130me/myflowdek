@@ -40,6 +40,7 @@ const fileSelect = {
   uploadedAt: true,
   url: true,
   thumbnailUrl: true,
+  taskLinks: { select: { taskId: true } },
 } as const;
 
 /** List provider metadata only; file bytes stay in the user's cloud drive. */
@@ -55,20 +56,51 @@ export function listFiles(projectId: string) {
 export async function updateFileTaskLink(
   fileId: string,
   projectId: string,
-  taskId: string | null,
+  taskId: string,
+  linked: boolean,
 ) {
-  if (taskId) {
-    const task = await db.task.findFirst({
-      where: { id: taskId, projectId },
-      select: { id: true },
-    });
-    if (!task) throw new AuthError('Task not found in this project', 404);
-  }
+  const task = await db.task.findFirst({
+    where: { id: taskId, projectId },
+    select: { id: true },
+  });
+  if (!task) throw new AuthError('Task not found in this project', 404);
 
-  return db.file.update({
-    where: { id: fileId },
-    data: { taskId },
-    select: { ...fileSelect, uploadedBy: { select: { id: true, name: true, avatarColor: true } } },
+  return db.$transaction(async tx => {
+    const file = await tx.file.findFirst({
+      where: { id: fileId, projectId },
+      select: { id: true, taskId: true },
+    });
+    if (!file) throw new AuthError('File not found in this project', 404);
+
+    if (linked) {
+      await tx.taskFile.upsert({
+        where: { taskId_fileId: { taskId, fileId } },
+        create: { taskId, fileId },
+        update: {},
+      });
+      // Keep the first association populated for legacy file views.
+      if (!file.taskId) {
+        await tx.file.update({ where: { id: fileId }, data: { taskId } });
+      }
+    } else {
+      await tx.taskFile.deleteMany({ where: { taskId, fileId } });
+      if (file.taskId === taskId) {
+        const replacement = await tx.taskFile.findFirst({
+          where: { fileId },
+          select: { taskId: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        await tx.file.update({
+          where: { id: fileId },
+          data: { taskId: replacement?.taskId ?? null },
+        });
+      }
+    }
+
+    return tx.file.findUniqueOrThrow({
+      where: { id: fileId },
+      select: { ...fileSelect, uploadedBy: { select: { id: true, name: true, avatarColor: true } } },
+    });
   });
 }
 
@@ -78,6 +110,7 @@ export async function createFile(projectId: string, uploadedById: string, input:
     data: {
       projectId,
       taskId: input.taskId ?? null,
+      taskLinks: input.taskId ? { create: { taskId: input.taskId } } : undefined,
       name: input.name,
       size: input.size ?? 0,
       uploadedById,
@@ -98,6 +131,7 @@ export function createProviderFile(
       projectId,
       uploadedById,
       taskId: input.taskId ?? null,
+      taskLinks: input.taskId ? { create: { taskId: input.taskId } } : undefined,
       name: input.name,
       size: input.size,
       mimeType: input.mimeType,
@@ -131,6 +165,7 @@ export async function attachConnectedFile(
       projectId,
       uploadedById: userId,
       taskId: input.taskId ?? null,
+      taskLinks: input.taskId ? { create: { taskId: input.taskId } } : undefined,
       name: metadata.name,
       size: metadata.size,
       mimeType: metadata.mimeType,

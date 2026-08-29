@@ -30,7 +30,7 @@ interface TaskDetailPanelProps {
   onToggleTaskTag?: (taskId: string, tagId: string) => void;
   onAddTag?: (tag: Tag) => void;
   onRemoveTag?: (tagId: string) => void;
-  onAddComment?: (taskId: string, text: string, parentId?: string | null, fileIds?: string[]) => void;
+  onAddComment?: (taskId: string, text: string, parentId?: string | null, fileIds?: string[], mentionedUserIds?: string[]) => void;
   onDeleteComment?: (commentId: string) => void;
   onEditComment?: (commentId: string, newText: string) => void;
   onToggleReaction?: (commentId: string, emoji: string) => void;
@@ -42,7 +42,7 @@ interface TaskDetailPanelProps {
   customCols?: CustomColumn[];
   onViewFile?: (fileId: string) => void;
   onRemoveFile?: (fileId: string) => void;
-  onLinkFile?: (fileId: string, linkedTaskId: string | null) => void;
+  onLinkFile?: (fileId: string, taskId: string, linked?: boolean) => void;
   onAddFiles?: (files: File[]) => void;
   onFileAttached?: () => void;
   /* #30: Duplicate with options */
@@ -155,8 +155,9 @@ function TagPicker({ tags, taskTags, onToggle, onAddTag, onRemoveTag }: { tags: 
 export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comments = [], activity = [], parentTask, onClose, onUpdate, onAddSubtask, onNavigateToTask, onToggleTaskTag, onAddTag, onRemoveTag, onAddComment, onDeleteComment, onEditComment, onToggleReaction, onToggleFollower, timeLogs = [], onAddTimeLog, onDeleteTimeLog, currentUserId, customCols, onViewFile, onRemoveFile, onLinkFile, onAddFiles, onFileAttached, onDuplicateTaskWithOptions, onMoveToProject, projects, currentProjectId, onPromoteSubtask, onDemoteToSubtask, onSetTaskSection, sections = [], members = [] }: TaskDetailPanelProps) {
   const { isMobile } = useViewport();
   const deps = task.deps.map(id => allTasks.find(t => t.id === id)).filter(Boolean) as Task[];
-  const taskFiles = files.filter(f => f.linkedTaskId === task.id);
-  const projectFiles = files.filter(f => f.linkedTaskId !== task.id);
+  const linkedTaskIdsFor = (file: FileItem) => file.linkedTaskIds ?? (file.linkedTaskId ? [file.linkedTaskId] : []);
+  const taskFiles = files.filter(file => linkedTaskIdsFor(file).includes(task.id));
+  const projectFiles = files.filter(file => !linkedTaskIdsFor(file).includes(task.id));
   const dueStatus = getDueDateStatus(task.dueDate, task.status);
   const dueMeta = DUE_STATUS[dueStatus];
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -204,6 +205,9 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
               {onRemoveFile && (
                 <button onClick={() => onRemoveFile(f.id)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.red, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={14} /></button>
               )}
+              {onLinkFile && (
+                <button onClick={() => onLinkFile(f.id, task.id, false)} title="Unlink from this task" style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Link2 size={14} /></button>
+              )}
             </div>
           </div>
         ))}
@@ -214,25 +218,24 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
               Project files
             </div>
             {projectFiles.slice(0, 5).map(f => {
-              const linkedTask = f.linkedTaskId ? allTasks.find(t => t.id === f.linkedTaskId) : null;
-              const isAttachedToCurrent = f.linkedTaskId === task.id;
-              const isAvailable = !f.linkedTaskId;
+              const linkedTaskIds = linkedTaskIdsFor(f);
+              const linkedTasks = allTasks.filter(candidate => linkedTaskIds.includes(candidate.id));
               return (
                 <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 8, border: `1px solid ${COLORS.line}`, background: '#FFFFFF' }}>
                   <FileThumbnail name={f.name} thumbnailUrl={f.thumbnailUrl} size="sm" />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 500, fontFamily: FF, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: COLORS.ink }}>{f.name}</div>
-                    {isAttachedToCurrent ? (
-                      <div style={{ fontSize: 11, color: COLORS.accent, fontFamily: FF }}>Attached to this task</div>
-                    ) : linkedTask ? (
-                      <div style={{ fontSize: 11, color: COLORS.gray, fontFamily: FF }}>Linked to {linkedTask.name}</div>
+                    {linkedTasks.length > 0 ? (
+                      <div style={{ fontSize: 11, color: COLORS.gray, fontFamily: FF }}>
+                        Also used by {linkedTasks.length === 1 ? linkedTasks[0].name : `${linkedTasks.length} tasks`}
+                      </div>
                     ) : (
                       <div style={{ fontSize: 11, color: COLORS.gray, fontFamily: FF }}>Ready to attach</div>
                     )}
                   </div>
-                  {isAvailable && onLinkFile ? (
+                  {onLinkFile ? (
                     <button
-                      onClick={() => onLinkFile(f.id, task.id)}
+                      onClick={() => onLinkFile(f.id, task.id, true)}
                       style={{
                         border: 'none',
                         background: COLORS.accentSoft,
@@ -249,8 +252,8 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
                       Attach
                     </button>
                   ) : (
-                    <span style={{ fontSize: 11, color: isAttachedToCurrent ? COLORS.accent : COLORS.gray, fontFamily: FF, whiteSpace: 'nowrap' }}>
-                      {isAttachedToCurrent ? 'Attached' : (linkedTask ? 'In use' : 'Attached')}
+                    <span style={{ fontSize: 11, color: COLORS.gray, fontFamily: FF, whiteSpace: 'nowrap' }}>
+                      Unavailable
                     </span>
                   )}
                 </div>

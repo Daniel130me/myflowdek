@@ -253,6 +253,7 @@ async function main() {
           id: f.id,
           projectId,
           taskId: f.linkedTaskId,
+          taskLinks: f.linkedTaskId ? { create: { taskId: f.linkedTaskId } } : undefined,
           name: f.name,
           size: f.size,
           uploadedById: f.uploadedBy,

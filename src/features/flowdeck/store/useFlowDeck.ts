@@ -185,7 +185,7 @@ export interface FlowDeckState {
   toggleComplete: (projectId: string, taskId: string) => void;
   addFiles: (projectId: string, files: FileItem[]) => void;
   removeFile: (projectId: string, fileId: string) => void;
-  linkFile: (projectId: string, fileId: string, linkedTaskId: string | null) => void;
+  linkFile: (projectId: string, fileId: string, taskId: string, linked?: boolean) => void;
   addRaidItem: (projectId: string, item: RaidItem) => void;
   updateRaidItem: (projectId: string, id: string, patch: Partial<RaidItem>) => void;
   removeRaidItem: (projectId: string, id: string) => void;
@@ -197,7 +197,7 @@ export interface FlowDeckState {
   removeTag: (projectId: string, tagId: string) => void;
   toggleTaskTag: (projectId: string, taskId: string, tagId: string) => void;
   /* Comments */
-  addComment: (projectId: string, taskId: string, text: string, parentId?: string | null, fileIds?: string[]) => void;
+  addComment: (projectId: string, taskId: string, text: string, parentId?: string | null, fileIds?: string[], mentionedUserIds?: string[]) => void;
   deleteComment: (projectId: string, commentId: string) => void;
   editComment: (projectId: string, commentId: string, newText: string) => void;
   toggleReaction: (projectId: string, commentId: string, emoji: string) => void;
@@ -1453,6 +1453,8 @@ export function useFlowDeckStore(): FlowDeckState {
             uploadedBy: data.file.uploadedById ?? '',
             uploadedAt: data.file.uploadedAt,
             linkedTaskId: data.file.taskId,
+            linkedTaskIds: data.file.taskLinks?.map((link: { taskId: string }) => link.taskId)
+              ?? (data.file.taskId ? [data.file.taskId] : []),
             url: '/api/files/' + data.file.id + '/download',
             thumbnailUrl: data.file.thumbnailUrl ?? undefined,
           });
@@ -1530,11 +1532,25 @@ export function useFlowDeckStore(): FlowDeckState {
     setFilesByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).filter(f => f.id !== id) }));
   }, []);
 
-  const linkFile = useCallback((projectId: string, id: string, linkedTaskId: string | null) => {
+  const linkFile = useCallback((projectId: string, id: string, taskId: string, linked = true) => {
     if (!projectId) return;
     const snapshot = filesByProject[projectId] || [];
-    setFilesByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).map(f => f.id === id ? { ...f, linkedTaskId } : f) }));
-    apiLinkFile(id, linkedTaskId).then((res) => {
+    setFilesByProject(prev => ({
+      ...prev,
+      [projectId]: (prev[projectId] || []).map(file => {
+        if (file.id !== id) return file;
+        const existing = file.linkedTaskIds ?? (file.linkedTaskId ? [file.linkedTaskId] : []);
+        const linkedTaskIds = linked
+          ? Array.from(new Set([...existing, taskId]))
+          : existing.filter(linkedTaskId => linkedTaskId !== taskId);
+        return {
+          ...file,
+          linkedTaskIds,
+          linkedTaskId: linkedTaskIds[0] ?? null,
+        };
+      }),
+    }));
+    apiLinkFile(id, taskId, linked).then((res) => {
       if (res.ok) return;
       setFilesByProject(prev => ({ ...prev, [projectId]: snapshot }));
       toast.error('Failed to update task attachment', { description: res.error });
@@ -1727,7 +1743,7 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [tasksByProject, commit, logActivity]);
 
   /* ---- Comments ---- */
-  const addComment = useCallback((projectId: string, taskId: string, text: string, parentId?: string | null, fileIds: string[] = []) => {
+  const addComment = useCallback((projectId: string, taskId: string, text: string, parentId?: string | null, fileIds: string[] = [], mentionedUserIds: string[] = []) => {
     const normalizedFileIds = Array.from(new Set(fileIds)).slice(0, 10);
     if (!projectId || (!text.trim() && normalizedFileIds.length === 0)) return;
     const tempId = defaultIdGenerator.generate('c');
@@ -1754,7 +1770,7 @@ export function useFlowDeckStore(): FlowDeckState {
     // Persist to PostgreSQL. The API returns the canonical server comment —
     // we swap the temp id for the server id so subsequent edits/deletes
     // target the right row. On failure we roll back the optimistic insert.
-    apiAddComment(projectId, taskId, text.trim(), parentId ?? undefined, normalizedFileIds).then((res) => {
+    apiAddComment(projectId, taskId, text.trim(), parentId ?? undefined, normalizedFileIds, Array.from(new Set(mentionedUserIds))).then((res) => {
       if (!res.ok) {
         setCommentsByProject(prev => ({ ...prev, [projectId]: snapshot }));
         toast.error('Failed to save comment', { description: res.error });

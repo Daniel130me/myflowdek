@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useParams, useRouter, notFound } from 'next/navigation';
 import ProjectTasksPage from '../page';
 import { TaskDetailPanel } from '@/features/flowdeck/components/modals';
@@ -13,7 +13,7 @@ import { useProjectMembers } from '@/features/flowdeck/components/ui';
 import { getTaskForProject } from '@/features/tasks/selectors/getTaskForProject';
 import { routes } from '@/shared/navigation/routes';
 import { TaskDetailSkeleton } from '@/components/ui/skeleton';
-import type { ActivityEntry } from '@/features/flowdeck/model';
+import { useTaskActivity } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 
 export default function TaskDetailRoutePage() {
   const params = useParams();
@@ -32,30 +32,7 @@ export default function TaskDetailRoutePage() {
   // Real project members for the assignee <select> in the detail panel.
   const { members } = useProjectMembers(projectId);
 
-  // Fetch real activity from the API (replaces mock store activity).
-  const [apiActivity, setApiActivity] = useState<ActivityEntry[]>([]);
-
-  useEffect(() => {
-    if (!taskId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`/api/tasks/${taskId}/activity`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled) return;
-        setApiActivity((data.activity ?? []).map((a: any) => ({
-          id: a.id,
-          taskId: a.taskId,
-          type: a.type,
-          description: a.description,
-          authorId: a.authorId ?? '',
-          timestamp: a.createdAt,
-        })));
-      } catch { /* network error */ }
-    })();
-    return () => { cancelled = true; };
-  }, [taskId]);
+  const { activity: taskActivity } = useTaskActivity(taskId || null);
 
   const taskDataUnavailable = !projectId || !taskId || !state.tasksByProject[projectId];
   const task = getTaskForProject(state.tasksByProject, projectId, taskId);
@@ -80,8 +57,6 @@ export default function TaskDetailRoutePage() {
   // (state.activityByProject) is intentionally removed — when the API returns
   // no activity we want to show "No activity recorded yet" instead of fake
   // demo entries that drift out of sync with the server's audit trail.
-  const taskActivity = apiActivity;
-
   const taskTimeLogs = projectTimeLogs.filter(log => log.taskId === taskId);
 
   const parentTask = task.parentId ? projectTasks.find(t => t.id === task.parentId) : undefined;
@@ -104,7 +79,7 @@ export default function TaskDetailRoutePage() {
         onToggleTaskTag={(taskId, tagId) => state.toggleTaskTag(projectId, taskId, tagId)}
         onAddTag={(tag) => state.addTag(projectId, tag)}
         onRemoveTag={(tagId) => state.removeTag(projectId, tagId)}
-        onAddComment={(taskId, text, parentId, fileIds) => state.addComment(projectId, taskId, text, parentId, fileIds)}
+        onAddComment={(taskId, text, parentId, fileIds, mentionedUserIds) => state.addComment(projectId, taskId, text, parentId, fileIds, mentionedUserIds)}
         onDeleteComment={(commentId) => state.deleteComment(projectId, commentId)}
         onEditComment={(commentId, newText) => state.editComment(projectId, commentId, newText)}
         onToggleReaction={(commentId, emoji) => state.toggleReaction(projectId, commentId, emoji)}
@@ -116,7 +91,7 @@ export default function TaskDetailRoutePage() {
         customCols={projectCustomFields}
         onViewFile={fileId => router.push(routes.file(projectId, fileId))}
         onRemoveFile={fileMutations.removeFile}
-        onLinkFile={(fileId, linkedTaskId) => state.linkFile(projectId, fileId, linkedTaskId)}
+        onLinkFile={(fileId, linkedTaskId, linked) => state.linkFile(projectId, fileId, linkedTaskId, linked)}
         onFileAttached={() => void fileMutations.refetch()}
         onAddFiles={(files) => fileMutations.uploadFiles(files, taskId)}
         onDuplicateTaskWithOptions={(taskId, opts) => state.duplicateTaskWithOptions(projectId, taskId, opts)}

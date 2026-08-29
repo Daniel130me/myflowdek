@@ -6,6 +6,8 @@ import { COLORS, FF, type Comment, type ActivityEntry, type Reaction, type Membe
 import { Avatar } from './Avatar';
 import { Field } from './Field';
 import { useMemberDirectory } from './MemberDirectory';
+import { MarkdownPreview } from './MarkdownDescription';
+import { applyMarkdownFormat, MarkdownToolbar, type MarkdownFormat } from './MarkdownToolbar';
 
 /* ---- Quick-reaction emojis ---- */
 const QUICK_REACTIONS = ['❤️', '👍', '🎉', '🎊', '👏', '😮', '😎', '👀'];
@@ -15,7 +17,7 @@ interface CommentsSectionProps {
   taskId: string;
   comments: Comment[];
   activity: ActivityEntry[];
-  onAddComment: (taskId: string, text: string, parentId?: string | null, fileIds?: string[]) => void;
+  onAddComment: (taskId: string, text: string, parentId?: string | null, fileIds?: string[], mentionedUserIds?: string[]) => void;
   onDeleteComment: (commentId: string) => void;
   onEditComment?: (commentId: string, newText: string) => void;
   onToggleReaction?: (commentId: string, emoji: string) => void;
@@ -33,6 +35,7 @@ export function CommentsSection({
 }: CommentsSectionProps) {
   const [text, setText] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+  const [selectedMentionIds, setSelectedMentionIds] = useState<string[]>([]);
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [activeTab, setActiveTab] = useState<'comments' | 'activity'>('comments');
   const listRef = useRef<HTMLDivElement>(null);
@@ -71,9 +74,10 @@ export function CommentsSection({
   /* ---- Main comment submit ---- */
   function submit() {
     if (!text.trim() && selectedFileIds.length === 0) return;
-    onAddComment(taskId, text, null, selectedFileIds);
+    onAddComment(taskId, text, null, selectedFileIds, selectedMentionIds);
     setText('');
     setSelectedFileIds([]);
+    setSelectedMentionIds([]);
     setShowFilePicker(false);
   }
 
@@ -95,21 +99,6 @@ export function CommentsSection({
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays}d ago`;
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
-
-  /* ---- @mention rendering ---- */
-  function renderMentionText(text: string): React.ReactNode {
-    const parts = text.split(/(@\w+)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith('@')) {
-        const username = part.slice(1);
-        const member = memberList.find(m => m.name.toLowerCase().split(' ').some(n => n.toLowerCase().startsWith(username.toLowerCase())));
-        return (
-          <span key={i} style={{ fontWeight: 600, color: member?.color || COLORS.teal, backgroundColor: member?.color ? `${member.color}15` : 'transparent', padding: '1px 4px', borderRadius: 4 }}>{part}</span>
-        );
-      }
-      return part;
-    });
   }
 
   /* ---- @mention autocomplete (main input) ---- */
@@ -138,14 +127,16 @@ export function CommentsSection({
     }
   }
 
-  function insertMention(name: string, textarea: HTMLTextAreaElement | null, currentText: string, currentCursorPos: number, setTextFn: (v: string) => void, setCursorPosFn: (v: number) => void) {
+  function insertMention(member: MemberInfo, textarea: HTMLTextAreaElement | null, currentText: string, currentCursorPos: number, setTextFn: (v: string) => void, setCursorPosFn: (v: number) => void, trackMention = false) {
     const beforeCursor = currentText.slice(0, currentCursorPos);
     const afterCursor = currentText.slice(currentCursorPos);
-    const newBefore = beforeCursor.replace(/@\w*$/, `@${name.split(' ')[0]} `);
+    const newBefore = beforeCursor.replace(/@\w*$/, `@${member.name.split(' ')[0]} `);
     const newText = newBefore + afterCursor;
     setTextFn(newText);
+    setCursorPosFn(newBefore.length);
     setShowMentions(false);
     setMentionQuery('');
+    if (trackMention) setSelectedMentionIds(current => Array.from(new Set([...current, member.id])));
     requestAnimationFrame(() => {
       if (textarea) {
         const newPos = newBefore.length;
@@ -162,7 +153,7 @@ export function CommentsSection({
       if (e.key === 'Tab' || e.key === 'Enter') {
         if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
           e.preventDefault();
-          insertMention(mentionMatches[mentionIdx].name, textareaRef.current, text, cursorPos, setText, setCursorPos);
+          insertMention(mentionMatches[mentionIdx], textareaRef.current, text, cursorPos, setText, setCursorPos, true);
           return;
         }
       }
@@ -176,7 +167,7 @@ export function CommentsSection({
   }
 
   /* ---- Mention autocomplete dropdown (shared) ---- */
-  function MentionDropdown({ matches, idx, onSelect, position }: { matches: MemberInfo[]; idx: number; onSelect: (name: string) => void; position: 'above' | 'below' }) {
+  function MentionDropdown({ matches, idx, onSelect, position }: { matches: MemberInfo[]; idx: number; onSelect: (member: MemberInfo) => void; position: 'above' | 'below' }) {
     if (matches.length === 0) return null;
     return (
       <div style={{ position: position === 'above' ? 'absolute' as const : 'absolute' as const, ...(position === 'above' ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }), left: 0, background: '#FFFFFF', border: `1px solid ${COLORS.line}`, borderRadius: 10, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04)', zIndex: 10, padding: 4, minWidth: 200, maxHeight: 200, overflowY: 'auto' }}>
@@ -184,7 +175,8 @@ export function CommentsSection({
           <button
             key={m.id}
             type="button"
-            onClick={() => onSelect(m.name)}
+            onMouseDown={event => event.preventDefault()}
+            onClick={() => onSelect(m)}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, border: 'none',
               background: i === idx ? '#F3F4F6' : 'transparent', cursor: 'pointer', width: '100%', textAlign: 'left',
@@ -378,7 +370,7 @@ export function CommentsSection({
         if (e.key === 'Tab' || e.key === 'Enter') {
           if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
             e.preventDefault();
-            insertMention(replyMentionMatches[replyMentionIdx].name, replyRef.current, replyText, replyCursorPos, setReplyText, setReplyCursorPos);
+            insertMention(replyMentionMatches[replyMentionIdx], replyRef.current, replyText, replyCursorPos, setReplyText, setReplyCursorPos);
             return;
           }
         }
@@ -452,8 +444,8 @@ export function CommentsSection({
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: 13, fontFamily: FF, lineHeight: 1.5, color: COLORS.ink, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-              {renderMentionText(comment.text)}
+            <div style={{ wordBreak: 'break-word' }}>
+              <MarkdownPreview content={comment.text} members={memberList} />
             </div>
           )}
 
@@ -522,7 +514,7 @@ export function CommentsSection({
                 <MentionDropdown
                   matches={replyMentionMatches}
                   idx={replyMentionIdx}
-                  onSelect={(name) => insertMention(name, replyRef.current, replyText, replyCursorPos, setReplyText, setReplyCursorPos)}
+                  onSelect={(member) => insertMention(member, replyRef.current, replyText, replyCursorPos, setReplyText, setReplyCursorPos)}
                   position="above"
                 />
               )}
@@ -624,26 +616,44 @@ export function CommentsSection({
                   })}
                 </div>
               )}
-              <textarea
-                ref={textareaRef}
-                value={text}
-                onChange={e => handleTextChange(e.target.value)}
-                onKeyDown={handleMainKeyDown}
-                onBlur={handleMainBlur}
-                placeholder="Write a comment… Type @ to mention someone"
-                style={{
-                  width: '100%', minHeight: 58, maxHeight: 140, resize: 'none',
-                  padding: '10px 54px 10px 48px', borderRadius: 10,
-                  border: `1.5px solid ${COLORS.line}`,
-                  fontSize: 16, fontFamily: FF, color: COLORS.ink,
-                  outline: 'none', boxSizing: 'border-box' as const, lineHeight: 1.4,
-                }}
-              />
+              {selectedMentionIds.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }} aria-label="Mentioned people">
+                  {selectedMentionIds.map(memberId => {
+                    const member = memberList.find(candidate => candidate.id === memberId);
+                    if (!member) return null;
+                    return (
+                      <span key={memberId} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 7px', borderRadius: 7, background: 'rgba(8,145,178,0.09)', color: COLORS.teal, fontFamily: FF, fontSize: 11.5, fontWeight: 600 }}>
+                        @{member.name}
+                        <button type="button" onClick={() => setSelectedMentionIds(current => current.filter(id => id !== memberId))} aria-label={`Remove mention of ${member.name}`} style={{ display: 'grid', placeItems: 'center', width: 24, height: 24, padding: 0, border: 0, background: 'transparent', color: COLORS.teal, cursor: 'pointer' }}><X size={13} /></button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{ border: `1.5px solid ${COLORS.line}`, borderRadius: 10, overflow: 'hidden', background: '#FFFFFF' }}>
+                <MarkdownToolbar onFormat={(format: MarkdownFormat) => applyMarkdownFormat(format, textareaRef.current, text, setText)} />
+                <div style={{ position: 'relative' }}>
+                  <textarea
+                    ref={textareaRef}
+                    value={text}
+                    onChange={e => handleTextChange(e.target.value)}
+                    onKeyDown={handleMainKeyDown}
+                    onBlur={handleMainBlur}
+                    placeholder="Write a comment… Type @ to mention someone"
+                    style={{
+                      width: '100%', minHeight: 72, maxHeight: 160, resize: 'vertical',
+                      padding: '10px 54px 10px 48px', border: 0,
+                      fontSize: 16, fontFamily: FF, color: COLORS.ink,
+                      outline: 'none', boxSizing: 'border-box' as const, lineHeight: 1.4,
+                    }}
+                  />
+                </div>
+              </div>
               {showMentions && (
                 <MentionDropdown
                   matches={mentionMatches}
                   idx={mentionIdx}
-                  onSelect={(name) => insertMention(name, textareaRef.current, text, cursorPos, setText, setCursorPos)}
+                  onSelect={(member) => insertMention(member, textareaRef.current, text, cursorPos, setText, setCursorPos, true)}
                   position="above"
                 />
               )}

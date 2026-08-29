@@ -39,6 +39,7 @@ interface ApiFile {
   id: string;
   projectId?: string;
   taskId?: string | null;
+  taskLinks?: Array<{ taskId: string }>;
   name: string;
   size: number;
   mimeType?: string | null;
@@ -59,6 +60,7 @@ function mapFile(file: ApiFile): FileItem {
     uploadedBy: file.uploadedById ?? '',
     uploadedAt: file.uploadedAt,
     linkedTaskId: file.taskId ?? null,
+    linkedTaskIds: file.taskLinks?.map(link => link.taskId) ?? (file.taskId ? [file.taskId] : []),
     url: file.providerWebUrl ?? file.url ?? undefined,
     thumbnailUrl: file.thumbnailUrl ?? undefined,
     storageProvider: file.storageProvider ?? null,
@@ -155,7 +157,7 @@ export function useComments(projectId: string | null) {
 
   /** Add a comment via the API and update the local list. */
   const addComment = useCallback(
-    async (input: { taskId: string; text: string; parentId?: string | null; fileIds?: string[] }) => {
+    async (input: { taskId: string; text: string; parentId?: string | null; fileIds?: string[]; mentionedUserIds?: string[] }) => {
       if (!projectId) return null;
       const res = await fetch(`/api/projects/${projectId}/comments`, {
         method: 'POST',

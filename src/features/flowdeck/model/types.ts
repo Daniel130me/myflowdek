@@ -177,6 +177,8 @@ export interface FileItem {
   uploadedBy: string;
   uploadedAt: string;
   linkedTaskId: string | null;
+  /** All tasks that reference this project file. */
+  linkedTaskIds?: string[];
   url?: string;
   thumbnailUrl?: string;
   /** Connected storage provider (GOOGLE_DRIVE, ONEDRIVE, DROPBOX) or null

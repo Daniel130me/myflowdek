@@ -19,7 +19,7 @@ export function FilesView({
   tasks: Task[];
   onAttachClick?: () => void;
   onRemove: (id: string) => void;
-  onLink: (id: string, taskId: string | null) => void;
+  onLink: (id: string, taskId: string) => void;
   onViewFile: (id: string) => void;
   onShareFile?: (file: FileItem) => void;
 }) {
@@ -84,7 +84,9 @@ export function FilesView({
         <SectionHeader title="Files" subtitle={`${files.length} connected files`} right={attachBtn} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {files.map(f => {
-            const linkedTask = f.linkedTaskId ? tasks.find(t => t.id === f.linkedTaskId) : null;
+            const linkedTaskIds = f.linkedTaskIds ?? (f.linkedTaskId ? [f.linkedTaskId] : []);
+            const linkedTasks = tasks.filter(task => linkedTaskIds.includes(task.id));
+            const availableTasks = tasks.filter(task => !linkedTaskIds.includes(task.id));
             return (
               <div key={f.id} style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: 12, overflow: 'hidden' }}>
                 {/* Thumbnail row */}
@@ -93,9 +95,10 @@ export function FilesView({
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <div style={{ fontSize: 14, fontWeight: 600, fontFamily: FF, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>{f.name}</div>
                     <div style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF }}>{fmtSize(f.size)} · {fmtDate(f.uploadedAt)}</div>
-                    {linkedTask && (
+                    {linkedTasks.length > 0 && (
                       <div style={{ fontSize: 11, color: COLORS.accent, fontFamily: FF, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        <Paperclip size={10} style={{ display: 'inline', marginRight: 3, verticalAlign: -1 }} />{linkedTask.name}
+                        <Paperclip size={10} style={{ display: 'inline', marginRight: 3, verticalAlign: -1 }} />
+                        {linkedTasks.length === 1 ? linkedTasks[0].name : `${linkedTasks.length} linked tasks`}
                       </div>
                     )}
                   </div>
@@ -112,7 +115,9 @@ export function FilesView({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px 10px' }}>
                   <Avatar id={f.uploadedBy} size={18} />
                   <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF }}>{lookupMember(f.uploadedBy)?.name.split(' ')[0]}</span>
-                  <select value={f.linkedTaskId || ''} onChange={e => onLink(f.id, e.target.value || null)} style={{ marginLeft: 'auto', border: `1px solid ${COLORS.line}`, borderRadius: 8, fontSize: 11, padding: '4px 6px', cursor: 'pointer', maxWidth: 120, fontFamily: FF }}><option value="">Link task...</option>{tasks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                  {availableTasks.length > 0 && (
+                    <select value="" onChange={e => { if (e.target.value) onLink(f.id, e.target.value); }} style={{ marginLeft: 'auto', border: `1px solid ${COLORS.line}`, borderRadius: 8, fontSize: 11, padding: '4px 6px', cursor: 'pointer', maxWidth: 120, fontFamily: FF }}><option value="">Link task...</option>{availableTasks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                  )}
                 </div>
               </div>
             );
@@ -129,7 +134,9 @@ export function FilesView({
       {/* Thumbnail grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14, marginBottom: 20 }}>
         {files.map(f => {
-          const linkedTask = f.linkedTaskId ? tasks.find(t => t.id === f.linkedTaskId) : null;
+          const linkedTaskIds = f.linkedTaskIds ?? (f.linkedTaskId ? [f.linkedTaskId] : []);
+          const linkedTasks = tasks.filter(task => linkedTaskIds.includes(task.id));
+          const availableTasks = tasks.filter(task => !linkedTaskIds.includes(task.id));
           const isHovered = hoveredId === f.id;
           return (
             <div
@@ -205,14 +212,14 @@ export function FilesView({
                     <Share2 size={12} /> Share in Cloud Provider
                   </button>
                 )}
-                {linkedTask && (
+                {linkedTasks.length > 0 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8, fontSize: 11.5, color: COLORS.accent, fontFamily: FF, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <Paperclip size={11} /> {linkedTask.name}
+                    <Paperclip size={11} /> {linkedTasks.length === 1 ? linkedTasks[0].name : `${linkedTasks.length} linked tasks`}
                   </div>
                 )}
                 {/* Inline link task select */}
-                {!linkedTask && (
-                  <select value="" onChange={e => { if (e.target.value) onLink(f.id, e.target.value); }} style={{ marginTop: 8, width: '100%', border: `1px solid ${COLORS.line}`, borderRadius: 8, fontSize: 11.5, padding: '5px 8px', cursor: 'pointer', color: COLORS.gray, fontFamily: FF }}><option value="">Link to task...</option>{tasks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                {availableTasks.length > 0 && (
+                  <select value="" onChange={e => { if (e.target.value) onLink(f.id, e.target.value); }} style={{ marginTop: 8, width: '100%', border: `1px solid ${COLORS.line}`, borderRadius: 8, fontSize: 11.5, padding: '5px 8px', cursor: 'pointer', color: COLORS.gray, fontFamily: FF }}><option value="">Link to another task...</option>{availableTasks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
                 )}
               </div>
             </div>

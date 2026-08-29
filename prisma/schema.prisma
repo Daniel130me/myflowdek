@@ -559,6 +559,7 @@ model Task {
   tags               TaskTag[]
   comments           Comment[]
   files              File[]
+  fileLinks          TaskFile[]
   timeLogs           TimeLog[]
   followers          TaskFollower[]
   activity           ActivityEntry[]
@@ -928,11 +929,26 @@ model File {
   uploadedBy          User?              @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   storageConnection   StorageConnection? @relation(fields: [storageConnectionId], references: [id], onDelete: SetNull)
   commentAttachments  CommentAttachment[]
+  taskLinks           TaskFile[]
 
   @@index([projectId])
   @@index([taskId])
   @@index([uploadedById])
   @@index([storageConnectionId])
+}
+
+/** A project file can be referenced by several tasks without duplicating the
+ * provider-owned file metadata. File.taskId remains as the legacy primary
+ * association for older views while this join is the source of truth. */
+model TaskFile {
+  taskId    String
+  fileId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([taskId, fileId])
+  @@index([fileId])
 }
 
 /** A project file referenced from a comment. Files remain provider-owned and

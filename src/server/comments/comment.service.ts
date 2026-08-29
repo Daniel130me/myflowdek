@@ -67,6 +67,7 @@ const attachmentFileSelect = {
   uploadedAt: true,
   url: true,
   thumbnailUrl: true,
+  taskLinks: { select: { taskId: true } },
 } as const;
 
 const attachmentsSelect = {

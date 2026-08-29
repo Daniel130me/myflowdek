@@ -44,7 +44,7 @@ function renderMentionText(text: string, members: ReturnType<typeof useMemberDir
 }
 
 /* ---- Markdown preview renderer ---- */
-function MarkdownPreview({ content, members }: { content: string; members: ReturnType<typeof useMemberDirectory>['list'] }) {
+export function MarkdownPreview({ content, members }: { content: string; members: ReturnType<typeof useMemberDirectory>['list'] }) {
   return (
     <div style={{ fontSize: 13.5, fontFamily: FF, lineHeight: 1.6, color: COLORS.ink }}>
       <ReactMarkdown
@@ -68,7 +68,7 @@ function MarkdownPreview({ content, members }: { content: string; members: Retur
             if (props.type === 'checkbox') return <input {...props} style={{ marginRight: 6 }} readOnly />;
             return <input {...props} />;
           },
-          blockquote: ({ children }) => <blockquote style={{ borderLeft: `3px solid ${COLORS.line}`, paddingLeft: 12, margin: '8px 0', color: COLORS.gray }}>{children}</blockquote>,
+          blockquote: ({ children }) => <blockquote style={{ borderInlineStart: `1px solid ${COLORS.line}`, paddingInlineStart: 12, margin: '8px 0', color: COLORS.gray }}>{children}</blockquote>,
         }}
       >
         {content}
@@ -316,6 +316,7 @@ export function MarkdownDescription({ value, onUpdate }: { value: string | undef
                   <button
                     key={m.id}
                     type="button"
+                    onMouseDown={event => event.preventDefault()}
                     onClick={() => insertMention(m.name)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, border: 'none',
