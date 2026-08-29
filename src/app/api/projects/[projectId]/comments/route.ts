@@ -5,8 +5,7 @@ import {
   authErrorResponse,
 } from '@/server/auth/authorization';
 import { checkMutationLimit, RATE_LIMITS } from '@/lib/rate-limit';
-import { listComments, createComment } from '@/server/comments/comment.service';
-import { createCommentSchema } from '@/server/comments/comment.service';
+import { createComment, createCommentSchema, listComments } from '@/server/comments/comment.service';
 
 /** GET /api/projects/:projectId/comments?taskId=xxx — list comments. */
 export async function GET(

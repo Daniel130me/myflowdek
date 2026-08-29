@@ -64,7 +64,7 @@ export default function InterceptedTaskDetailPage() {
       onToggleTaskTag={(taskId, tagId) => state.toggleTaskTag(projectId, taskId, tagId)}
       onAddTag={(tag) => state.addTag(projectId, tag)}
       onRemoveTag={(tagId) => state.removeTag(projectId, tagId)}
-      onAddComment={(taskId, text, parentId) => state.addComment(projectId, taskId, text, parentId)}
+      onAddComment={(taskId, text, parentId, fileIds) => state.addComment(projectId, taskId, text, parentId, fileIds)}
       onDeleteComment={(commentId) => state.deleteComment(projectId, commentId)}
       onEditComment={(commentId, newText) => state.editComment(projectId, commentId, newText)}
       onToggleReaction={(commentId, emoji) => state.toggleReaction(projectId, commentId, emoji)}
@@ -77,6 +77,7 @@ export default function InterceptedTaskDetailPage() {
       onViewFile={fileId => router.push(routes.file(projectId, fileId))}
       onRemoveFile={fileMutations.removeFile}
       onLinkFile={(fileId, linkedTaskId) => state.linkFile(projectId, fileId, linkedTaskId)}
+      onFileAttached={() => void fileMutations.refetch()}
       onAddFiles={(files) => fileMutations.uploadFiles(files, taskId)}
       onDuplicateTaskWithOptions={(taskId, opts) => state.duplicateTaskWithOptions(projectId, taskId, opts)}
       onMoveToProject={(taskId, targetProjectId) => state.moveTaskToProject(projectId, taskId, targetProjectId)}

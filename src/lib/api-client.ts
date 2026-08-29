@@ -176,10 +176,11 @@ export function apiAddComment(
   taskId: string,
   text: string,
   parentId?: string,
+  fileIds: string[] = [],
 ) {
   return apiCallWithData<{ comment: { id: string; [key: string]: unknown } }>(
     `/api/projects/${projectId}/comments`,
-    json('POST', { taskId, text, parentId }),
+    json('POST', { taskId, text, parentId, fileIds }),
   );
 }
 
@@ -191,6 +192,11 @@ export function apiEditComment(commentId: string, text: string) {
 /** DELETE /api/comments/:commentId — delete a comment. */
 export function apiDeleteComment(commentId: string) {
   return apiCall(`/api/comments/${commentId}`, { method: 'DELETE' });
+}
+
+/** PATCH /api/files/:fileId — persist or clear a task attachment. */
+export function apiLinkFile(fileId: string, taskId: string | null) {
+  return apiCall(`/api/files/${fileId}`, json('PATCH', { taskId }));
 }
 
 /** POST /api/comments/:commentId/reactions — add a reaction. */

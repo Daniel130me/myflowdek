@@ -30,7 +30,7 @@ interface TaskDetailPanelProps {
   onToggleTaskTag?: (taskId: string, tagId: string) => void;
   onAddTag?: (tag: Tag) => void;
   onRemoveTag?: (tagId: string) => void;
-  onAddComment?: (taskId: string, text: string, parentId?: string | null) => void;
+  onAddComment?: (taskId: string, text: string, parentId?: string | null, fileIds?: string[]) => void;
   onDeleteComment?: (commentId: string) => void;
   onEditComment?: (commentId: string, newText: string) => void;
   onToggleReaction?: (commentId: string, emoji: string) => void;
@@ -327,7 +327,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
 
   /* Shared: comments section */
   const commentsSection = onAddComment ? (
-    <CommentsSection taskId={task.id} comments={comments} activity={activity} onAddComment={onAddComment || (() => {})} onDeleteComment={onDeleteComment || (() => {})} onEditComment={onEditComment} onToggleReaction={onToggleReaction} currentUserId={currentUserId} />
+    <CommentsSection taskId={task.id} comments={comments} activity={activity} files={files} onViewFile={onViewFile} onAddComment={onAddComment || (() => {})} onDeleteComment={onDeleteComment || (() => {})} onEditComment={onEditComment} onToggleReaction={onToggleReaction} currentUserId={currentUserId} />
   ) : null;
 
   /* Shared: followers section */

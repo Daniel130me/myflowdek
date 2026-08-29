@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Trash2, Pencil, Reply, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
-import { COLORS, FF, type Comment, type ActivityEntry, type Reaction, type MemberInfo } from '@/features/flowdeck/model';
+import { Send, Trash2, Pencil, Reply, ChevronDown, ChevronRight, MessageSquare, Paperclip, X, FileText } from 'lucide-react';
+import { COLORS, FF, type Comment, type ActivityEntry, type Reaction, type MemberInfo, type FileItem } from '@/features/flowdeck/model';
 import { Avatar } from './Avatar';
 import { Field } from './Field';
 import { useMemberDirectory } from './MemberDirectory';
@@ -15,7 +15,7 @@ interface CommentsSectionProps {
   taskId: string;
   comments: Comment[];
   activity: ActivityEntry[];
-  onAddComment: (taskId: string, text: string, parentId?: string | null) => void;
+  onAddComment: (taskId: string, text: string, parentId?: string | null, fileIds?: string[]) => void;
   onDeleteComment: (commentId: string) => void;
   onEditComment?: (commentId: string, newText: string) => void;
   onToggleReaction?: (commentId: string, emoji: string) => void;
@@ -23,13 +23,17 @@ interface CommentsSectionProps {
    *  the user's own comments + render the main input avatar. Defaults to
    *  an empty string (no edit/delete actions shown) when omitted. */
   currentUserId?: string;
+  files?: FileItem[];
+  onViewFile?: (fileId: string) => void;
 }
 
 export function CommentsSection({
   taskId, comments, activity, onAddComment, onDeleteComment, onEditComment, onToggleReaction,
-  currentUserId = '',
+  currentUserId = '', files = [], onViewFile,
 }: CommentsSectionProps) {
   const [text, setText] = useState('');
+  const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+  const [showFilePicker, setShowFilePicker] = useState(false);
   const [activeTab, setActiveTab] = useState<'comments' | 'activity'>('comments');
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -66,9 +70,19 @@ export function CommentsSection({
 
   /* ---- Main comment submit ---- */
   function submit() {
-    if (!text.trim()) return;
-    onAddComment(taskId, text);
+    if (!text.trim() && selectedFileIds.length === 0) return;
+    onAddComment(taskId, text, null, selectedFileIds);
     setText('');
+    setSelectedFileIds([]);
+    setShowFilePicker(false);
+  }
+
+  function toggleSelectedFile(fileId: string) {
+    setSelectedFileIds(current => {
+      if (current.includes(fileId)) return current.filter(id => id !== fileId);
+      if (current.length >= 10) return current;
+      return [...current, fileId];
+    });
   }
 
   /* ---- Time formatter ---- */
@@ -443,6 +457,29 @@ export function CommentsSection({
             </div>
           )}
 
+          {!editing && comment.attachments && comment.attachments.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: comment.text ? 7 : 2 }}>
+              {comment.attachments.map(file => (
+                <button
+                  key={file.id}
+                  type="button"
+                  onClick={() => onViewFile?.(file.id)}
+                  disabled={!onViewFile}
+                  aria-label={`Preview ${file.name}`}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 7, width: '100%', minHeight: 38,
+                    padding: '7px 9px', borderRadius: 8, border: `1px solid ${COLORS.line}`,
+                    background: '#F9FAFB', color: COLORS.ink, fontFamily: FF, textAlign: 'left',
+                    cursor: onViewFile ? 'pointer' : 'default',
+                  }}
+                >
+                  <FileText size={15} color={COLORS.teal} aria-hidden="true" />
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5, fontWeight: 600 }}>{file.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Reactions bar */}
           {!editing && <ReactionBar commentId={comment.id} reactions={comment.reactions} />}
 
@@ -540,6 +577,53 @@ export function CommentsSection({
           <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'flex-start' }}>
             <Avatar id={currentUserId} size={28} />
             <div style={{ flex: 1, position: 'relative' }}>
+              {showFilePicker && (
+                <div style={{
+                  position: 'absolute', left: 0, right: 0, bottom: '100%', marginBottom: 6, zIndex: 12,
+                  maxHeight: 220, overflowY: 'auto', padding: 6, borderRadius: 10,
+                  border: `1px solid ${COLORS.line}`, background: '#FFFFFF',
+                  boxShadow: '0 10px 25px rgba(15,23,42,0.12)',
+                }}>
+                  {files.length === 0 ? (
+                    <div style={{ padding: '10px 12px', color: COLORS.gray, fontSize: 12.5, fontFamily: FF }}>No project files are available yet.</div>
+                  ) : files.map(file => {
+                    const selected = selectedFileIds.includes(file.id);
+                    return (
+                      <button
+                        key={file.id}
+                        type="button"
+                        onClick={() => toggleSelectedFile(file.id)}
+                        aria-pressed={selected}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 42,
+                          padding: '8px 10px', border: 'none', borderRadius: 8,
+                          background: selected ? 'rgba(254,128,41,0.10)' : 'transparent',
+                          color: COLORS.ink, cursor: 'pointer', textAlign: 'left', fontFamily: FF,
+                        }}
+                      >
+                        <FileText size={16} color={selected ? COLORS.accent : COLORS.gray} aria-hidden="true" />
+                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5 }}>{file.name}</span>
+                        <span style={{ color: selected ? COLORS.accent : COLORS.grayLight, fontSize: 11, fontWeight: 700 }}>{selected ? 'Selected' : 'Attach'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {selectedFileIds.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
+                  {selectedFileIds.map(fileId => {
+                    const file = files.find(candidate => candidate.id === fileId);
+                    if (!file) return null;
+                    return (
+                      <span key={fileId} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, maxWidth: '100%', padding: '5px 7px', borderRadius: 7, background: '#F3F4F6', color: COLORS.ink, fontFamily: FF, fontSize: 11.5 }}>
+                        <Paperclip size={12} aria-hidden="true" />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+                        <button type="button" onClick={() => toggleSelectedFile(fileId)} aria-label={`Remove ${file.name}`} style={{ display: 'grid', placeItems: 'center', width: 24, height: 24, padding: 0, border: 'none', background: 'transparent', color: COLORS.gray, cursor: 'pointer' }}><X size={13} /></button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
               <textarea
                 ref={textareaRef}
                 value={text}
@@ -548,10 +632,10 @@ export function CommentsSection({
                 onBlur={handleMainBlur}
                 placeholder="Write a comment… Type @ to mention someone"
                 style={{
-                  width: '100%', minHeight: 38, maxHeight: 120, resize: 'none',
-                  padding: '8px 36px 8px 10px', borderRadius: 10,
+                  width: '100%', minHeight: 58, maxHeight: 140, resize: 'none',
+                  padding: '10px 54px 10px 48px', borderRadius: 10,
                   border: `1.5px solid ${COLORS.line}`,
-                  fontSize: 13, fontFamily: FF, color: COLORS.ink,
+                  fontSize: 16, fontFamily: FF, color: COLORS.ink,
                   outline: 'none', boxSizing: 'border-box' as const, lineHeight: 1.4,
                 }}
               />
@@ -565,17 +649,30 @@ export function CommentsSection({
               )}
               <button
                 type="button"
-                onClick={submit}
-                disabled={!text.trim()}
+                onClick={() => setShowFilePicker(open => !open)}
+                aria-label="Attach project files"
+                aria-expanded={showFilePicker}
                 style={{
-                  position: 'absolute', right: 6, bottom: 6,
-                  width: 26, height: 26, borderRadius: 8,
-                  border: 'none', background: text.trim() ? COLORS.accent : COLORS.line,
-                  color: '#FFFFFF', cursor: text.trim() ? 'pointer' : 'not-allowed',
+                  position: 'absolute', left: 4, bottom: 7, width: 44, height: 44, borderRadius: 9,
+                  border: 'none', background: showFilePicker ? 'rgba(254,128,41,0.10)' : 'transparent',
+                  color: showFilePicker ? COLORS.accent : COLORS.gray, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              ><Paperclip size={18} aria-hidden="true" /></button>
+              <button
+                type="button"
+                onClick={submit}
+                disabled={!text.trim() && selectedFileIds.length === 0}
+                aria-label="Send comment"
+                style={{
+                  position: 'absolute', right: 4, bottom: 7,
+                  width: 44, height: 44, borderRadius: 10,
+                  border: 'none', background: text.trim() || selectedFileIds.length > 0 ? COLORS.accent : COLORS.line,
+                  color: '#FFFFFF', cursor: text.trim() || selectedFileIds.length > 0 ? 'pointer' : 'not-allowed',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   transition: 'background 0.15s',
                 }}
-              ><Send size={13} /></button>
+              ><Send size={18} aria-hidden="true" /></button>
             </div>
           </div>
         </>

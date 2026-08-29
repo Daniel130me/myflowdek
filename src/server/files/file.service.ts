@@ -51,6 +51,27 @@ export function listFiles(projectId: string) {
   });
 }
 
+/** Persist a project file's optional task association. */
+export async function updateFileTaskLink(
+  fileId: string,
+  projectId: string,
+  taskId: string | null,
+) {
+  if (taskId) {
+    const task = await db.task.findFirst({
+      where: { id: taskId, projectId },
+      select: { id: true },
+    });
+    if (!task) throw new AuthError('Task not found in this project', 404);
+  }
+
+  return db.file.update({
+    where: { id: fileId },
+    data: { taskId },
+    select: { ...fileSelect, uploadedBy: { select: { id: true, name: true, avatarColor: true } } },
+  });
+}
+
 /** Create a legacy external-link record. Binary uploads use createProviderFile. */
 export async function createFile(projectId: string, uploadedById: string, input: CreateFileInput) {
   return db.file.create({

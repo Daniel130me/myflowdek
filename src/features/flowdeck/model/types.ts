@@ -65,6 +65,8 @@ export interface Comment {
   /* #43 */ reactions?: Reaction[];
   /* #44 */ edited?: boolean;
   /* #45 */ parentId?: string | null;
+  /** Existing project files referenced by this comment. */
+  attachments?: FileItem[];
 }
 
 /* ---------------------------------- Activity ---------------------------------- */

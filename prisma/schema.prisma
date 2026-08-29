@@ -879,6 +879,7 @@ model Comment {
   replies   Comment[]         @relation("CommentReplies")
   reactions CommentReaction[]
   mentions  CommentMention[]
+  attachments CommentAttachment[]
   createdAt DateTime          @default(now())
 
   @@index([taskId])
@@ -926,11 +927,25 @@ model File {
   task                Task?              @relation(fields: [taskId], references: [id], onDelete: SetNull)
   uploadedBy          User?              @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   storageConnection   StorageConnection? @relation(fields: [storageConnectionId], references: [id], onDelete: SetNull)
+  commentAttachments  CommentAttachment[]
 
   @@index([projectId])
   @@index([taskId])
   @@index([uploadedById])
   @@index([storageConnectionId])
+}
+
+/** A project file referenced from a comment. Files remain provider-owned and
+ * can be referenced by more than one comment without duplicating metadata. */
+model CommentAttachment {
+  commentId String
+  fileId    String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([commentId, fileId])
+  @@index([fileId])
 }
 
 /**

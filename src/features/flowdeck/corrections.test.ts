@@ -78,7 +78,7 @@ test('task detail route keeps loading until the task fetch resolves and stays ab
   const hook = readFileSync(join(process.cwd(), 'src/features/flowdeck/hooks/useTasks.ts'), 'utf8');
 
   assert.ok(page.includes('tasksLoading'));
-  assert.ok(page.includes('Loading task…'));
+  assert.ok(page.includes('<TaskDetailSkeleton />'));
   assert.ok(page.includes('!tasksLoading && !taskDataUnavailable'));
   assert.ok(hook.includes('useState(Boolean(projectId))'));
   assert.ok(hook.includes('requestedProjectId !== projectId'));
@@ -118,4 +118,27 @@ test('timeline refresh waits for project-store hydration and fetches its tasks',
 
   assert.ok(layout.includes('!projectExistsInStore && (loading || project)'));
   assert.ok(timeline.includes('useProjectTasks(projectId)'));
+});
+
+test('task file links persist through the authenticated file endpoint', () => {
+  const store = readFileSync(join(process.cwd(), 'src/features/flowdeck/store/useFlowDeck.ts'), 'utf8');
+  const fileRoute = readFileSync(join(process.cwd(), 'src/app/api/files/[fileId]/route.ts'), 'utf8');
+
+  assert.ok(store.includes('apiLinkFile(id, linkedTaskId)'));
+  assert.ok(store.includes("toast.error('Failed to update task attachment'"));
+  assert.ok(fileRoute.includes('export async function PATCH'));
+  assert.ok(fileRoute.includes("requireProjectCapability(user.id, file.projectId, 'EDIT_TASK')"));
+});
+
+test('comments can persist project file references and expose accessible controls', () => {
+  const schema = readFileSync(join(process.cwd(), 'prisma/schema.prisma'), 'utf8');
+  const service = readFileSync(join(process.cwd(), 'src/server/comments/comment.service.ts'), 'utf8');
+  const commentsUi = readFileSync(join(process.cwd(), 'src/features/flowdeck/components/ui/CommentsSection.tsx'), 'utf8');
+
+  assert.ok(schema.includes('model CommentAttachment'));
+  assert.ok(service.includes('id: { in: fileIds }'));
+  assert.ok(service.includes("throw new AuthError('One or more attached files are not available in this project'"));
+  assert.ok(commentsUi.includes('aria-label="Attach project files"'));
+  assert.ok(commentsUi.includes('aria-label="Send comment"'));
+  assert.ok(commentsUi.includes('width: 44, height: 44'));
 });

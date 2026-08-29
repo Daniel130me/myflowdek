@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { Comment, Reaction } from '@/features/flowdeck/model';
+import type { Comment, FileItem, Reaction } from '@/features/flowdeck/model';
 
 /**
  * Shape returned by GET /api/projects/:id/comments.
@@ -32,6 +32,39 @@ interface ApiComment {
   reactions?: ApiReaction[];
   /** Nested replies — only present on top-level comments. */
   replies?: ApiComment[];
+  attachments?: Array<{ file: ApiFile }>;
+}
+
+interface ApiFile {
+  id: string;
+  projectId?: string;
+  taskId?: string | null;
+  name: string;
+  size: number;
+  mimeType?: string | null;
+  storageProvider?: FileItem['storageProvider'];
+  providerWebUrl?: string | null;
+  uploadedById?: string | null;
+  uploadedAt: string;
+  url?: string | null;
+  thumbnailUrl?: string | null;
+}
+
+function mapFile(file: ApiFile): FileItem {
+  return {
+    id: file.id,
+    projectId: file.projectId,
+    name: file.name,
+    size: file.size,
+    uploadedBy: file.uploadedById ?? '',
+    uploadedAt: file.uploadedAt,
+    linkedTaskId: file.taskId ?? null,
+    url: file.providerWebUrl ?? file.url ?? undefined,
+    thumbnailUrl: file.thumbnailUrl ?? undefined,
+    storageProvider: file.storageProvider ?? null,
+    providerWebUrl: file.providerWebUrl ?? null,
+    mimeType: file.mimeType ?? null,
+  };
 }
 
 /**
@@ -65,6 +98,7 @@ function mapComment(api: ApiComment): Comment {
     edited: Boolean(api.editedAt),
     parentId: api.parentId ?? null,
     reactions: groupReactions(api.reactions),
+    attachments: (api.attachments ?? []).map(attachment => mapFile(attachment.file)),
   };
 }
 
@@ -121,7 +155,7 @@ export function useComments(projectId: string | null) {
 
   /** Add a comment via the API and update the local list. */
   const addComment = useCallback(
-    async (input: { taskId: string; text: string; parentId?: string | null }) => {
+    async (input: { taskId: string; text: string; parentId?: string | null; fileIds?: string[] }) => {
       if (!projectId) return null;
       const res = await fetch(`/api/projects/${projectId}/comments`, {
         method: 'POST',

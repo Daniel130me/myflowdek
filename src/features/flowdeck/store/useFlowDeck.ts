@@ -21,7 +21,7 @@ import { loadPersistedState, savePersistedState, clearPersistedState, loadCustom
 import { defaultIdGenerator } from '@/shared/utils/id';
 import {
   apiUpdateTask, apiDeleteTask, apiCreateTask, apiBulkAction,
-  apiAddComment, apiEditComment, apiDeleteComment,
+  apiAddComment, apiEditComment, apiDeleteComment, apiLinkFile,
   apiAddReaction, apiRemoveReaction,
   apiAddTaskTag, apiRemoveTaskTag,
   apiFollowTask, apiUnfollowTask,
@@ -197,7 +197,7 @@ export interface FlowDeckState {
   removeTag: (projectId: string, tagId: string) => void;
   toggleTaskTag: (projectId: string, taskId: string, tagId: string) => void;
   /* Comments */
-  addComment: (projectId: string, taskId: string, text: string, parentId?: string | null) => void;
+  addComment: (projectId: string, taskId: string, text: string, parentId?: string | null, fileIds?: string[]) => void;
   deleteComment: (projectId: string, commentId: string) => void;
   editComment: (projectId: string, commentId: string, newText: string) => void;
   toggleReaction: (projectId: string, commentId: string, emoji: string) => void;
@@ -1532,8 +1532,14 @@ export function useFlowDeckStore(): FlowDeckState {
 
   const linkFile = useCallback((projectId: string, id: string, linkedTaskId: string | null) => {
     if (!projectId) return;
+    const snapshot = filesByProject[projectId] || [];
     setFilesByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).map(f => f.id === id ? { ...f, linkedTaskId } : f) }));
-  }, []);
+    apiLinkFile(id, linkedTaskId).then((res) => {
+      if (res.ok) return;
+      setFilesByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to update task attachment', { description: res.error });
+    });
+  }, [filesByProject]);
 
   const addRaidItem = useCallback((projectId: string, item: RaidItem) => {
     if (!projectId) return;
@@ -1721,8 +1727,9 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [tasksByProject, commit, logActivity]);
 
   /* ---- Comments ---- */
-  const addComment = useCallback((projectId: string, taskId: string, text: string, parentId?: string | null) => {
-    if (!projectId || !text.trim()) return;
+  const addComment = useCallback((projectId: string, taskId: string, text: string, parentId?: string | null, fileIds: string[] = []) => {
+    const normalizedFileIds = Array.from(new Set(fileIds)).slice(0, 10);
+    if (!projectId || (!text.trim() && normalizedFileIds.length === 0)) return;
     const tempId = defaultIdGenerator.generate('c');
     const comment: Comment = {
       id: tempId,
@@ -1732,6 +1739,7 @@ export function useFlowDeckStore(): FlowDeckState {
       createdAt: new Date().toISOString(),
       parentId: parentId || null,
       reactions: [],
+      attachments: (filesByProject[projectId] || []).filter(file => normalizedFileIds.includes(file.id)),
     };
     // Snapshot for rollback — capture the pre-add comment list so we can
     // restore it if the API rejects the comment.
@@ -1746,7 +1754,7 @@ export function useFlowDeckStore(): FlowDeckState {
     // Persist to PostgreSQL. The API returns the canonical server comment —
     // we swap the temp id for the server id so subsequent edits/deletes
     // target the right row. On failure we roll back the optimistic insert.
-    apiAddComment(projectId, taskId, text.trim(), parentId ?? undefined).then((res) => {
+    apiAddComment(projectId, taskId, text.trim(), parentId ?? undefined, normalizedFileIds).then((res) => {
       if (!res.ok) {
         setCommentsByProject(prev => ({ ...prev, [projectId]: snapshot }));
         toast.error('Failed to save comment', { description: res.error });
@@ -1761,7 +1769,7 @@ export function useFlowDeckStore(): FlowDeckState {
         ),
       }));
     });
-  }, [commentsByProject, logActivity, resolveMemberName]);
+  }, [commentsByProject, filesByProject, logActivity, resolveMemberName]);
 
   const deleteComment = useCallback((projectId: string, commentId: string) => {
     if (!projectId) return;

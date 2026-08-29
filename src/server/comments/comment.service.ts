@@ -8,12 +8,17 @@ import { createNotification } from '@/server/notifications/notification.service'
 import { NOTIFICATION_TYPES } from '@/server/notifications/constants';
 
 export const createCommentSchema = z.object({
-  text: z.string().trim().min(1, 'Comment cannot be empty').max(5000),
+  text: z.string().trim().max(5000).default(''),
   taskId: z.string().min(1),
   /** Optional parent comment ID for threaded replies. */
   parentId: z.string().optional().nullable(),
   /** Structured mention user IDs (from UI autocomplete, NOT text parsing). */
   mentionedUserIds: z.array(z.string()).optional(),
+  /** Existing project file IDs referenced by this comment. */
+  fileIds: z.array(z.string().min(1)).max(10).optional().default([]),
+}).refine(input => input.text.length > 0 || input.fileIds.length > 0, {
+  message: 'Add a comment or attach a file',
+  path: ['text'],
 });
 
 export const updateCommentSchema = z.object({
@@ -24,7 +29,9 @@ export const createReactionSchema = z.object({
   emoji: z.string().trim().min(1, 'Emoji is required').max(10),
 });
 
-export type CreateCommentInput = z.infer<typeof createCommentSchema>;
+export type CreateCommentInput = Omit<z.output<typeof createCommentSchema>, 'fileIds'> & {
+  fileIds?: string[];
+};
 export type UpdateCommentInput = z.infer<typeof updateCommentSchema>;
 export type CreateReactionInput = z.infer<typeof createReactionSchema>;
 
@@ -47,6 +54,26 @@ const authorSelect = {
   avatarColor: true,
 } as const;
 
+const attachmentFileSelect = {
+  id: true,
+  projectId: true,
+  taskId: true,
+  name: true,
+  size: true,
+  mimeType: true,
+  storageProvider: true,
+  providerWebUrl: true,
+  uploadedById: true,
+  uploadedAt: true,
+  url: true,
+  thumbnailUrl: true,
+} as const;
+
+const attachmentsSelect = {
+  select: { file: { select: attachmentFileSelect } },
+  orderBy: { createdAt: 'asc' as const },
+};
+
 /**
  * List comments for a project (optionally filtered by task).
  *
@@ -60,6 +87,7 @@ export function listComments(projectId: string, taskId?: string) {
     select: {
       ...commentSelect,
       author: { select: authorSelect },
+      attachments: attachmentsSelect,
       reactions: {
         include: { user: { select: authorSelect } },
       },
@@ -67,6 +95,7 @@ export function listComments(projectId: string, taskId?: string) {
         select: {
           ...commentSelect,
           author: { select: authorSelect },
+          attachments: attachmentsSelect,
           reactions: {
             include: { user: { select: authorSelect } },
           },
@@ -84,6 +113,7 @@ export async function createComment(
   authorId: string,
   input: CreateCommentInput,
 ) {
+  const text = input.text.trim();
   // Verify the task belongs to this project.
   const task = await db.task.findUnique({
     where: { id: input.taskId },
@@ -104,18 +134,34 @@ export async function createComment(
     }
   }
 
+  const fileIds = Array.from(new Set(input.fileIds ?? []));
+  if (fileIds.length > 0) {
+    // Validate all selected files in one query and prevent cross-project references.
+    const projectFiles = await db.file.findMany({
+      where: { projectId, id: { in: fileIds } },
+      select: { id: true },
+    });
+    if (projectFiles.length !== fileIds.length) {
+      throw new AuthError('One or more attached files are not available in this project', 400);
+    }
+  }
+
   try {
     const comment = await db.comment.create({
       data: {
         taskId: input.taskId,
         projectId,
         authorId,
-        text: input.text,
+        text,
         parentId: input.parentId ?? null,
+        attachments: fileIds.length > 0
+          ? { create: fileIds.map(fileId => ({ fileId })) }
+          : undefined,
       },
       select: {
         ...commentSelect,
         author: { select: authorSelect },
+        attachments: attachmentsSelect,
         reactions: { include: { user: { select: authorSelect } } },
       },
     });
