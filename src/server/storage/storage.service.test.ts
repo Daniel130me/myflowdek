@@ -1,7 +1,14 @@
 import assert from 'node:assert';
 import { describe, test } from 'node:test';
 import { randomBytes } from 'node:crypto';
-import { baseUrl, redirectUri, authorizationUrl, parseStorageProvider, extractAndVerifyOAuthState } from './storage.service';
+import {
+  baseUrl,
+  redirectUri,
+  authorizationUrl,
+  parseStorageProvider,
+  extractAndVerifyOAuthState,
+  formatStorageDisconnectBlockers,
+} from './storage.service';
 
 describe('active storage providers', () => {
   test('accepts Google Drive', () => {
@@ -11,6 +18,20 @@ describe('active storage providers', () => {
   test('keeps deferred providers disabled', () => {
     assert.throws(() => parseStorageProvider('onedrive'), /Unsupported storage provider/);
     assert.throws(() => parseStorageProvider('dropbox'), /Unsupported storage provider/);
+  });
+});
+
+describe('disconnect UX messaging', () => {
+  test('formats a helpful disconnect blocker message with document names and project names', () => {
+    const message = formatStorageDisconnectBlockers([
+      { type: 'projectDocument', name: 'Project Charter - Website', projectName: 'Website' },
+      { type: 'projectDocument', name: 'Stakeholder Register - Website', projectName: 'Website' },
+    ]);
+
+    assert.match(message, /Project Charter - Website/);
+    assert.match(message, /Stakeholder Register - Website/);
+    assert.match(message, /Website/);
+    assert.match(message, /Documents/i);
   });
 });
 

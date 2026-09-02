@@ -87,6 +87,14 @@ describe('Picker config API (behavioral)', () => {
       'developerKey must not be nullable in the response',
     );
   });
+
+  test('picker config explains reconnect when Google Drive token is stale or mismatched', () => {
+    const source = readSrc('src/app/api/storage/picker/config/route.ts');
+    assert.ok(
+      source.includes('Reconnect Google Drive in Settings') || source.includes('same Google account'),
+      'must tell users to reconnect Google Drive when the stored token is stale or belongs to a different account',
+    );
+  });
 });
 
 /**
