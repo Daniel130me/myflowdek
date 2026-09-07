@@ -52,6 +52,28 @@ export function taskToApiPayload(task: Partial<Task>): Record<string, unknown> {
   };
 }
 
+/**
+ * Pull the most useful message out of the API's error response bodies.
+ *
+ * The server has several error shapes — { error }, { message, issues }
+ * (zod validation), { message } (apiError family) — and the client used to
+ * read only `error`, so roughly 40% of failure paths degraded to a
+ * meaningless "HTTP 4xx" toast (audit H-16). Priority: explicit error →
+ * first validation issue → message → generic status text.
+ */
+export function extractApiErrorMessage(data: unknown, status: number): string {
+  if (data && typeof data === 'object') {
+    const record = data as Record<string, unknown>;
+    if (typeof record.error === 'string' && record.error) return record.error;
+    if (record.issues && typeof record.issues === 'object') {
+      const first = Object.values(record.issues as Record<string, string[]>).flat()[0];
+      if (typeof first === 'string' && first) return first;
+    }
+    if (typeof record.message === 'string' && record.message) return record.message;
+  }
+  return `HTTP ${status}`;
+}
+
 /** Generic fetch wrapper that returns { ok, error } instead of throwing. */
 async function apiCall(
   url: string,
@@ -61,7 +83,7 @@ async function apiCall(
     const res = await fetch(url, options);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      return { ok: false, error: data.error ?? `HTTP ${res.status}` };
+      return { ok: false, error: extractApiErrorMessage(data, res.status) };
     }
     return { ok: true };
   } catch {
@@ -80,11 +102,11 @@ async function apiCallWithData<T = unknown>(
 ): Promise<{ ok: boolean; error?: string; data?: T }> {
   try {
     const res = await fetch(url, options);
-    const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+    const data = (await res.json().catch(() => ({}))) as unknown;
     if (!res.ok) {
-      return { ok: false, error: (data as { error?: string }).error ?? `HTTP ${res.status}` };
+      return { ok: false, error: extractApiErrorMessage(data, res.status) };
     }
-    return { ok: true, data };
+    return { ok: true, data: data as T };
   } catch {
     return { ok: false, error: 'Network error' };
   }
