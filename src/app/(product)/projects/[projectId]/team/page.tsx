@@ -7,6 +7,7 @@ import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useAuth } from '@/features/flowdeck/components/auth';
 import { getSingleParam } from '@/shared/utils/routeParams';
 import { fetchJson } from '@/lib/fetch-json';
+import { useProjectTimeLogs } from '@/features/flowdeck/hooks/useProjectTimeLogs';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { toast } from 'sonner';
 import { TableSkeleton } from '@/components/ui/skeleton';
@@ -32,6 +33,8 @@ export default function ProjectTeamPage() {
   const projectId = getSingleParam(params.projectId);
   const state = useFlowDeck();
   const auth = useAuth();
+  // Workload numbers read timeLogsByProject — hydrate it (audit H-09).
+  useProjectTimeLogs(projectId || null);
 
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);

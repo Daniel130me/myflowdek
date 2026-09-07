@@ -6,6 +6,7 @@ import ProjectTasksPage from '../page';
 import { TaskDetailPanel } from '@/features/flowdeck/components/modals';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useProjectComments } from '@/features/flowdeck/hooks/useProjectComments';
+import { useProjectTimeLogs } from '@/features/flowdeck/hooks/useProjectTimeLogs';
 import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { useConnectedFileMutations } from '@/features/flowdeck/hooks/useConnectedFileMutations';
 import { useProjectFiles } from '@/features/flowdeck/hooks/useProjectFiles';
@@ -30,6 +31,8 @@ export default function TaskDetailRoutePage() {
   // Fetch real tasks + comments from the API and sync into the store.
   const { tasks: fetchedTasks, loading: tasksLoading, error: tasksError, refetch: refetchTasks } = useProjectTasks(projectId);
   useProjectComments(projectId);
+  // Hydrate time logs from the API so logged work survives a reload (audit H-09).
+  useProjectTimeLogs(projectId || null);
   // Real project members for the assignee <select> in the detail panel.
   const { members } = useProjectMembers(projectId);
 

@@ -12,6 +12,7 @@ import { useConnectedFileMutations } from '@/features/flowdeck/hooks/useConnecte
 import { useProjectFiles } from '@/features/flowdeck/hooks/useProjectFiles';
 import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { useProjectComments } from '@/features/flowdeck/hooks/useProjectComments';
+import { useProjectTimeLogs } from '@/features/flowdeck/hooks/useProjectTimeLogs';
 import { TaskDetailSkeleton } from '@/components/ui/skeleton';
 import { TaskLoadError } from '@/components/ui/task-load-error';
 import { useTaskActivity } from '@/features/flowdeck/hooks/useAdvancedFeatures';
@@ -34,6 +35,8 @@ export default function InterceptedTaskDetailPage() {
   const cachedTask = getTaskForProject(state.tasksByProject, projectId, taskId);
   const { tasks: fetchedTasks, loading: tasksLoading, error: tasksError, refetch: refetchTasks } = useProjectTasks(cachedTask ? null : projectId);
   useProjectComments(projectId);
+  // Hydrate time logs so the detail panel keeps showing logged work (audit H-09).
+  useProjectTimeLogs(projectId || null);
   const { activity: taskActivity } = useTaskActivity(taskId || null);
 
   const task = cachedTask ?? fetchedTasks.find(candidate => candidate.id === taskId) ?? null;

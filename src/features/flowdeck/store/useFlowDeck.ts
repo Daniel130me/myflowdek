@@ -139,6 +139,7 @@ export interface FlowDeckState {
   syncProjectTags: (projectId: string, tags: Tag[]) => void;
   /** Replace a project's custom-field column definitions with API data. */
   syncProjectCustomCols: (projectId: string, cols: CustomColumn[]) => void;
+  syncProjectTimeLogs: (projectId: string, logs: TimeLog[]) => void;
   /** Replace a project's comments with API data. */
   syncProjectComments: (projectId: string, comments: Comment[]) => void;
   /** Replace a project's files with API data. */
@@ -603,6 +604,11 @@ export function useFlowDeckStore(): FlowDeckState {
     setCommentsByProject(prev => ({ ...prev, [projectId]: comments }));
   }, []);
 
+  /** One-way sync: replace a project's time logs with API data (audit H-09). */
+  const syncProjectTimeLogs = useCallback((projectId: string, logs: TimeLog[]) => {
+    setTimeLogsByProject(prev => ({ ...prev, [projectId]: logs }));
+  }, []);
+
   const syncProjectFiles = useCallback((projectId: string, files: FileItem[]) => {
     setFilesByProject(prev => ({ ...prev, [projectId]: files }));
   }, []);
@@ -908,6 +914,22 @@ export function useFlowDeckStore(): FlowDeckState {
       }
       const serverId = res.data?.task?.id;
       if (!serverId || serverId === tempId) return;
+      // Persist tags picked at creation (audit H-05): the create payload
+      // cannot carry them, so they render optimistically and are fanned out
+      // to the tag API here, one call per tag. A failed call rolls back just
+      // that tag — the task itself already exists on the server.
+      for (const tagId of input.tags ?? []) {
+        apiAddTaskTag(serverId, tagId).then((tagRes) => {
+          if (tagRes.ok) return;
+          setTasksByProject(prev => ({
+            ...prev,
+            [projectId]: (prev[projectId] || []).map(t =>
+              t.id === serverId ? { ...t, tags: (t.tags || []).filter(id => id !== tagId) } : t,
+            ),
+          }));
+          toast.error('Failed to save a task tag', { description: tagRes.error });
+        });
+      }
       // Replace the temp id with the canonical server id everywhere it
       // appears in this project's task list (the task itself, plus any
       // sibling deps/parentId references that pointed at the temp id).
@@ -3001,7 +3023,7 @@ export function useFlowDeckStore(): FlowDeckState {
     searchFilters, setSearchFilters, activeFilterCount, clearFilters,
     timeLogs, taskTimeLogs,
     gridActions,
-    openProject, syncProjectFromRoute, syncProjectTasks, syncProjectTags, syncProjectCustomCols, syncProjectComments, syncProjectFiles, syncProjectMembers, syncProjectStatusUpdates, syncProjects, upsertProject, removeProjectFromCache, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
+    openProject, syncProjectFromRoute, syncProjectTasks, syncProjectTags, syncProjectCustomCols, syncProjectComments, syncProjectFiles, syncProjectMembers, syncProjectStatusUpdates, syncProjects, syncProjectTimeLogs, upsertProject, removeProjectFromCache, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
     updateTask, addTask, removeTask, removeTasksBulk, moveStatus, toggleComplete,
     duplicateTask, duplicateTaskWithOptions, duplicateTasksBulk,
     moveTaskToProject, moveTasksToProjectBulk,

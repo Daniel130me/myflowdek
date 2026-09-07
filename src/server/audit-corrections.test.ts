@@ -294,6 +294,43 @@ describe('Audit Remediation: Sidebar gating + project empty states (Item 11)', (
   });
 });
 
+describe('Audit Remediation: Tags at creation + time-log sync (Item 12)', () => {
+  test('addTask persists optimistically-selected tags via the tag API', () => {
+    const storePath = path.join(process.cwd(), 'src/features/flowdeck/store/useFlowDeck.ts');
+    const source = fs.readFileSync(storePath, 'utf-8');
+
+    // The fan-out lives inside addTask's create reconciliation: after the
+    // server id is known, every selected tag gets an apiAddTaskTag call.
+    const addTaskBody = source.split('apiCreateTask(projectId, taskToApiPayload')[1]?.split('const addTasksBulk')[0] ?? '';
+    assert.match(addTaskBody, /apiAddTaskTag\(/, 'addTask must persist creation-time tags');
+    assert.match(addTaskBody, /input\.tags/, 'addTask must read the selected tags');
+  });
+
+  test('a project-level time-log endpoint hydrates the store', () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/projects/[projectId]/time-logs/route.ts');
+    assert.ok(fs.existsSync(routePath), 'GET /api/projects/:id/time-logs must exist (one query, no N+1)');
+
+    const hookPath = path.join(process.cwd(), 'src/features/flowdeck/hooks/useProjectTimeLogs.ts');
+    const hookSource = fs.readFileSync(hookPath, 'utf-8');
+    assert.ok(hookSource.includes('syncProjectTimeLogs'), 'the sync hook must feed the store');
+    assert.ok(
+      fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/store/useFlowDeck.ts'), 'utf-8')
+        .includes('syncProjectTimeLogs'),
+      'the store must expose syncProjectTimeLogs',
+    );
+  });
+
+  test('task detail pages call the time-log sync hook', () => {
+    for (const p of [
+      'src/app/(product)/projects/[projectId]/tasks/[taskId]/page.tsx',
+      'src/app/(product)/@modal/(.)projects/[projectId]/tasks/[taskId]/page.tsx',
+    ]) {
+      const source = fs.readFileSync(path.join(process.cwd(), p), 'utf-8');
+      assert.ok(source.includes('useProjectTimeLogs('), `${p} must hydrate time logs`);
+    }
+  });
+});
+
 describe('Audit Remediation: Project-scoped routes and persistence (Item 6)', () => {
   test('routes helper defines project-scoped advanced features', () => {
     const projectId = 'proj-999';
