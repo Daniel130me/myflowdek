@@ -39,6 +39,8 @@ export const PROJECT_PERMISSIONS = {
   MANAGE_FORMS: ['OWNER', 'ADMIN'] as ProjectRole[],
   /** Manage approvals (create/resolve). */
   MANAGE_APPROVALS: ['OWNER', 'ADMIN', 'MEMBER'] as ProjectRole[],
+  /** Manage RAID log items (risks, assumptions, issues, dependencies). */
+  MANAGE_RAID: ['OWNER', 'ADMIN', 'MEMBER'] as ProjectRole[],
   /** Manage comments (any member can comment; deletion follows own-content rule). */
   CREATE_COMMENT: ['OWNER', 'ADMIN', 'MEMBER'] as ProjectRole[],
   /** Upload files. */

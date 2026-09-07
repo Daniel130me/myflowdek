@@ -10,6 +10,7 @@ import {
   PROJECT_TEMPLATES,
   FONT_FAMILY as FF,
   type Task, type Project, type FileItem, type RaidItem, type CustomColumn, type TaskStatus, type TaskPriority,
+  type CreateRaidItemInput, type UpdateRaidItemPatch, type ApiRaidItem, mapApiRaidItem,
   type Tag, type Comment, type ActivityEntry, type TimeLog, type SearchFilters, type Section, type Reaction, type Goal, type KeyResult, type SavedFilter, EMPTY_FILTERS,
   type AutomationRule, type Form, type FormSubmission, type ApprovalRequest, type Budget, type Expense, type TimesheetEntry, type CreateTaskInput,
   type MemberInfo,
@@ -29,6 +30,7 @@ import {
   apiCreateTag, apiDeleteTag,
   apiAddDependency, apiRemoveDependency,
   apiAddTimeLog, apiDeleteTimeLog,
+  apiCreateRaid, apiUpdateRaid, apiDeleteRaid,
   apiUpdateProject, apiSetProjectFavorite, apiArchiveProject, apiRestoreProject,
   apiAddProjectMember, apiRemoveProjectMember,
   apiCreateProjectStatusUpdate, apiDeleteProjectStatusUpdate,
@@ -142,6 +144,8 @@ export interface FlowDeckState {
   syncProjectTimeLogs: (projectId: string, logs: TimeLog[]) => void;
   /** Replace a project's comments with API data. */
   syncProjectComments: (projectId: string, comments: Comment[]) => void;
+  /** Replace a project's RAID log items with API data (audit C-01). */
+  syncProjectRaid: (projectId: string, items: RaidItem[]) => void;
   /** Replace a project's files with API data. */
   syncProjectFiles: (projectId: string, files: FileItem[]) => void;
   /**
@@ -185,8 +189,9 @@ export interface FlowDeckState {
   addFiles: (projectId: string, files: FileItem[]) => void;
   removeFile: (projectId: string, fileId: string) => void;
   linkFile: (projectId: string, fileId: string, taskId: string, linked?: boolean) => void;
-  addRaidItem: (projectId: string, item: RaidItem) => void;
-  updateRaidItem: (projectId: string, id: string, patch: Partial<RaidItem>) => void;
+  /** RAID CRUD — optimistic with API persistence + rollback (audit C-01). */
+  addRaidItem: (projectId: string, input: CreateRaidItemInput) => void;
+  updateRaidItem: (projectId: string, id: string, patch: UpdateRaidItemPatch) => void;
   removeRaidItem: (projectId: string, id: string) => void;
   addColumn: (projectId: string, def: CustomColumn) => void;
   removeColumn: (projectId: string, key: string) => void;
@@ -602,6 +607,11 @@ export function useFlowDeckStore(): FlowDeckState {
 
   const syncProjectComments = useCallback((projectId: string, comments: Comment[]) => {
     setCommentsByProject(prev => ({ ...prev, [projectId]: comments }));
+  }, []);
+
+  /** One-way sync: replace a project's RAID items with API data (audit C-01). */
+  const syncProjectRaid = useCallback((projectId: string, items: RaidItem[]) => {
+    setRaidByProject(prev => ({ ...prev, [projectId]: items }));
   }, []);
 
   /** One-way sync: replace a project's time logs with API data (audit H-09). */
@@ -1608,20 +1618,67 @@ export function useFlowDeckStore(): FlowDeckState {
     });
   }, [filesByProject]);
 
-  const addRaidItem = useCallback((projectId: string, item: RaidItem) => {
-    if (!projectId) return;
-    setRaidByProject(prev => ({ ...prev, [projectId]: [item, ...(prev[projectId] || [])] }));
-  }, []);
+  /* ---- RAID log (audit C-01: persisted via /api/projects/:id/raid) ---- */
 
-  const updateRaidItem = useCallback((projectId: string, id: string, patch: Partial<RaidItem>) => {
+  const addRaidItem = useCallback((projectId: string, input: CreateRaidItemInput) => {
     if (!projectId) return;
+    // Optimistic insert with a temp id, reconciled with the server row below.
+    const optimistic: RaidItem = {
+      id: defaultIdGenerator.generate('raid'),
+      type: input.type,
+      description: input.description,
+      owner: input.owner,
+      impact: input.impact,
+      status: 'open',
+      dateRaised: TODAY.toISOString().slice(0, 10),
+    };
+    const snapshot = raidByProject[projectId] || [];
+    setRaidByProject(prev => ({ ...prev, [projectId]: [optimistic, ...(prev[projectId] || [])] }));
+    apiCreateRaid(projectId, {
+      type: input.type,
+      description: input.description,
+      ownerId: input.owner || null,
+      impact: input.impact,
+    }).then(res => {
+      if (res.ok && res.data) {
+        const saved = mapApiRaidItem((res.data as { item: ApiRaidItem }).item);
+        setRaidByProject(prev => ({
+          ...prev,
+          [projectId]: (prev[projectId] || []).map(r => (r.id === optimistic.id ? saved : r)),
+        }));
+        return;
+      }
+      setRaidByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save log item', { description: res.error });
+    });
+  }, [raidByProject]);
+
+  const updateRaidItem = useCallback((projectId: string, id: string, patch: UpdateRaidItemPatch) => {
+    if (!projectId) return;
+    const snapshot = raidByProject[projectId] || [];
     setRaidByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).map(r => r.id === id ? { ...r, ...patch } : r) }));
-  }, []);
+    // Translate the frontend field name (`owner`) to the API's (`ownerId`).
+    const { owner, ...rest } = patch;
+    apiUpdateRaid(projectId, id, {
+      ...rest,
+      ...(owner !== undefined ? { ownerId: owner || null } : {}),
+    }).then(res => {
+      if (res.ok) return;
+      setRaidByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to update log item', { description: res.error });
+    });
+  }, [raidByProject]);
 
   const removeRaidItem = useCallback((projectId: string, id: string) => {
     if (!projectId) return;
+    const snapshot = raidByProject[projectId] || [];
     setRaidByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).filter(r => r.id !== id) }));
-  }, []);
+    apiDeleteRaid(projectId, id).then(res => {
+      if (res.ok) return;
+      setRaidByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to delete log item', { description: res.error });
+    });
+  }, [raidByProject]);
 
   /* ---- Tags ---- */
   const addTag = useCallback((projectId: string, tag: Tag) => {
@@ -3045,7 +3102,7 @@ export function useFlowDeckStore(): FlowDeckState {
     searchFilters, setSearchFilters, activeFilterCount, clearFilters,
     timeLogs, taskTimeLogs,
     gridActions,
-    openProject, syncProjectFromRoute, syncProjectTasks, syncProjectTags, syncProjectCustomCols, syncProjectComments, syncProjectFiles, syncProjectMembers, syncProjectStatusUpdates, syncProjects, syncProjectTimeLogs, upsertProject, removeProjectFromCache, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
+    openProject, syncProjectFromRoute, syncProjectTasks, syncProjectTags, syncProjectCustomCols, syncProjectComments, syncProjectRaid, syncProjectFiles, syncProjectMembers, syncProjectStatusUpdates, syncProjects, syncProjectTimeLogs, upsertProject, removeProjectFromCache, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
     updateTask, addTask, removeTask, removeTasksBulk, moveStatus, toggleComplete,
     duplicateTask, duplicateTaskWithOptions, duplicateTasksBulk,
     moveTaskToProject, moveTasksToProjectBulk,

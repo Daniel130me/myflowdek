@@ -2,11 +2,17 @@
 
 import React, { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { COLORS, RAID_META, RAID_ORDER, IMPACT_META, TODAY, type RaidItem } from '@/features/flowdeck/model';
+import { COLORS, RAID_META, RAID_ORDER, IMPACT_META, type RaidItem } from '@/features/flowdeck/model';
 import { Avatar, SectionHeader, selectStyle, FF, useMemberDirectory, useProjectMembers } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 
-export function RaidView({ items, onAdd, onUpdate, onRemove, projectId }: { items: RaidItem[]; onAdd: (item: RaidItem) => void; onUpdate: (id: string, patch: Partial<RaidItem>) => void; onRemove: (id: string) => void; projectId?: string | null }) {
+/**
+ * RAID log view. Persistence lives behind `onAdd`/`onUpdate`/`onRemove`
+ * (audit C-01 — the parent page wires these to the store's API-backed
+ * actions). The add contract carries only user-entered fields: ids and
+ * dates are owned by the server.
+ */
+export function RaidView({ items, onAdd, onUpdate, onRemove, projectId }: { items: RaidItem[]; onAdd: (input: { type: string; description: string; owner: string; impact: string }) => void; onUpdate: (id: string, patch: Partial<Pick<RaidItem, 'type' | 'description' | 'owner' | 'impact' | 'status'>>) => void; onRemove: (id: string) => void; projectId?: string | null }) {
   const { isMobile } = useViewport();
   // Real project members — used to populate the owner dropdown. Falls back
   // to an empty list when no project is selected.
@@ -19,7 +25,7 @@ export function RaidView({ items, onAdd, onUpdate, onRemove, projectId }: { item
 
   function submit() {
     if (!draft.description.trim()) return;
-    onAdd({ id: 'r' + Math.random().toString(36).slice(2, 8), type: draft.type, description: draft.description.trim(), owner: draft.owner, impact: draft.impact, status: 'open', dateRaised: TODAY.toISOString().slice(0, 10) });
+    onAdd({ type: draft.type, description: draft.description.trim(), owner: draft.owner, impact: draft.impact });
     setDraft({ type: 'risk', description: '', owner: members[0]?.id ?? '', impact: 'medium' });
     setShowForm(false);
   }

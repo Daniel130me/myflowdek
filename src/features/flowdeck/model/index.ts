@@ -1,6 +1,7 @@
 /* Barrel re-export for lib/flowdeck */
 
 export * from './types';
+export * from './raid';
 export * from './constants';
 export { FONT_FAMILY as FF } from './constants';
 export * from './helpers';

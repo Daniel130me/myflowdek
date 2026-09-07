@@ -306,6 +306,43 @@ export function apiDeleteTag(projectId: string, tagId: string) {
   return apiCall(`/api/projects/${projectId}/tags/${tagId}`, { method: 'DELETE' });
 }
 
+/* ----------------------------- RAID log -------------------------------- */
+
+/**
+ * RAID log mutations (audit C-01 — the log previously had no persistence).
+ * Rows are returned untyped (as `unknown` data) on purpose: mapping the API
+ * shape into the frontend `RaidItem` lives in one place, the model layer
+ * (`features/flowdeck/model/raid.ts`), so the transport stays dumb.
+ */
+
+/** POST /api/projects/:projectId/raid — create a RAID log item. */
+export function apiCreateRaid(
+  projectId: string,
+  input: { type: string; description: string; ownerId?: string | null; impact: string },
+) {
+  return apiCallWithData<{ item: unknown }>(
+    `/api/projects/${projectId}/raid`,
+    json('POST', input),
+  );
+}
+
+/** PATCH /api/projects/:projectId/raid/:itemId — update a RAID log item. */
+export function apiUpdateRaid(
+  projectId: string,
+  itemId: string,
+  patch: Record<string, unknown>,
+) {
+  return apiCallWithData<{ item: unknown }>(
+    `/api/projects/${projectId}/raid/${itemId}`,
+    json('PATCH', patch),
+  );
+}
+
+/** DELETE /api/projects/:projectId/raid/:itemId — delete a RAID log item. */
+export function apiDeleteRaid(projectId: string, itemId: string) {
+  return apiCall(`/api/projects/${projectId}/raid/${itemId}`, { method: 'DELETE' });
+}
+
 /* --------------------------- Time-log mutations ------------------------- */
 
 /**
