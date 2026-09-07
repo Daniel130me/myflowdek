@@ -447,6 +447,15 @@ export function apiRemoveProjectMember(projectId: string, userId: string) {
   return apiCall(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' });
 }
 
+/**
+ * PATCH /api/projects/:projectId/members/:userId — change a member's role
+ * (OWNER/ADMIN only, enforced server-side). Used by the Share modal's
+ * View/Edit access control (audit C-03).
+ */
+export function apiUpdateProjectMemberRole(projectId: string, userId: string, role: string) {
+  return apiCall(`/api/projects/${projectId}/members/${userId}`, json('PATCH', { role }));
+}
+
 /* ----------------- Project status update mutations ------------------- */
 
 /** POST /api/projects/:projectId/status-updates — post a status update. */

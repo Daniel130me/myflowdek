@@ -93,6 +93,9 @@ function mapMember(api: ApiProjectMember): MemberInfo {
     id: api.user.id,
     name: api.user.name ?? api.user.email,
     role: api.user.jobTitle ?? undefined,
+    // The role ON the project (VIEWER/MEMBER/...) — used by the Share
+    // modal's access list (audit C-03). Distinct from the job title above.
+    projectRole: api.role,
     color: api.user.avatarColor ?? undefined,
   };
 }

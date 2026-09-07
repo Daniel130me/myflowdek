@@ -17,6 +17,12 @@ export interface MemberInfo {
   name: string;
   /** Optional role / job title (display-only). */
   role?: string;
+  /**
+   * Role of this member **on the project** (VIEWER/MEMBER/ADMIN/OWNER),
+   * separate from `role`, which is the user's display-only job title.
+   * Populated from GET /api/projects/:id/members.
+   */
+  projectRole?: string;
   /** Optional avatar colour (hex). */
   color?: string;
 }
