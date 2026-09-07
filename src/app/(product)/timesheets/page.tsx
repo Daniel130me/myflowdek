@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { fetchJson } from '@/lib/fetch-json';
 import { TimesheetView } from '@/features/flowdeck/components/views';
 import { useTimesheets } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
@@ -32,17 +33,18 @@ export default function TimesheetsRoutePage() {
 
   const handleAddEntry = useCallback(async (entry: Partial<TimesheetEntry>) => {
     try {
-      const res = await fetch('/api/timesheets', {
+      await fetchJson('/api/timesheets', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId: entry.projectId || projectId,
           taskId: entry.taskId, date: entry.date, hours: entry.hours, note: entry.note,
         }),
       });
-      if (!res.ok) throw new Error();
       toast.success('Time entry added');
       refetch();
-    } catch { toast.error('Failed to add time entry'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add time entry');
+    }
   }, [projectId, refetch]);
 
   const handleUpdateEntry = useCallback(async (id: string, patch: Partial<TimesheetEntry>) => {

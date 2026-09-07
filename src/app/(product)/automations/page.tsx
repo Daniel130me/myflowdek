@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { fetchJson } from '@/lib/fetch-json';
 import { AutomationsView } from '@/features/flowdeck/components/views';
 import { useAutomations } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
@@ -26,34 +27,39 @@ export default function AutomationsRoutePage() {
   const handleAdd = useCallback(async (rule: Partial<AutomationRule>) => {
     if (!projectId) return;
     try {
-      const res = await fetch(`/api/projects/${projectId}/automations`, {
+      await fetchJson(`/api/projects/${projectId}/automations`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: rule.name, trigger: rule.trigger, actions: rule.actions }),
       });
-      if (!res.ok) throw new Error();
       toast.success('Automation created');
       refetch();
-    } catch { toast.error('Failed to create automation'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create automation');
+    }
   }, [projectId, refetch]);
 
   const handleUpdate = useCallback(async (id: string, patch: Partial<AutomationRule>) => {
     if (!projectId) return;
     try {
-      await fetch(`/api/projects/${projectId}/automations/${id}`, {
+      await fetchJson(`/api/projects/${projectId}/automations/${id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       });
       refetch();
-    } catch { toast.error('Failed to update automation'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update automation');
+    }
   }, [projectId, refetch]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (!projectId) return;
     try {
-      await fetch(`/api/projects/${projectId}/automations/${id}`, { method: 'DELETE' });
+      await fetchJson(`/api/projects/${projectId}/automations/${id}`, { method: 'DELETE' });
       toast.success('Automation deleted');
       refetch();
-    } catch { toast.error('Failed to delete automation'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete automation');
+    }
   }, [projectId, refetch]);
 
   if (loading) return <TableSkeleton />;

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { fetchJson } from '@/lib/fetch-json';
 import { BudgetView } from '@/features/flowdeck/components/views';
 import { useBudgets } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
@@ -66,14 +67,15 @@ export default function BudgetsRoutePage() {
   const handleAddBudget = useCallback(async (budget: Partial<Budget>) => {
     if (!projectId) return;
     try {
-      const res = await fetch(`/api/projects/${projectId}/budgets`, {
+      await fetchJson(`/api/projects/${projectId}/budgets`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: budget.name, totalBudget: budget.totalBudget ?? 0, currency: budget.currency ?? 'USD' }),
       });
-      if (!res.ok) throw new Error();
       toast.success('Budget created');
       refetch();
-    } catch { toast.error('Failed to create budget'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create budget');
+    }
   }, [projectId, refetch]);
 
   const handleUpdateBudget = useCallback(async (id: string, patch: Partial<Budget>) => {
@@ -90,23 +92,26 @@ export default function BudgetsRoutePage() {
   const handleDeleteBudget = useCallback(async (id: string) => {
     if (!projectId) return;
     try {
-      await fetch(`/api/projects/${projectId}/budgets/${id}`, { method: 'DELETE' });
+      await fetchJson(`/api/projects/${projectId}/budgets/${id}`, { method: 'DELETE' });
       toast.success('Budget deleted');
       refetch();
-    } catch { toast.error('Failed to delete budget'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete budget');
+    }
   }, [projectId, refetch]);
 
   const handleAddExpense = useCallback(async (budgetId: string, expense: Partial<Expense>) => {
     if (!projectId) return;
     try {
-      const res = await fetch(`/api/projects/${projectId}/budgets/${budgetId}`, {
+      await fetchJson(`/api/projects/${projectId}/budgets/${budgetId}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ budgetId, description: expense.description, amount: expense.amount, category: expense.category ?? 'general' }),
       });
-      if (!res.ok) throw new Error();
       toast.success('Expense added');
       refetch();
-    } catch { toast.error('Failed to add expense'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add expense');
+    }
   }, [projectId, refetch]);
 
   const handleDeleteExpense = useCallback(async (id: string) => {

@@ -6,6 +6,7 @@ import { Users, UserPlus, UserMinus, Crown } from 'lucide-react';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useAuth } from '@/features/flowdeck/components/auth';
 import { getSingleParam } from '@/shared/utils/routeParams';
+import { fetchJson } from '@/lib/fetch-json';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { toast } from 'sonner';
 import { TableSkeleton } from '@/components/ui/skeleton';
@@ -57,21 +58,25 @@ export default function ProjectTeamPage() {
 
   const handleChangeRole = async (userId: string, role: string) => {
     try {
-      await fetch(`/api/projects/${projectId}/members/${userId}`, {
+      await fetchJson(`/api/projects/${projectId}/members/${userId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role }),
       });
       toast.success('Role updated');
       fetchMembers();
-    } catch { toast.error('Failed to update role'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update role');
+    }
   };
 
   const handleRemove = async (userId: string) => {
     try {
-      await fetch(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' });
+      await fetchJson(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' });
       toast.success('Member removed');
       fetchMembers();
-    } catch { toast.error('Failed to remove member'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to remove member');
+    }
   };
 
   const handleAddMember = async (userId: string) => {

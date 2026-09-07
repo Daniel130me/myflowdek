@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { fetchJson } from '@/lib/fetch-json';
 import { FormsView } from '@/features/flowdeck/components/views';
 import { useForms } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
@@ -64,14 +65,15 @@ export default function FormsRoutePage() {
   const handleAddForm = useCallback(async (form: Partial<Form>) => {
     if (!projectId) return;
     try {
-      const res = await fetch(`/api/projects/${projectId}/forms`, {
+      await fetchJson(`/api/projects/${projectId}/forms`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: form.name, description: form.description, fields: form.fields ?? [] }),
       });
-      if (!res.ok) throw new Error();
       toast.success('Form created');
       refetch();
-    } catch { toast.error('Failed to create form'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create form');
+    }
   }, [projectId, refetch]);
 
   const handleUpdateForm = useCallback(async (id: string, patch: Partial<Form>) => {
@@ -89,10 +91,12 @@ export default function FormsRoutePage() {
   const handleDeleteForm = useCallback(async (id: string) => {
     if (!projectId) return;
     try {
-      await fetch(`/api/projects/${projectId}/forms/${id}`, { method: 'DELETE' });
+      await fetchJson(`/api/projects/${projectId}/forms/${id}`, { method: 'DELETE' });
       toast.success('Form deleted');
       refetch();
-    } catch { toast.error('Failed to delete form'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete form');
+    }
   }, [projectId, refetch]);
 
   if (loading) return <TableSkeleton />;

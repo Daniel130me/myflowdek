@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { fetchJson } from '@/lib/fetch-json';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Building2, Users, Mail, Settings, Trash2, Crown, Shield, UserMinus, Send, HardDrive, AlertTriangle, X } from 'lucide-react';
 import { useWorkspaces } from '@/features/flowdeck/hooks/useWorkspaces';
@@ -174,32 +175,38 @@ export default function WorkspaceSettingsPage() {
   const handleRemoveMember = async (userId: string) => {
     if (!workspaceId) return;
     try {
-      await fetch(`/api/workspaces/${workspaceId}/members/${userId}`, { method: 'DELETE' });
+      await fetchJson(`/api/workspaces/${workspaceId}/members/${userId}`, { method: 'DELETE' });
       toast.success('Member removed');
       fetchAll();
-    } catch { toast.error('Failed to remove member'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to remove member');
+    }
   };
 
   const handleChangeRole = async (userId: string, role: string) => {
     if (!workspaceId) return;
     try {
-      await fetch(`/api/workspaces/${workspaceId}/members/${userId}`, {
+      await fetchJson(`/api/workspaces/${workspaceId}/members/${userId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role }),
       });
       toast.success('Role updated');
       fetchAll();
-    } catch { toast.error('Failed to update role'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update role');
+    }
   };
 
   const handleDelete = async () => {
     if (!workspaceId) return;
     if (!confirm('Are you sure? This will permanently delete the workspace and all its projects.')) return;
     try {
-      await fetch(`/api/workspaces/${workspaceId}`, { method: 'DELETE' });
+      await fetchJson(`/api/workspaces/${workspaceId}`, { method: 'DELETE' });
       toast.success('Workspace deleted');
       router.push('/projects');
-    } catch { toast.error('Failed to delete workspace'); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete workspace');
+    }
   };
 
   const handleDisconnectStorage = async (slug: string) => {
