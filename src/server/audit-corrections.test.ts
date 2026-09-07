@@ -57,17 +57,28 @@ describe('Audit Remediation: Onboarding profile persistence (Item 2)', () => {
 });
 
 describe('Audit Remediation: Forgot password flow (Item 3)', () => {
-  test('routes contains resetPassword route', () => {
+  test('routes contains forgotPassword and resetPassword routes', () => {
+    assert.strictEqual(routes.forgotPassword(), '/forgot-password');
     assert.strictEqual(routes.resetPassword(), '/reset-password');
   });
 
-  test('LoginPage wires Forgot password to resetPassword route', () => {
+  test('forgot-password page exists and calls the forgot-password API', () => {
+    const pagePath = path.join(process.cwd(), 'src/app/(auth)/forgot-password/page.tsx');
+    const source = fs.readFileSync(pagePath, 'utf-8');
+
+    assert.ok(
+      source.includes('/api/auth/forgot-password'),
+      'forgot-password page must POST to /api/auth/forgot-password',
+    );
+  });
+
+  test('LoginPage wires Forgot password to forgotPassword route', () => {
     const loginPath = path.join(process.cwd(), 'src/features/flowdeck/components/auth/LoginPage.tsx');
     const source = fs.readFileSync(loginPath, 'utf-8');
 
     assert.ok(
-      source.includes('routes.resetPassword()'),
-      'LoginPage must wire Forgot password buttons to routes.resetPassword()',
+      source.includes('routes.forgotPassword()'),
+      'LoginPage must wire Forgot password buttons to routes.forgotPassword()',
     );
   });
 });

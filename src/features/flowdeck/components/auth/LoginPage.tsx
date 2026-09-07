@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import Link from 'next/link';
 import { Eye, EyeOff, ArrowRight, Layers, BarChart3, Users, Zap, ChevronRight, Sparkles, LogOut } from 'lucide-react';
 import { COLORS, FF } from '@/features/flowdeck/model';
+import { routes } from '@/shared/navigation/routes';
 import type { UserProfile } from './useAuth';
 
 interface LoginPageProps {
@@ -37,6 +39,21 @@ const inputFocus: React.CSSProperties = {
   border: `1px solid ${COLORS.accent}`,
   boxShadow: '0 0 0 3px rgba(254,128,41,0.12)',
 };
+
+/**
+ * Link to the forgot-password flow. Shared by all three responsive login
+ * layouts so the recovery path stays consistent (and wired) in one place.
+ */
+function ForgotPasswordLink() {
+  return (
+    <Link
+      href={routes.forgotPassword()}
+      style={{ fontSize: 12, color: COLORS.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FF, padding: 0, textDecoration: 'none' }}
+    >
+      Forgot password?
+    </Link>
+  );
+}
 
 function useWindowSize() {
   const [w, setW] = useState(0);
@@ -187,7 +204,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
               <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>Password</span>
                 {mode === 'signin' && (
-                  <button type="button" style={{ fontSize: 12, color: COLORS.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FF, padding: 0 }}>Forgot password?</button>
+                  <ForgotPasswordLink />
                 )}
               </label>
               <div style={{ position: 'relative' }}>
@@ -389,7 +406,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>Password</span>
                   {mode === 'signin' && (
-                    <button type="button" style={{ fontSize: 12, color: COLORS.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FF, padding: 0 }}>Forgot password?</button>
+                    <ForgotPasswordLink />
                   )}
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -577,7 +594,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
               <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>Password</span>
                 {mode === 'signin' && (
-                  <button type="button" style={{ fontSize: 12, color: COLORS.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FF, padding: 0 }}>Forgot password?</button>
+                  <ForgotPasswordLink />
                 )}
               </label>
               <div style={{ position: 'relative' }}>
