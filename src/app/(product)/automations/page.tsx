@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { SelectProjectNotice } from '@/features/flowdeck/components/ui/SelectProjectNotice';
 import { fetchJson } from '@/lib/fetch-json';
 import { AutomationsView } from '@/features/flowdeck/components/views';
 import { useAutomations } from '@/features/flowdeck/hooks/useAdvancedFeatures';
@@ -62,6 +63,8 @@ export default function AutomationsRoutePage() {
     }
   }, [projectId, refetch]);
 
+  // No project opened: show an explicit empty state instead of a silent no-op (audit H-11).
+  if (!projectId) return <SelectProjectNotice feature="Automations" />;
   if (loading) return <TableSkeleton />;
 
   return (

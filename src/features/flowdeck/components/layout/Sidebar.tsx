@@ -7,7 +7,7 @@ import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { Avatar } from '../ui';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../auth';
-import { NAV } from './navItems';
+import { NAV, navItemRequiresProject } from './navItems';
 import { WorkspaceSelector } from './WorkspaceSelector';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaces';
 import type { Project } from '@/features/flowdeck/model';
@@ -113,9 +113,9 @@ export function Sidebar({ project, projects, activeView, onNavigate, goToPortfol
         {NAV.map(n => {
           const Icon = n.icon;
           const active = activeView === n.id;
-          const disabled = !project && n.id !== 'talent';
+          const disabled = !project && navItemRequiresProject(n.id);
           return (
-            <button key={n.id} onClick={() => { if (!disabled) onNavigate(n.id); }} disabled={disabled} style={{
+            <button key={n.id} onClick={() => { if (!disabled) onNavigate(n.id); }} disabled={disabled} title={disabled ? 'Open a project first' : undefined} style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10,
               border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', textAlign: 'left',
               background: active ? S.activeBg : 'transparent',

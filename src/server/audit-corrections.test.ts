@@ -245,6 +245,55 @@ describe('Audit Remediation: Legal links + a11y basics (Item 10)', () => {
   });
 });
 
+describe('Audit Remediation: Sidebar gating + project empty states (Item 11)', () => {
+  test('nav model marks exactly the project-scoped views', () => {
+    const navPath = path.join(process.cwd(), 'src/features/flowdeck/components/layout/navItems.ts');
+    const source = fs.readFileSync(navPath, 'utf-8');
+
+    assert.ok(source.includes('navItemRequiresProject'), 'nav module must export the gating helper');
+    // Workspace-level destinations must NOT require a project…
+    for (const id of ['mytasks', 'inbox', 'goals', 'automations', 'forms', 'approvals', 'budget', 'timesheets', 'ai']) {
+      assert.ok(
+        !new RegExp(`id: '${id}'.*requiresProject`).test(source),
+        `workspace-level item '${id}' must stay enabled without a project`,
+      );
+    }
+    // …while project-scoped views must.
+    for (const id of ['board', 'sheet', 'timeline', 'calendar', 'raid']) {
+      assert.ok(
+        new RegExp(`id: '${id}'.*requiresProject: true`).test(source),
+        `project-scoped item '${id}' must require an open project`,
+      );
+    }
+  });
+
+  test('all nav surfaces gate disabled state via the shared helper', () => {
+    for (const f of ['Sidebar.tsx', 'MobileSidebar.tsx', 'MoreMenu.tsx']) {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), 'src/features/flowdeck/components/layout', f),
+        'utf-8',
+      );
+      assert.ok(
+        source.includes('navItemRequiresProject'),
+        `${f} must use the shared gating helper`,
+      );
+    }
+  });
+
+  test('workspace-level pages show a Select-a-project state when none is open', () => {
+    for (const f of ['automations', 'forms', 'approvals', 'budgets', 'timesheets']) {
+      const source = fs.readFileSync(
+        path.join(process.cwd(), `src/app/(product)/${f}/page.tsx`),
+        'utf-8',
+      );
+      assert.ok(
+        source.includes('SelectProjectNotice'),
+        `${f} page must render the explicit select-a-project empty state`,
+      );
+    }
+  });
+});
+
 describe('Audit Remediation: Project-scoped routes and persistence (Item 6)', () => {
   test('routes helper defines project-scoped advanced features', () => {
     const projectId = 'proj-999';

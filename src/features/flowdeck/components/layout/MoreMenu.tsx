@@ -3,7 +3,7 @@
 import React from 'react';
 import { FONT_FAMILY as FF } from '@/features/flowdeck/model';
 import { useTheme } from '../../hooks/useTheme';
-import { MORE_NAV } from './navItems';
+import { MORE_NAV, navItemRequiresProject } from './navItems';
 import type { Project } from '@/features/flowdeck/model';
 
 const BOTTOM_NAV_HEIGHT = 64;
@@ -23,7 +23,7 @@ export function MoreMenu({ activeView, project, onNavigate, onClose }: {
         {MORE_NAV.map(item => {
           const Icon = item.icon;
           const active = activeView === item.id;
-          const disabled = !project && item.id !== 'talent';
+          const disabled = !project && navItemRequiresProject(item.id);
           return (
             <button key={item.id} onClick={() => { if (!disabled) { onNavigate(item.id); onClose(); } }} disabled={disabled} style={{
               display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', padding: '11px 14px',

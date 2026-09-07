@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { SelectProjectNotice } from '@/features/flowdeck/components/ui/SelectProjectNotice';
 import { ApprovalsView } from '@/features/flowdeck/components/views';
 import { useApprovals } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
@@ -50,6 +51,8 @@ export default function ApprovalsRoutePage() {
     } catch { toast.error('Failed to resolve approval'); }
   }, [refetch]);
 
+  // No project opened: show an explicit empty state instead of a silent no-op (audit H-11).
+  if (!projectId) return <SelectProjectNotice feature="Approvals" />;
   if (loading) return <TableSkeleton />;
 
   return (
