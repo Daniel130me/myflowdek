@@ -8,6 +8,8 @@ export const routes = {
   forgotPassword: () => '/forgot-password',
   resetPassword: () => '/reset-password',
   onboarding: () => '/onboarding',
+  terms: () => '/terms',
+  privacy: () => '/privacy',
 
   // Top-level product routes
   projects: () => '/projects',

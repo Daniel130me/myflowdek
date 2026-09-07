@@ -150,7 +150,7 @@ export const TopBar = forwardRef<TopBarHandle, {
           />
           {project && (
             <div style={{ position: 'relative', marginLeft: 'auto' }}>
-              <button onClick={() => setFilterOpen(o => !o)} style={{ position: 'relative', border: 'none', background: 'none', cursor: 'pointer', color: activeFilterCount > 0 ? COLORS.accent : colors.grayLight, padding: 4, borderRadius: 8, display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}>
+              <button onClick={() => setFilterOpen(o => !o)} aria-label="Filters" aria-expanded={filterOpen} aria-haspopup="true" style={{ position: 'relative', border: 'none', background: 'none', cursor: 'pointer', color: activeFilterCount > 0 ? COLORS.accent : colors.grayLight, padding: 4, borderRadius: 8, display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}>
                 <SlidersHorizontal size={15} strokeWidth={1.8} />
                 {activeFilterCount > 0 && (
                   <span style={{ position: 'absolute', top: -2, right: -4, width: 15, height: 15, borderRadius: '50%', background: COLORS.accent, color: '#FFFFFF', fontSize: 9, fontWeight: 700, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{activeFilterCount}</span>
@@ -170,7 +170,7 @@ export const TopBar = forwardRef<TopBarHandle, {
             </div>
           ))}</div>
         )}
-        <button onClick={() => project ? onShowNewTask() : onShowNewProject()} style={{
+        <button onClick={() => project ? onShowNewTask() : onShowNewProject()} aria-label={project ? 'New task' : 'New project'} style={{
           display: 'flex', alignItems: 'center', gap: 6,
           background: COLORS.accent, color: '#FFFFFF', border: 'none', borderRadius: 10,
           padding: isMobile ? '0 12px' : '9px 16px', height: isMobile ? 38 : 'auto', fontSize: 13, fontWeight: 600, cursor: 'pointer',
@@ -186,6 +186,9 @@ export const TopBar = forwardRef<TopBarHandle, {
         <div ref={userMenuRef} style={{ position: 'relative' }}>
           <button
             onClick={() => setUserMenuOpen(o => !o)}
+            aria-label="Account menu"
+            aria-haspopup="menu"
+            aria-expanded={userMenuOpen}
             style={{
               width: isMobile ? 34 : 36, height: isMobile ? 34 : 36, borderRadius: '50%',
               background: myAvatarColor, border: `2px solid ${S.topbar.bg}`, cursor: 'pointer',

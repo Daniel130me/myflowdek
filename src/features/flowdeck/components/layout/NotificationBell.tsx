@@ -105,6 +105,8 @@ export function NotificationBell() {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
         aria-label="Notifications"
+        aria-haspopup="true"
+        aria-expanded={open}
       >
         <Bell size={18} color={COLORS.gray} />
         {unreadCount > 0 && (
@@ -141,6 +143,7 @@ export function NotificationBell() {
                 <button
                   onClick={handleMarkAllRead}
                   title="Mark all as read"
+                  aria-label="Mark all as read"
                   style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4 }}
                 >
                   <CheckCheck size={16} color={COLORS.accent} />
@@ -148,6 +151,7 @@ export function NotificationBell() {
               )}
               <button
                 onClick={() => setOpen(false)}
+                aria-label="Close notifications"
                 style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4 }}
               >
                 <X size={16} color={COLORS.gray} />

@@ -206,6 +206,45 @@ describe('Audit Remediation: Demo account backdoor (Item 9)', () => {
   });
 });
 
+describe('Audit Remediation: Legal links + a11y basics (Item 10)', () => {
+  test('terms and privacy pages exist', () => {
+    assert.strictEqual(routes.terms(), '/terms');
+    assert.strictEqual(routes.privacy(), '/privacy');
+    for (const p of ['src/app/terms/page.tsx', 'src/app/privacy/page.tsx']) {
+      assert.ok(fs.existsSync(path.join(process.cwd(), p)), `${p} must exist`);
+    }
+  });
+
+  test('login page links the real legal pages, not dead spans', () => {
+    const loginPath = path.join(process.cwd(), 'src/features/flowdeck/components/auth/LoginPage.tsx');
+    const source = fs.readFileSync(loginPath, 'utf-8');
+
+    assert.ok(source.includes('<LegalLinks />'), 'all login layouts must render the shared LegalLinks');
+    assert.ok(
+      !source.includes(">Terms of Service</span>"),
+      'fake clickable legal spans must be gone',
+    );
+  });
+
+  test('Field binds its label to form controls via htmlFor + useId', () => {
+    const fieldPath = path.join(process.cwd(), 'src/features/flowdeck/components/ui/Field.tsx');
+    const source = fs.readFileSync(fieldPath, 'utf-8');
+
+    assert.ok(source.includes('useId'), 'Field must generate a stable id with useId');
+    assert.ok(source.includes('htmlFor'), 'Field must render a real <label htmlFor> for form controls');
+  });
+
+  test('password show/hide buttons have accessible names', () => {
+    const loginPath = path.join(process.cwd(), 'src/features/flowdeck/components/auth/LoginPage.tsx');
+    const source = fs.readFileSync(loginPath, 'utf-8');
+
+    assert.ok(
+      source.includes("aria-label={showPw ? 'Hide password' : 'Show password'}"),
+      'every password toggle must carry an aria-label',
+    );
+  });
+});
+
 describe('Audit Remediation: Project-scoped routes and persistence (Item 6)', () => {
   test('routes helper defines project-scoped advanced features', () => {
     const projectId = 'proj-999';

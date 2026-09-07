@@ -55,6 +55,21 @@ function ForgotPasswordLink() {
   );
 }
 
+/**
+ * Legal links used in the “By continuing…” fine print. Real pages — the old
+ * spans looked clickable but did nothing (audit Section 4, legal compliance).
+ */
+function LegalLinks() {
+  const linkStyle: React.CSSProperties = { color: COLORS.accent, textDecoration: 'none' };
+  return (
+    <>
+      <Link href={routes.terms()} style={linkStyle}>Terms of Service</Link>
+      {' '}and{' '}
+      <Link href={routes.privacy()} style={linkStyle}>Privacy Policy</Link>
+    </>
+  );
+}
+
 function useWindowSize() {
   const [w, setW] = useState(0);
   useEffect(() => {
@@ -226,6 +241,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
                 <button
                   type="button"
                   onClick={() => setShowPw(v => !v)}
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
                   style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: COLORS.grayLight, padding: 0, display: 'flex' }}
                 >
                   {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -270,10 +286,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
 
           {/* Terms */}
           <p style={{ textAlign: 'center', fontSize: 11, color: COLORS.grayLight, marginTop: 14, lineHeight: 1.5 }}>
-            By continuing, you agree to our{' '}
-            <span style={{ color: COLORS.accent, cursor: 'pointer' }}>Terms of Service</span>
-            {' '}and{' '}
-            <span style={{ color: COLORS.accent, cursor: 'pointer' }}>Privacy Policy</span>
+            By continuing, you agree to our <LegalLinks />.
           </p>
         </div>
       </div>
@@ -422,7 +435,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
                     style={{ ...inputStyle, ...(focused === 'password' ? inputFocus : {}), paddingRight: 44 }}
                     autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                   />
-                  <button type="button" onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: COLORS.grayLight, padding: 0, display: 'flex' }}>
+                  <button type="button" onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide password' : 'Show password'} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: COLORS.grayLight, padding: 0, display: 'flex' }}>
                     {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
@@ -454,10 +467,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
             </p>
 
             <p style={{ textAlign: 'center', fontSize: 11, color: COLORS.grayLight, marginTop: 16, lineHeight: 1.5 }}>
-              By continuing, you agree to our{' '}
-              <span style={{ color: COLORS.accent, cursor: 'pointer' }}>Terms of Service</span>
-              {' '}and{' '}
-              <span style={{ color: COLORS.accent, cursor: 'pointer' }}>Privacy Policy</span>
+              By continuing, you agree to our <LegalLinks />.
             </p>
           </div>
         </div>
@@ -610,7 +620,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
                   style={{ ...inputStyle, ...(focused === 'password' ? inputFocus : {}), paddingRight: 44 }}
                   autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                 />
-                <button type="button" onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: COLORS.grayLight, padding: 0, display: 'flex' }}>
+                <button type="button" onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide password' : 'Show password'} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: COLORS.grayLight, padding: 0, display: 'flex' }}>
                   {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
@@ -642,10 +652,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
           </p>
 
           <p style={{ textAlign: 'center', fontSize: 11, color: COLORS.grayLight, marginTop: 20, lineHeight: 1.5 }}>
-            By continuing, you agree to our{' '}
-            <span style={{ color: COLORS.accent, cursor: 'pointer' }}>Terms of Service</span>
-            {' '}and{' '}
-            <span style={{ color: COLORS.accent, cursor: 'pointer' }}>Privacy Policy</span>
+            By continuing, you agree to our <LegalLinks />.
           </p>
         </div>
       </div>
