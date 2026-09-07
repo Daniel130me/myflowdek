@@ -129,6 +129,24 @@ describe('Audit Remediation: Due date approaching automations (Item 5)', () => {
   });
 });
 
+describe('Audit Remediation: API abuse vectors (Item 7)', () => {
+  test('legacy unauthenticated POST /api/users route is removed', () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/users/route.ts');
+    assert.ok(!fs.existsSync(routePath), 'unauthenticated /api/users route must not exist');
+  });
+
+  test('POST /api/ai requires authentication and a rate limit', () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/ai/route.ts');
+    const source = fs.readFileSync(routePath, 'utf-8');
+
+    assert.ok(
+      source.includes('requireAuthenticatedUser'),
+      '/api/ai must require an authenticated user',
+    );
+    assert.ok(source.includes('checkMutationLimit'), '/api/ai must be rate-limited');
+  });
+});
+
 describe('Audit Remediation: Project-scoped routes and persistence (Item 6)', () => {
   test('routes helper defines project-scoped advanced features', () => {
     const projectId = 'proj-999';

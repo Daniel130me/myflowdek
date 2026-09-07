@@ -31,6 +31,7 @@ export const RATE_LIMITS = {
   fileUpload: { maxRequests: 10, windowMs: 60_000 }, // 10 per minute
   bulkAction: { maxRequests: 10, windowMs: 60_000 }, // 10 per minute
   generalMutation: { maxRequests: 60, windowMs: 60_000 }, // 60 per minute (fallback)
+  aiGenerate: { maxRequests: 10, windowMs: 60_000 }, // 10 per minute (LLM calls are expensive)
 } as const;
 
 const buckets = new Map<string, Bucket>();
