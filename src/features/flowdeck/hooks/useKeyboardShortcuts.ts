@@ -114,14 +114,19 @@ export function useKeyboardShortcuts(opts: KeyboardShortcutsOptions): void {
       }
     }
 
-    /* ---------- `Tab` / `Shift+Tab` → indent / outdent ---------- */
-    if (e.key === 'Tab' && !isMeta(e)) {
+    /* ---------- `Alt+Arrow` → indent / outdent selected tasks ----------
+     * Plain Tab is never intercepted: it must always move keyboard focus
+     * between controls (WCAG 2.1.1 Keyboard / 2.1.2 No Keyboard Trap).
+     * Indent/outdent only make sense with an active selection, so the
+     * Alt+Arrow shortcut is gated on selectedIds as well. */
+    if (e.altKey && e.key === 'ArrowRight' && o.selectedIds.size > 0 && !isMeta(e)) {
       e.preventDefault();
-      if (e.shiftKey) {
-        o.onOutdent();
-      } else {
-        o.onIndent();
-      }
+      o.onIndent();
+      return;
+    }
+    if (e.altKey && e.key === 'ArrowLeft' && o.selectedIds.size > 0 && !isMeta(e)) {
+      e.preventDefault();
+      o.onOutdent();
       return;
     }
 

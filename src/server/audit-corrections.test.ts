@@ -147,6 +147,29 @@ describe('Audit Remediation: API abuse vectors (Item 7)', () => {
   });
 });
 
+describe('Audit Remediation: Keyboard navigation (Item 8)', () => {
+  test('global shortcut hook never intercepts plain Tab', () => {
+    const hookPath = path.join(process.cwd(), 'src/features/flowdeck/hooks/useKeyboardShortcuts.ts');
+    const source = fs.readFileSync(hookPath, 'utf-8');
+
+    // Plain Tab must always move focus (WCAG 2.1.1/2.1.2) — the only allowed
+    // Tab-related shortcut is a modifier combo, and indent/outdent now live
+    // on Alt+Arrow gated on an active selection.
+    assert.ok(
+      !/e\.key === 'Tab'/g.test(source.replace(/\u00a0/g, ' ')),
+      "plain Tab must never be intercepted (no `e.key === 'Tab'` handler)",
+    );
+    assert.ok(
+      source.includes("e.key === 'ArrowRight'") && source.includes('e.altKey'),
+      'indent must move to Alt+Arrow with an explicit selection gate',
+    );
+    assert.ok(
+      source.includes('o.selectedIds.size > 0'),
+      'indent/outdent shortcuts must require an active selection',
+    );
+  });
+});
+
 describe('Audit Remediation: Project-scoped routes and persistence (Item 6)', () => {
   test('routes helper defines project-scoped advanced features', () => {
     const projectId = 'proj-999';
