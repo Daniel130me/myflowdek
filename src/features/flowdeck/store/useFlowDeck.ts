@@ -738,12 +738,32 @@ export function useFlowDeckStore(): FlowDeckState {
     if (projectId) setTasksByProject(prev => ({ ...prev, [projectId]: nextTasksForProject }));
   }, [tasksByProject]);
 
+  /* ---- Debounced persistence for task edits (audit H-06) ----
+   * Sheet cells call updateTask on every keystroke; the optimistic local
+   * update stays instant, but network PATCHes are coalesced: all patches for
+   * the same task inside the window are merged into one request carrying the
+   * final values. On failure we toast instead of rolling back to a snapshot —
+   * the snapshot would be stale by flush time and clobber newer edits. */
+  const TASK_SAVE_DEBOUNCE_MS = 400;
+  const pendingTaskSavesRef = useRef(
+    new Map<string, { patch: Partial<Task>; timer: ReturnType<typeof setTimeout> }>(),
+  );
+
+  const flushTaskSave = useCallback((taskId: string) => {
+    const pending = pendingTaskSavesRef.current.get(taskId);
+    if (!pending) return;
+    pendingTaskSavesRef.current.delete(taskId);
+    const apiPatch = taskToApiPayload(pending.patch);
+    if (Object.keys(apiPatch).length === 0) return;
+    apiUpdateTask(taskId, apiPatch).then((res) => {
+      if (res.ok) return;
+      toast.error('Failed to save task change', { description: res.error });
+    });
+  }, []);
+
   const updateTask = useCallback((projectId: string, id: string, patch: Partial<Task>) => {
     const projectTasks = tasksByProject[projectId] || [];
     const task = projectTasks.find(t => t.id === id);
-    // Snapshot for rollback — captures the pre-update task list for this
-    // project so we can restore it if the API rejects the change.
-    const snapshot = projectTasks;
     // Capture the task's pre-update customFields so we can roll back the
     // customFields portion of the optimistic update independently if the
     // value-set endpoint rejects a specific key.
@@ -773,11 +793,13 @@ export function useFlowDeckStore(): FlowDeckState {
     // reach the wire — those have dedicated endpoints.
     const apiPatch = taskToApiPayload(patch);
     if (Object.keys(apiPatch).length > 0) {
-      apiUpdateTask(id, apiPatch).then((res) => {
-        if (res.ok) return;
-        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
-        toast.error('Failed to save task change', { description: res.error });
-      });
+      // Queue the PATCH instead of firing it per keystroke; merge with any
+      // patch already queued for this task so the flush sends final values.
+      const existing = pendingTaskSavesRef.current.get(id);
+      const mergedPatch = existing ? { ...existing.patch, ...patch } : patch;
+      if (existing) clearTimeout(existing.timer);
+      const timer = setTimeout(() => flushTaskSave(id), TASK_SAVE_DEBOUNCE_MS);
+      pendingTaskSavesRef.current.set(id, { patch: mergedPatch, timer });
     }
 
     // Persist custom-field value changes via the dedicated value-set
@@ -816,7 +838,7 @@ export function useFlowDeckStore(): FlowDeckState {
         );
       }
     }
-  }, [tasksByProject, commit, logActivity, resolveMemberName]);
+  }, [tasksByProject, commit, logActivity, resolveMemberName, flushTaskSave]);
 
   const toggleComplete = useCallback((projectId: string, id: string) => {
     const projectTasks = tasksByProject[projectId] || [];

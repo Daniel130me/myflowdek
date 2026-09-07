@@ -331,6 +331,25 @@ describe('Audit Remediation: Tags at creation + time-log sync (Item 12)', () => 
   });
 });
 
+describe('Audit Remediation: Sheet cell PATCH storm (Item 13)', () => {
+  test('updateTask coalesces network writes through a debounce', () => {
+    const storePath = path.join(process.cwd(), 'src/features/flowdeck/store/useFlowDeck.ts');
+    const source = fs.readFileSync(storePath, 'utf-8');
+
+    assert.ok(
+      source.includes('TASK_SAVE_DEBOUNCE_MS') && source.includes('flushTaskSave'),
+      'updateTask must queue PATCHes via a named debounce instead of firing per keystroke',
+    );
+    // The old code PATCHed directly inside updateTask on every call.
+    const updateTaskBody = source.split('const updateTask = useCallback')[1]?.split('const toggleComplete')[0] ?? '';
+    assert.doesNotMatch(
+      updateTaskBody,
+      /apiUpdateTask\(id, apiPatch\)/,
+      'updateTask must not fire apiUpdateTask synchronously',
+    );
+  });
+});
+
 describe('Audit Remediation: Project-scoped routes and persistence (Item 6)', () => {
   test('routes helper defines project-scoped advanced features', () => {
     const projectId = 'proj-999';
