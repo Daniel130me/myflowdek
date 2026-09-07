@@ -6,7 +6,7 @@ import {
   ONBOARDING_STORAGE_KEY,
   DEFAULT_JOB_TITLE_FALLBACK,
   DEFAULT_AVATAR_COLOR,
-  DEMO_CREDENTIALS,
+  DEMO_LOGIN_SENTINEL,
 } from '@/lib/auth.constants';
 
 export interface UserProfile {
@@ -120,11 +120,20 @@ export function useAuth() {
     [],
   );
 
-  /** Sign in as the seeded demo project manager (Wale Johnson). */
+  /**
+   * Sign in as the seeded demo project manager (Wale Johnson).
+   *
+   * Sends the public DEMO_LOGIN_SENTINEL — the real demo credentials never
+   * reach the client bundle. Only offered when NEXT_PUBLIC_DEMO_MODE is on,
+   * mirroring the server-side DEMO_MODE gate.
+   */
   const demoLogin = useCallback(async (): Promise<LoginResult> => {
+    if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') {
+      return { ok: false, error: 'Demo mode is not enabled' };
+    }
     const result = await signIn('credentials', {
-      email: DEMO_CREDENTIALS.email,
-      password: DEMO_CREDENTIALS.password,
+      email: DEMO_LOGIN_SENTINEL.email,
+      password: DEMO_LOGIN_SENTINEL.password,
       redirect: false,
     });
     if (result?.error) {

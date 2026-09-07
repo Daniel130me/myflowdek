@@ -56,19 +56,20 @@ export const ONBOARDING_STORAGE_KEY = 'flowdeck_onboarding';
 /* ------------------------------- demo ----------------------------------- */
 
 /**
- * Credentials for the "Try demo workspace" button.
- *
- * The demo account is created by `prisma/seed.ts` (Wale Johnson, the project
- * manager). Keeping the credentials here means the seed script and the UI
- * button can never drift out of sync.
+ * Public sentinel the demo button sends instead of real credentials. The
+ * server maps it to the seeded demo account only when DEMO_MODE is enabled —
+ * so no usable demo credential ever ships in the client bundle (audit H-18).
  */
-export const DEMO_CREDENTIALS = {
-  email: 'wale.johnson@flowdeck.io',
-  password: 'flowdeck123',
+export const DEMO_LOGIN_SENTINEL = {
+  email: 'demo@flowdeck.local',
+  password: 'demo',
 } as const;
 
-/** Password assigned to every seeded demo user (so any of them can sign in). */
-export const DEMO_PASSWORD = DEMO_CREDENTIALS.password;
+/** Password assigned to every seeded demo user (so any of them can sign in).
+ *  Server-side only (seed script + demo tooling) — never imported by client
+ *  code: shipping demo credentials in the browser bundle turned the demo
+ *  account into a built-in backdoor (audit H-18). */
+export const DEMO_PASSWORD = 'flowdeck123';
 
 /** Domain used for seeded demo emails (e.g. `wale.johnson@flowdeck.io`). */
 export const DEMO_EMAIL_DOMAIN = 'flowdeck.io';

@@ -145,28 +145,33 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
               : 'Get started with FlowDeck in seconds'}
           </p>
 
-          {/* Demo button */}
-          <button
-            onClick={handleDemo}
-            disabled={loading}
-            style={{
-              width: '100%', padding: '12px 16px', borderRadius: 10, border: 'none',
-              background: COLORS.accent, color: '#FFFFFF', fontSize: 14, fontWeight: 700,
-              fontFamily: FF, cursor: loading ? 'wait' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              marginBottom: 14, opacity: loading ? 0.7 : 1, transition: 'opacity 0.2s, background 0.2s',
-            }}
-          >
-            <Sparkles size={16} />
-            {loading ? 'Signing in…' : 'Try demo workspace'}
-          </button>
+          {/* Demo button — only offered when demo mode is enabled, mirroring
+              the server-side DEMO_MODE gate (audit H-18). */}
+          {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && (
+            <button
+              onClick={handleDemo}
+              disabled={loading}
+              style={{
+                width: '100%', padding: '12px 16px', borderRadius: 10, border: 'none',
+                background: COLORS.accent, color: '#FFFFFF', fontSize: 14, fontWeight: 700,
+                fontFamily: FF, cursor: loading ? 'wait' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                marginBottom: 14, opacity: loading ? 0.7 : 1, transition: 'opacity 0.2s, background 0.2s',
+              }}
+            >
+              <Sparkles size={16} />
+              {loading ? 'Signing in…' : 'Try demo workspace'}
+            </button>
+          )}
 
-          {/* Divider */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-            <div style={{ flex: 1, height: 1, background: COLORS.line }} />
-            <span style={{ fontSize: 11, color: COLORS.grayLight, textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>or continue with email</span>
-            <div style={{ flex: 1, height: 1, background: COLORS.line }} />
-          </div>
+          {/* Divider (part of the demo-button block) */}
+          {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+              <div style={{ flex: 1, height: 1, background: COLORS.line }} />
+              <span style={{ fontSize: 11, color: COLORS.grayLight, textTransform: 'uppercase', letterSpacing: 0.5, whiteSpace: 'nowrap' }}>or continue with email</span>
+              <div style={{ flex: 1, height: 1, background: COLORS.line }} />
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

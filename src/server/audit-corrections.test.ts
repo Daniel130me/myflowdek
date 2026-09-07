@@ -170,6 +170,42 @@ describe('Audit Remediation: Keyboard navigation (Item 8)', () => {
   });
 });
 
+describe('Audit Remediation: Demo account backdoor (Item 9)', () => {
+  test('demo auto-provisioning in authorize() is gated behind DEMO_MODE', () => {
+    const authPath = path.join(process.cwd(), 'src/lib/auth.ts');
+    const source = fs.readFileSync(authPath, 'utf-8');
+
+    assert.ok(
+      source.includes("process.env.DEMO_MODE === 'true'"),
+      'authorize() must gate the demo path behind the DEMO_MODE env flag',
+    );
+    assert.ok(
+      source.includes('DEMO_LOGIN_SENTINEL'),
+      'authorize() must map the public sentinel to the demo account server-side',
+    );
+  });
+
+  test('demo credentials are not imported by client code', () => {
+    const hookPath = path.join(process.cwd(), 'src/features/flowdeck/components/auth/useAuth.ts');
+    const source = fs.readFileSync(hookPath, 'utf-8');
+
+    assert.ok(
+      !source.includes('DEMO_CREDENTIALS') && !source.includes('DEMO_PASSWORD'),
+      'the client auth hook must not reference real demo credentials',
+    );
+  });
+
+  test('the demo button only renders when NEXT_PUBLIC_DEMO_MODE is enabled', () => {
+    const loginPath = path.join(process.cwd(), 'src/features/flowdeck/components/auth/LoginPage.tsx');
+    const source = fs.readFileSync(loginPath, 'utf-8');
+
+    assert.ok(
+      source.includes("process.env.NEXT_PUBLIC_DEMO_MODE === 'true'"),
+      'the demo button must be hidden unless NEXT_PUBLIC_DEMO_MODE is enabled',
+    );
+  });
+});
+
 describe('Audit Remediation: Project-scoped routes and persistence (Item 6)', () => {
   test('routes helper defines project-scoped advanced features', () => {
     const projectId = 'proj-999';

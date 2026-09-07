@@ -7,6 +7,10 @@ import {
   LOGIN_PATH,
   DEFAULT_JOB_TITLE_FALLBACK,
   DEFAULT_AVATAR_COLOR,
+  DEMO_LOGIN_SENTINEL,
+  DEMO_PASSWORD,
+  DEMO_EMAIL_DOMAIN,
+  BCRYPT_ROUNDS,
 } from '@/lib/auth.constants';
 import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { audit } from '@/server/audit/log';
@@ -60,9 +64,19 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials, req) {
-        const email = credentials?.email?.trim().toLowerCase();
-        const password = credentials?.password;
+        /* --- Demo mode gate (audit H-18) ---
+         * The demo account can only be signed into — and auto-provisioned —
+         * when DEMO_MODE is explicitly enabled in the environment. The client
+         * sends the public sentinel (no real credential ships in the bundle);
+         * the mapping to the seeded demo account happens here, server-side. */
+        const demoModeEnabled = process.env.DEMO_MODE === 'true';
+        let email = credentials?.email?.trim().toLowerCase();
+        let password = credentials?.password;
         if (!email || !password) return null;
+        if (demoModeEnabled && email === DEMO_LOGIN_SENTINEL.email && password === DEMO_LOGIN_SENTINEL.password) {
+          email = `wale.johnson@${DEMO_EMAIL_DOMAIN}`;
+          password = DEMO_PASSWORD;
+        }
 
         // --- Rate limit (per email, 10/min) ---
         const rl = rateLimit(`login:${email}`, RATE_LIMITS.login);
@@ -85,11 +99,13 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          // Auto-provision demo account if requested and not yet created in DB
-          if (email === 'wale.johnson@flowdeck.io' && password === 'flowdeck123') {
+          // Auto-provision demo account if requested and not yet created in DB.
+          // Gated behind DEMO_MODE — without the flag this is a hard-coded
+          // OWNER backdoor reachable by anyone (audit H-18).
+          if (demoModeEnabled && email === `wale.johnson@${DEMO_EMAIL_DOMAIN}` && password === DEMO_PASSWORD) {
             const existingDemo = await db.user.findUnique({ where: { email } });
             if (!existingDemo) {
-              const demoHash = await bcrypt.hash('flowdeck123', 10);
+              const demoHash = await bcrypt.hash(DEMO_PASSWORD, BCRYPT_ROUNDS);
               const newDemoUser = await db.user.create({
                 data: {
                   id: 'u5',
