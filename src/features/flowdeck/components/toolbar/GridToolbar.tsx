@@ -2,7 +2,7 @@
 
 import React from 'react';
 import {
-  Plus, Undo2, Redo2, MoreHorizontal, UserPlus, Repeat, Outdent, Indent,
+  Plus, MoreHorizontal, UserPlus, Repeat, Outdent, Indent,
   Link2, Unlink2, Trash2, Bold, Palette, Hash, Diamond, FileUp, FileDown,
   Printer, Scissors, Copy, ClipboardPaste, Paperclip, Columns3, Share2,
 } from 'lucide-react';
@@ -36,8 +36,6 @@ export function GridToolbar({ projectId, tasks, grid, filterSlot, extraLeft, mem
           >
             <Plus size={16} /> Add
           </button>
-          <button onClick={grid.onUndo} disabled={!grid.canUndo} style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${COLORS.line}`, borderRadius: 10, background: '#F3F4F6', color: grid.canUndo ? COLORS.ink : COLORS.line, cursor: grid.canUndo ? 'pointer' : 'not-allowed', opacity: grid.canUndo ? 1 : 0.5 }}><Undo2 size={16} /></button>
-          <button onClick={grid.onRedo} disabled={!grid.canRedo} style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${COLORS.line}`, borderRadius: 10, background: '#F3F4F6', color: grid.canRedo ? COLORS.ink : COLORS.line, cursor: grid.canRedo ? 'pointer' : 'not-allowed', opacity: grid.canRedo ? 1 : 0.5 }}><Redo2 size={16} /></button>
           <div style={{ flex: 1 }} />
           {hasSelection && <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF, marginRight: 4 }}>{grid.selectedIds.size} selected</span>}
           <button onClick={() => setMobileSheet(true)} style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${COLORS.line}`, borderRadius: 10, background: '#F3F4F6', color: COLORS.ink, cursor: 'pointer' }}><MoreHorizontal size={18} /></button>
@@ -112,10 +110,6 @@ export function GridToolbar({ projectId, tasks, grid, filterSlot, extraLeft, mem
           ))}</div>
         )
       })}
-
-      <Sep />
-      {iconBtn(Undo2, 'undo', 'Undo', { onClick: grid.onUndo, disabled: !grid.canUndo })}
-      {iconBtn(Redo2, 'redo', 'Redo', { onClick: grid.onRedo, disabled: !grid.canRedo })}
 
       <Sep />
       {iconBtn(Outdent, 'outdent', 'Outdent', { onClick: () => grid.onOutdent(projectId), disabled: !hasSelection })}

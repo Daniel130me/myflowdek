@@ -10,8 +10,6 @@ export interface KeyboardShortcutsOptions {
   onIndent: () => void;
   onOutdent: () => void;
   onDelete: () => void;
-  onUndo: () => void;
-  onRedo: () => void;
   onShowNewTask: () => void;
   onSearchFocus: () => void;
   onShowShortcuts: () => void;
@@ -42,22 +40,10 @@ export function useKeyboardShortcuts(opts: KeyboardShortcutsOptions): void {
     const o = ref.current;
     const editable = isEditable(e.target);
 
-    /* ---------- Ctrl/Cmd combos (work even inside inputs) ---------- */
-    if (isMeta(e) && e.key === 'z' && !e.shiftKey) {
-      e.preventDefault();
-      o.onUndo();
-      return;
-    }
-    if (isMeta(e) && e.key === 'z' && e.shiftKey) {
-      e.preventDefault();
-      o.onRedo();
-      return;
-    }
-    if (isMeta(e) && e.key === 'Z') {
-      e.preventDefault();
-      o.onRedo();
-      return;
-    }
+    /* ---------- Ctrl/Cmd combos (work even inside inputs) ----------
+     * Note: Cmd+Z is deliberately NOT intercepted — undo/redo is not
+     * implemented for persisted changes (audit H-01), and letting the
+     * browser handle it preserves native text undo inside inputs. */
     /* ---------- Cmd+K → command palette (works even inside inputs) ---------- */
     if (isMeta(e) && e.key === 'k') {
       e.preventDefault();
@@ -135,7 +121,9 @@ export function useKeyboardShortcuts(opts: KeyboardShortcutsOptions): void {
       if (o.selectedIds.size > 0) {
         e.preventDefault();
         const count = o.selectedIds.size;
-        if (confirm(`Delete ${count} task${count > 1 ? 's' : ''}? This action can be undone with Ctrl+Z.`)) {
+        // Honest copy: undo/redo is not implemented for persisted tasks
+        // (audit H-01/H-02) — never promise recoverability we don't have.
+        if (confirm(`Delete ${count} task${count > 1 ? 's' : ''}? This permanently deletes them.`)) {
           o.onDelete();
         }
         return;

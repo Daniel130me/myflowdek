@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, Search, Plus, CheckCircle2, Indent, Outdent, Trash2, Undo2, Redo2, Keyboard, Flag, CircleHelp } from 'lucide-react';
+import { X, Search, Plus, CheckCircle2, Indent, Outdent, Trash2, Keyboard, Flag, CircleHelp } from 'lucide-react';
 import { COLORS, FF } from '@/features/flowdeck/model';
 import { useViewport } from '../../hooks/useViewport';
 
@@ -24,8 +24,6 @@ const SHORTCUTS: ShortcutEntry[] = [
   { keys: 'Alt + →', label: 'Indent selected tasks', icon: <Indent size={15} /> },
   { keys: 'Alt + ←', label: 'Outdent selected tasks', icon: <Outdent size={15} /> },
   { keys: 'Backspace / Del', label: 'Delete selected tasks', icon: <Trash2 size={15} /> },
-  { keys: '\u2318Z / Ctrl+Z', label: 'Undo', icon: <Undo2 size={15} />, separator: true },
-  { keys: '\u2318\u21E7Z / Ctrl+Shift+Z', label: 'Redo', icon: <Redo2 size={15} /> },
   { keys: 'Esc', label: 'Close modal / dismiss', icon: <Keyboard size={15} />, separator: true },
 ];
 

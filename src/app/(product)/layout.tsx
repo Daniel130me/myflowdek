@@ -95,8 +95,6 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
     onIndent: () => routeProjectId && gridActions.onIndent(routeProjectId),
     onOutdent: () => routeProjectId && gridActions.onOutdent(routeProjectId),
     onDelete: () => routeProjectId && gridActions.onDeleteSelected(routeProjectId),
-    onUndo: gridActions.onUndo,
-    onRedo: gridActions.onRedo,
     onShowNewTask: () => {
       if (routeProjectId) state.setShowNewTask(true);
     },
