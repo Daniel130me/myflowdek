@@ -128,7 +128,7 @@ export function WorkspaceSelector({
                 {ws.role}
               </span>
               {ws.id === currentWorkspace?.id && (
-                <Check size={14} color="#FE8029" style={{ flexShrink: 0 }} />
+                <Check size={14} color={COLORS.accent} style={{ flexShrink: 0 }} />
               )}
             </button>
           ))}
@@ -153,7 +153,7 @@ export function WorkspaceSelector({
               fontFamily: FF,
               fontSize: 12.5,
               fontWeight: 600,
-              color: '#FE8029',
+              color: COLORS.accent,
             }}
           >
             <Settings size={14} style={{ flexShrink: 0 }} />

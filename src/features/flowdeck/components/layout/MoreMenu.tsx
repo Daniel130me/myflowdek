@@ -29,7 +29,7 @@ export function MoreMenu({ activeView, project, onNavigate, onClose }: {
               display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', padding: '11px 14px',
               borderRadius: 12, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
               background: active ? colors.accentSoft : 'transparent',
-              color: disabled ? colors.grayLight : active ? '#FE8029' : colors.ink,
+              color: disabled ? colors.grayLight : active ? colors.accent : colors.ink,
               fontSize: 14, fontWeight: active ? 600 : 500, fontFamily: FF, opacity: disabled ? 0.5 : 1, minHeight: 44,
             }}>
               <Icon size={18} strokeWidth={1.8} />{item.label}

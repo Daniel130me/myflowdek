@@ -19,7 +19,9 @@ export default function GlobalError({
             onClick={() => reset()}
             style={{ 
               padding: '12px 24px', 
-              backgroundColor: '#FE8029', 
+              /* #C2410C = accessible CTA orange (5.2:1 with white text); kept as a
+                 literal because global-error must stay dependency-free. */
+              backgroundColor: '#C2410C', 
               color: 'white', 
               border: 'none',
               borderRadius: '8px', 

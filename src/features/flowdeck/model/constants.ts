@@ -9,8 +9,14 @@ export const COLORS = {
   card: "#FFFFFF",
   line: "#E5E7EB",
   lineLight: "#F3F4F6",
-  accent: "#FE8029",
-  accentDark: "#E67422",
+  /* Accent (CTA fill + accent text) — #C2410C is the darkest accessible
+   * shade of the brand orange: 5.2:1 against white text and white surfaces
+   * (WCAG AA ≥ 4.5:1). The previous #FE8029 measured 2.52:1 on every
+   * primary button and link. Use accentBright for decorative brand orange
+   * (logo gradients, charts, non-text accents) where AA does not apply. */
+  accent: "#C2410C",
+  accentDark: "#9A3412",
+  accentBright: "#FE8029",
   accentSoft: "#FFF4EB",
   teal: "#0891B2",
   tealSoft: "#CFFAFE",
@@ -124,7 +130,7 @@ export const LAYOUT = {
   topbar: { height: 56, bg: '#FFFFFF', border: '#E5E7EB', searchBg: '#F3F4F6', searchBorder: '#E5E7EB' },
   content: { bg: '#F7F7F7', padding: 24, radius: 0 },
   card: { bg: '#FFFFFF', border: '#E5E7EB', radius: 16, shadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)', shadowLg: '0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04)' },
-  btn: { primary: '#FE8029', primaryHover: '#E67422', radius: 10 },
+  btn: { primary: '#C2410C', primaryHover: '#9A3412', radius: 10 },
   text: { primary: '#1F2124', secondary: '#6B7280', muted: '#9CA3AF' },
 };
 

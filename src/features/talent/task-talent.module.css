@@ -7,7 +7,7 @@
 .sectionHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-top: 14px; }
 .sectionHeader h3 { margin: 0; font-size: 13px; }
 .sectionHeader p, .empty { margin: 4px 0 0; color: #6B7280; font-size: 11px; line-height: 1.45; }
-.sectionHeader button, .addRow button, .searchRow button, .inviteButton { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 6px; border: 1px solid #FE8029; border-radius: 8px; background: #FE8029; color: #FFFFFF; padding: 7px 10px; font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
+.sectionHeader button, .addRow button, .searchRow button, .inviteButton { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 6px; border: 1px solid #C2410C; border-radius: 8px; background: #C2410C; color: #FFFFFF; padding: 7px 10px; font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; }
 .sectionHeader button:disabled, .addRow button:disabled, .inviteButton:disabled { cursor: not-allowed; opacity: .55; }
 .requirementList, .invitationList { display: grid; gap: 7px; }
 .requirement { display: grid; grid-template-columns: minmax(0, 1fr) 105px auto auto; align-items: center; gap: 7px; padding: 9px; border: 1px solid #EEF0F2; border-radius: 9px; }

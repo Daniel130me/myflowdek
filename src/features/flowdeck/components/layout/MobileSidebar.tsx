@@ -60,7 +60,7 @@ export function MobileSidebar({
       }}>
         <div style={{ padding: '20px 16px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(135deg, #FE8029 0%, #FF9F5A 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(254,128,41,0.3)' }}>
+            <div style={{ width: 30, height: 30, borderRadius: 9, background: `linear-gradient(135deg, ${COLORS.accentBright} 0%, #FF9F5A 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(254,128,41,0.3)' }}>
               <div style={{ width: 10, height: 10, borderRadius: 3, background: '#fff' }} />
             </div>
             <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: 16, fontFamily: FF, letterSpacing: -0.5 }}>FlowDeck</span>

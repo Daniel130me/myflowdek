@@ -11,7 +11,9 @@ export default function NotFound() {
         href="/" 
         style={{ 
           padding: '12px 24px', 
-          backgroundColor: '#FE8029', 
+          /* #C2410C = accessible CTA orange (5.2:1 with white text); kept as a
+             literal so the 404 page stays dependency-free. */
+          backgroundColor: '#C2410C', 
           color: 'white', 
           textDecoration: 'none', 
           borderRadius: '8px', 

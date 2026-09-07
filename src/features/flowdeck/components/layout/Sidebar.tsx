@@ -50,7 +50,7 @@ export function Sidebar({ project, projects, activeView, onNavigate, goToPortfol
       display: 'flex', flexDirection: 'column', flexShrink: 0,
     }}>
       <div style={{ padding: '24px 20px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg, #FE8029 0%, #FF9F5A 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(254,128,41,0.3)' }}>
+        <div style={{ width: 32, height: 32, borderRadius: 10, background: `linear-gradient(135deg, ${COLORS.accentBright} 0%, #FF9F5A 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(254,128,41,0.3)' }}>
           <div style={{ width: 12, height: 12, borderRadius: 4, background: '#fff' }} />
         </div>
         <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: 18, fontFamily: FF, letterSpacing: -0.5 }}>FlowDeck</span>
@@ -124,7 +124,7 @@ export function Sidebar({ project, projects, activeView, onNavigate, goToPortfol
               opacity: disabled ? 0.5 : 1,
             }}>
               {active && <span style={{ position: 'absolute', right: 12, width: 6, height: 6, borderRadius: '50%', background: S.activeDot }} />}
-              {n.id === 'mytasks' && pendingMyTasks > 0 && !active && <span style={{ position: 'absolute', right: 12, minWidth: 18, height: 18, borderRadius: 9999, background: '#FE8029', color: '#FFFFFF', fontSize: 10, fontWeight: 700, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{pendingMyTasks}</span>}
+              {n.id === 'mytasks' && pendingMyTasks > 0 && !active && <span style={{ position: 'absolute', right: 12, minWidth: 18, height: 18, borderRadius: 9999, background: COLORS.accent, color: '#FFFFFF', fontSize: 10, fontWeight: 700, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{pendingMyTasks}</span>}
               <Icon size={16} strokeWidth={1.8} /> {n.label}
             </button>
           );

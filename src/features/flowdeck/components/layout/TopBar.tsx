@@ -119,7 +119,7 @@ export const TopBar = forwardRef<TopBarHandle, {
               <button onClick={() => { onToggleProjectMenu(); onShowNewProject(); }} style={{
                 width: '100%', textAlign: 'left', padding: isMobile ? '12px 14px' : '10px 12px', borderRadius: 10, border: 'none',
                 background: 'transparent', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
-                fontSize: 13.5, fontWeight: 600, color: '#FE8029', minHeight: 44, fontFamily: FF,
+                fontSize: 13.5, fontWeight: 600, color: colors.accent, minHeight: 44, fontFamily: FF,
               }}>
                 <Plus size={14} strokeWidth={2} /> New project
               </button>
@@ -172,9 +172,9 @@ export const TopBar = forwardRef<TopBarHandle, {
         )}
         <button onClick={() => project ? onShowNewTask() : onShowNewProject()} style={{
           display: 'flex', alignItems: 'center', gap: 6,
-          background: '#FE8029', color: '#FFFFFF', border: 'none', borderRadius: 10,
+          background: COLORS.accent, color: '#FFFFFF', border: 'none', borderRadius: 10,
           padding: isMobile ? '0 12px' : '9px 16px', height: isMobile ? 38 : 'auto', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-          flexShrink: 0, fontFamily: FF, boxShadow: '0 1px 3px rgba(254,128,41,0.3)', transition: 'background 0.15s ease',
+          flexShrink: 0, fontFamily: FF, boxShadow: '0 1px 3px rgba(194,65,12,0.3)', transition: 'background 0.15s ease',
         }}>
           <Plus size={15} strokeWidth={2} /> {!isMobile && (project ? 'New Task' : 'New Project')}
         </button>
