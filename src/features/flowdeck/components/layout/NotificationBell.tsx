@@ -34,6 +34,7 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loadingList, setLoadingList] = useState(false);
+  const [listError, setListError] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   // Poll unread count.
@@ -62,16 +63,25 @@ export function NotificationBell() {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  // Fetch full list when opened.
-  useEffect(() => {
+  // Fetch full list when opened. A failure is surfaced in the panel with a
+  // retry instead of silently showing an empty list (audit QW15).
+  const fetchNotifications = useCallback(() => {
     if (!open) return;
     setLoadingList(true);
+    setListError(false);
     fetch('/api/notifications?limit=20')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('failed to load notifications');
+        return res.json();
+      })
       .then(data => setNotifications(data.notifications ?? []))
-      .catch(() => {})
+      .catch(() => setListError(true))
       .finally(() => setLoadingList(false));
   }, [open]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const handleMarkRead = useCallback(async (id: string) => {
     await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
@@ -163,6 +173,17 @@ export function NotificationBell() {
           {loadingList ? (
             <div style={{ padding: 24, textAlign: 'center', color: COLORS.gray, fontSize: 13 }}>
               Loading…
+            </div>
+          ) : listError ? (
+            <div style={{ padding: 20, textAlign: 'center', fontSize: 13 }}>
+              <div style={{ color: COLORS.gray, marginBottom: 10 }}>Couldn't load notifications.</div>
+              <button
+                type="button"
+                onClick={fetchNotifications}
+                style={{ border: 'none', background: 'none', color: COLORS.accent, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FF, padding: 0 }}
+              >
+                Try again
+              </button>
             </div>
           ) : notifications.length === 0 ? (
             <div style={{ padding: 32, textAlign: 'center', color: COLORS.gray, fontSize: 13 }}>

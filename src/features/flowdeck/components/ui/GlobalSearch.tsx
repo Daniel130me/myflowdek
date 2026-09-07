@@ -37,22 +37,32 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
     }
   }, [open]);
 
-  // Debounced search.
+  // Debounced search. `searchNonce` lets the retry button force a re-run
+  // even when the query itself hasn't changed.
+  const [loadError, setLoadError] = useState(false);
+  const [searchNonce, setSearchNonce] = useState(0);
   useEffect(() => {
     if (!open || query.trim().length < 2) {
       setResults(null);
+      setLoadError(false);
       return;
     }
     const timer = setTimeout(async () => {
       setLoading(true);
+      setLoadError(false);
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`);
-        if (res.ok) setResults(await res.json());
-      } catch { /* network error */ }
+        if (!res.ok) throw new Error('search failed');
+        setResults(await res.json());
+      } catch {
+        // A failed search must not read as "no results" (audit QW15).
+        setResults(null);
+        setLoadError(true);
+      }
       finally { setLoading(false); }
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, open]);
+  }, [query, open, searchNonce]);
 
   // Close on Escape.
   useEffect(() => {
@@ -108,7 +118,19 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
           {loading && (
             <div style={{ padding: 24, textAlign: 'center', color: COLORS.gray, fontSize: 13 }}>Searching…</div>
           )}
-          {!loading && !hasResults && query.trim().length >= 2 && (
+          {!loading && loadError && (
+            <div style={{ padding: 12, textAlign: 'center', color: COLORS.gray, fontSize: 13 }}>
+              Search failed.
+              <button
+                type="button"
+                onClick={() => setSearchNonce(n => n + 1)}
+                style={{ display: 'block', margin: '8px auto 0', border: 'none', background: 'none', color: COLORS.accent, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: FF, padding: 0 }}
+              >
+                Try again
+              </button>
+            </div>
+          )}
+          {!loading && !hasResults && !loadError && query.trim().length >= 2 && (
             <div style={{ padding: 24, textAlign: 'center', color: COLORS.gray, fontSize: 13 }}>
               No results found for "{query}"
             </div>

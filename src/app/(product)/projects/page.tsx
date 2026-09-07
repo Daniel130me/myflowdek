@@ -30,6 +30,8 @@ export default function ProjectsPortfolioPage() {
     archiveProject,
     restoreProject,
     projects: workspaceProjects,
+    error: projectsError,
+    refetch: refetchProjects,
   } = useProjects(wsHook.selectedWorkspaceId);
   const projects = workspaceProjects;
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
@@ -67,6 +69,8 @@ export default function ProjectsPortfolioPage() {
       <PortfolioView
         projects={projects}
         searchQuery={state.searchQuery}
+        error={projectsError}
+        onRetry={() => void refetchProjects()}
         onOpen={handleOpen}
         onDelete={(id) => setProjectToDelete(projects[id] ?? null)}
         onNew={handleNew}

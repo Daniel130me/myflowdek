@@ -5,15 +5,19 @@ import { COLORS, TODAY, dayMs, fmtDate, type Project } from '@/features/flowdeck
 import { Plus, Trash2, Star, Archive, RotateCcw, Users, Grid3X3, List, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Avatar, SectionHeader, FF } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
+import { LoadErrorPanel } from '@/components/ui/load-error';
 
 type SortDir = 'asc' | 'desc';
 
-export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, onToggleFavorite, onArchive, onRestore }: {
+export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, onToggleFavorite, onArchive, onRestore, error, onRetry }: {
   projects: Record<string, Project>; searchQuery: string;
   onOpen: (id: string) => void; onDelete: (id: string) => void; onNew: () => void;
   onToggleFavorite?: (id: string) => void;
   onArchive?: (id: string) => void;
   onRestore?: (id: string) => void;
+  /** Set when the projects fetch failed — shows a retry panel instead of a fake empty state. */
+  error?: string | null;
+  onRetry?: () => void;
 }) {
   const { isMobile } = useViewport();
   const [showArchived, setShowArchived] = useState(false);
@@ -23,6 +27,14 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
 
   const activeProjects = Object.values(projects).filter(p => !p.isArchived && p.name.toLowerCase().includes((searchQuery || '').toLowerCase()));
   const archivedProjects = Object.values(projects).filter(p => p.isArchived && p.name.toLowerCase().includes((searchQuery || '').toLowerCase()));
+
+  // Empty means three different things — say which one (audit QW15):
+  // a failed fetch gets a retry panel, a filtered search says so, and a
+  // genuinely empty workspace gets a create CTA.
+  const hasSearch = Boolean(searchQuery && searchQuery.trim());
+  const emptyProjectsMessage = hasSearch
+    ? 'No projects match your search.'
+    : 'No projects yet — create your first project to get started.';
 
   function statsFor(id: string) {
     const stats = projects[id]?.portfolio;
@@ -319,7 +331,9 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
         }
       />
 
-      {viewMode === 'card' ? (
+      {error && onRetry ? (
+        <LoadErrorPanel title="Projects could not be loaded" onRetry={onRetry} />
+      ) : viewMode === 'card' ? (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: isMobile ? 10 : 14 }}>
             {activeProjects.map(p => renderCard(p, false))}
@@ -328,7 +342,7 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
               New project
             </button>
           </div>
-          {activeProjects.length === 0 && !showArchived && <div style={{ textAlign: 'center', color: COLORS.gray, fontSize: 13, marginTop: 12 }}>No projects match your search.</div>}
+          {activeProjects.length === 0 && !showArchived && <div style={{ textAlign: 'center', color: COLORS.gray, fontSize: 13, marginTop: 12 }}>{emptyProjectsMessage}</div>}
         </>
       ) : (
         <>
@@ -337,7 +351,7 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
             <Plus size={18} />
             New project
           </button>
-          {activeProjects.length === 0 && !showArchived && <div style={{ textAlign: 'center', color: COLORS.gray, fontSize: 13, marginTop: 12 }}>No projects match your search.</div>}
+          {activeProjects.length === 0 && !showArchived && <div style={{ textAlign: 'center', color: COLORS.gray, fontSize: 13, marginTop: 12 }}>{emptyProjectsMessage}</div>}
         </>
       )}
 

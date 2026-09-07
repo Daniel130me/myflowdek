@@ -6,6 +6,7 @@ import { MyTasksView } from '@/features/flowdeck/components/views';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useMyTasks } from '@/features/flowdeck/hooks/useMyTasks';
 import { routes } from '@/shared/navigation/routes';
+import { LoadErrorPanel } from '@/components/ui/load-error';
 import { TableSkeleton } from '@/components/ui/skeleton';
 
 /**
@@ -24,10 +25,15 @@ import { TableSkeleton } from '@/components/ui/skeleton';
 export default function MyTasksRoutePage() {
   const router = useRouter();
   const state = useFlowDeck();
-  const { tasks, loading, toggleComplete } = useMyTasks();
+  const { tasks, loading, error, refetch, toggleComplete } = useMyTasks();
 
   if (loading && tasks.length === 0) {
     return <TableSkeleton />;
+  }
+
+  // A failed fetch must not look like "no tasks" (audit QW15) — offer a retry.
+  if (error && tasks.length === 0) {
+    return <LoadErrorPanel title="Your tasks could not be loaded" onRetry={() => void refetch()} />;
   }
 
   return (

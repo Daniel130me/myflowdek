@@ -350,6 +350,49 @@ describe('Audit Remediation: Sheet cell PATCH storm (Item 13)', () => {
   });
 });
 
+describe('Audit Remediation: Empty vs error states (Item 14)', () => {
+  test('a shared retry panel exists and the task error reuses it', () => {
+    const panelPath = path.join(process.cwd(), 'src/components/ui/load-error.tsx');
+    assert.ok(fs.existsSync(panelPath), 'LoadErrorPanel must exist');
+
+    const taskError = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/ui/task-load-error.tsx'),
+      'utf-8',
+    );
+    assert.ok(taskError.includes('LoadErrorPanel'), 'TaskLoadError must reuse the shared panel');
+  });
+
+  test('portfolio and my-tasks surface fetch failures with retry', () => {
+    const portfolio = fs.readFileSync(
+      path.join(process.cwd(), 'src/features/flowdeck/components/views/PortfolioView.tsx'),
+      'utf-8',
+    );
+    assert.ok(portfolio.includes('LoadErrorPanel'), 'portfolio must render the retry panel on error');
+    assert.ok(portfolio.includes('emptyProjectsMessage'), 'empty state must differentiate search vs no data');
+
+    const myTasks = fs.readFileSync(
+      path.join(process.cwd(), 'src/app/(product)/my-tasks/page.tsx'),
+      'utf-8',
+    );
+    assert.ok(myTasks.includes('LoadErrorPanel'), 'my-tasks must render the retry panel on error');
+  });
+
+  test('global search and the notification bell no longer swallow failures', () => {
+    const search = fs.readFileSync(
+      path.join(process.cwd(), 'src/features/flowdeck/components/ui/GlobalSearch.tsx'),
+      'utf-8',
+    );
+    assert.ok(!search.includes('/* network error */'), 'search must surface network errors');
+    assert.ok(search.includes('searchNonce'), 'search retry must force a re-run');
+
+    const bell = fs.readFileSync(
+      path.join(process.cwd(), 'src/features/flowdeck/components/layout/NotificationBell.tsx'),
+      'utf-8',
+    );
+    assert.ok(!bell.includes('.catch(() => {})'), 'bell must not silently swallow fetch failures');
+  });
+});
+
 describe('Audit Remediation: Project-scoped routes and persistence (Item 6)', () => {
   test('routes helper defines project-scoped advanced features', () => {
     const projectId = 'proj-999';
