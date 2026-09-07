@@ -2,9 +2,31 @@
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Plus, Repeat, Layers } from 'lucide-react';
+import {
+  DndContext, DragOverlay, PointerSensor, KeyboardSensor,
+  useSensor, useSensors, useDroppable, closestCorners,
+  type DragStartEvent, type DragEndEvent, type DragOverEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext, useSortable, verticalListSortingStrategy, sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { PRIORITY_META, COLORS, STATUS_META, STATUS_ORDER, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task, type FileItem, type Tag, type Project } from '@/features/flowdeck/model';
 import { Avatar, PriorityFlag, SectionHeader, FileThumbnailGrid, TaskCheckbox, TagPills, TagFilterBar, FF, TaskContextMenu, InlineTaskName, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
+
+/**
+ * Pointer distance (px) required before a drag activates. Keeps clicks and
+ * scroll gestures working on touch while still allowing a real drag.
+ */
+const DRAG_ACTIVATION_DISTANCE = 6;
+
+/**
+ * Window (ms) after a drop in which a card's click handler is ignored —
+ * some browsers fire a trailing click after pointer-up, which would open
+ * the task you just dragged.
+ */
+const DRAG_CLICK_SUPPRESS_MS = 200;
 
 /* Helper: compute next occurrence date for recurring badge tooltip */
 function computeNextBoardDate(dateStr: string, recurrence: string): string {
@@ -45,6 +67,179 @@ interface BoardViewProps {
   onSetRecurrence?: (taskId: string, recurrence: string | undefined) => void;
 }
 
+/**
+ * Everything the per-card components need besides the task itself. Bundled
+ * once so SortableTaskCard/BoardCardBody stay readable instead of carrying
+ * fifteen parallel props.
+ */
+interface CardBundle {
+  tagMap: Record<string, Tag>;
+  filesByTask: Record<string, FileItem[]>;
+  tags: Tag[];
+  projects?: Record<string, Project>;
+  currentProjectId?: string | null;
+  allTasks: Task[];
+  isMobile: boolean;
+  onOpenTask: (id: string) => void;
+  onToggleComplete: (id: string) => void;
+  onUpdateTask?: (id: string, patch: Partial<Task>) => void;
+  onRemoveTask?: (id: string) => void;
+  onDuplicateTask?: (id: string) => void;
+  onToggleTaskTag?: (taskId: string, tagId: string) => void;
+  onMoveToProject?: (taskId: string, targetProjectId: string) => void;
+  onPromoteSubtask?: (taskId: string) => void;
+  onDemoteToSubtask?: (taskId: string, newParentId: string) => void;
+  onSetRecurrence?: (taskId: string, recurrence: string | undefined) => void;
+  /** Timestamp (Date.now()) of the last drop — used to swallow ghost clicks. */
+  lastDropAt: React.MutableRefObject<number>;
+}
+
+/* ------------------------------------------------------------------ */
+/*  BoardCardBody — the card's visual content (drag-agnostic)          */
+/* ------------------------------------------------------------------ */
+function BoardCardBody({ task: t, bundle }: { task: Task; bundle: CardBundle }) {
+  const { tagMap, filesByTask, isMobile, onOpenTask, onToggleComplete, onUpdateTask } = bundle;
+  const tFiles = filesByTask[t.id] || [];
+  const dueStatus = getDueDateStatus(t.dueDate, t.status);
+  const dueMeta = DUE_STATUS[dueStatus];
+  const isDone = t.status === 'done';
+  const meta = STATUS_META[t.status];
+
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <div onClick={e => { e.stopPropagation(); onToggleComplete(t.id); }} style={{ marginTop: 1 }}>
+          <TaskCheckbox done={isDone} onToggle={e => { e.stopPropagation(); onToggleComplete(t.id); }} size={18} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <InlineTaskName
+            name={t.name}
+            isDone={isDone}
+            style={{ fontSize: isMobile ? 14 : 13, marginBottom: 4, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? COLORS.gray : COLORS.ink }}
+            onSave={(newName) => onUpdateTask?.(t.id, { name: newName })}
+            onOpenTask={() => onOpenTask(t.id)}
+          />
+          {t.description && (
+            <div style={{ fontSize: 12, color: COLORS.gray, lineHeight: 1.4, fontFamily: FF, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden', marginBottom: 6 }}>{t.description}</div>
+          )}
+          {t.tags && t.tags.length > 0 && (
+            <div style={{ marginBottom: 6 }}><TagPills tags={t.tags} tagMap={tagMap} /></div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+            {t.recurrence && (
+              <span title={t.dueDate ? `Next: ${computeNextBoardDate(t.dueDate, t.recurrence)}` : 'Recurring task'} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, color: '#0891B2', background: '#CFFAFE', padding: '2px 7px', borderRadius: 9999, fontFamily: FF }}><Repeat size={9} />{t.recurrence}</span>
+            )}
+            {t.dueDate && dueStatus !== 'none' && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, fontFamily: FF, padding: '2px 8px', borderRadius: 9999, background: dueMeta.bg, color: dueMeta.color }}>{dueDateOffsetLabel(t.dueDate, t.status)}</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {tFiles.length > 0 && (
+        <div style={{ marginBottom: 8, marginLeft: 26 }}><FileThumbnailGrid files={tFiles} max={3} /></div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginLeft: 26 }}>
+        <PriorityFlag priority={t.priority} />
+        <Avatar id={t.assignee} size={22} />
+      </div>
+
+      <div style={{ marginTop: 8, height: 4, background: COLORS.line, borderRadius: 2, marginLeft: 26 }}>
+        <div style={{ width: `${t.progress}%`, height: '100%', borderRadius: 2, background: meta.color }} />
+      </div>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  SortableTaskCard — dnd-kit wrapper (audit C-08)                     */
+/*                                                                      */
+/*  The previous card used native HTML5 drag events, which never fire   */
+/*  on touch devices, and was a plain div — unreachable by keyboard.    */
+/*  useSortable provides pointer + touch dragging and exposes the       */
+/*  KeyboardSensor's handles (Space lifts, arrows move, Space drops),  */
+/*  along with role="button" + tabIndex for focus and screen readers.   */
+/*  The right-click context menu is kept as a non-drag fallback.        */
+/* ------------------------------------------------------------------ */
+function SortableTaskCard({ task, columnKey, bundle }: { task: Task; columnKey: string; bundle: CardBundle }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+    data: { status: task.status, columnKey },
+  });
+  const { onOpenTask, lastDropAt } = bundle;
+
+  function handleClick() {
+    if (Date.now() - lastDropAt.current < DRAG_CLICK_SUPPRESS_MS) return;
+    onOpenTask(task.id);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    // dnd-kit's KeyboardSensor owns Space (lift/drop) and the arrow keys;
+    // its handler arrives via `listeners`. Enter is ours: open the task.
+    // (This prop intentionally overrides the spread listener — it delegates
+    // everything non-Enter back to the sensor.)
+    if (e.key === 'Enter' && !isDragging) {
+      e.preventDefault();
+      onOpenTask(task.id);
+      return;
+    }
+    listeners?.onKeyDown?.(e);
+  }
+
+  return (
+    <TaskContextMenu
+      task={task}
+      tags={bundle.tags}
+      projects={bundle.projects}
+      currentProjectId={bundle.currentProjectId}
+      allTasks={bundle.allTasks}
+      onOpenTask={bundle.onOpenTask}
+      onToggleComplete={bundle.onToggleComplete}
+      onUpdateTask={bundle.onUpdateTask || (() => {})}
+      onDeleteTask={bundle.onRemoveTask || (() => {})}
+      onDuplicateTask={bundle.onDuplicateTask}
+      onToggleTag={bundle.onToggleTaskTag}
+      onMoveToProject={bundle.onMoveToProject}
+      onPromoteSubtask={bundle.onPromoteSubtask}
+      onDemoteToSubtask={bundle.onDemoteToSubtask}
+      onSetRecurrence={bundle.onSetRecurrence}
+    >
+      <div
+        ref={setNodeRef}
+        {...attributes}
+        {...listeners}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        style={{
+          background: '#FFFFFF',
+          borderRadius: 12,
+          padding: bundle.isMobile ? 14 : 12,
+          cursor: 'grab',
+          border: `1px solid ${COLORS.line}`,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+          opacity: isDragging ? 0.4 : 1,
+          transform: CSS.Translate.toString(transform),
+          transition,
+          // Allow vertical page scroll on touch; drags still activate via
+          // the pointer-distance constraint.
+          touchAction: 'manipulation' as any,
+        }}
+      >
+        <BoardCardBody task={task} bundle={bundle} />
+      </div>
+    </TaskContextMenu>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  DroppableShell — registers a column as a drop target               */
+/* ------------------------------------------------------------------ */
+function DroppableShell({ droppableId, status, columnKey, style, children }: { droppableId: string; status: string; columnKey: string; style: React.CSSProperties; children: React.ReactNode }) {
+  const { setNodeRef } = useDroppable({ id: droppableId, data: { status, columnKey } });
+  return <div ref={setNodeRef} style={style}>{children}</div>;
+}
+
 /* ------------------------------------------------------------------ */
 /*  BoardView                                                          */
 /* ------------------------------------------------------------------ */
@@ -78,11 +273,20 @@ export function BoardView({
   const [swimlaneBy, setSwimlaneBy] = useState<string>('none');
   const [collapsedSwimlanes, setCollapsedSwimlanes] = useState<Set<string>>(new Set());
 
+  /* ---------- dnd-kit sensors (audit C-08: touch + keyboard) ---------- */
+  const sensors = useSensors(
+    // PointerSensor covers mouse AND touch; a small activation distance
+    // keeps taps and scrolls from turning into accidental drags.
+    useSensor(PointerSensor, { activationConstraint: { distance: DRAG_ACTIVATION_DISTANCE } }),
+    // KeyboardSensor makes the board fully operable without a pointer:
+    // Space lifts a focused card, arrows move it, Space drops it.
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   /* ---------- drag state ---------- */
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [dragSourceCol, setDragSourceCol] = useState<string | null>(null);
-  const [overCol, setOverCol] = useState<string | null>(null);
-  const [dragOverIdx, setDragOverIdx] = useState<number>(-1);
+  const [activeDrag, setActiveDrag] = useState<{ id: string; fromStatus: string } | null>(null);
+  const [overColumnId, setOverColumnId] = useState<string | null>(null);
+  const lastDropAt = useRef<number>(0);
 
   /* ---------- WIP limit state ---------- */
   const [wipLimits, setWipLimits] = useState<Record<string, number>>({});
@@ -139,71 +343,86 @@ export function BoardView({
     });
   }, []);
 
-  // True when we are doing a same-column reorder (insertion line visible)
-  const isReordering = !!(dragId && overCol && dragSourceCol && overCol === dragSourceCol);
-
   /* ---------------------------------------------------------------- */
-  /*  Drag handlers                                                     */
+  /*  Drag handlers (dnd-kit)                                          */
   /* ---------------------------------------------------------------- */
 
-  // Per-card dragover: compute insertion index within the hovered column.
-  // Uses stopPropagation so the column's onDragOver won't fire and
-  // overwrite the precise index with a fallback.
-  const handleCardDragOver = useCallback(
-    (e: React.DragEvent, status: string, idx: number) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!dragId) return;
-      setOverCol(status);
-      if (dragSourceCol === status) {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const midY = rect.top + rect.height / 2;
-        setDragOverIdx(e.clientY < midY ? idx : idx + 1);
-      }
-    },
-    [dragId, dragSourceCol],
-  );
-
-  // Column background dragover (fires when NOT hovering a card,
-  // because card handler stops propagation).
-  const handleColDragOver = useCallback(
-    (e: React.DragEvent, status: string, colLength: number) => {
-      e.preventDefault();
-      setOverCol(status);
-      // When hovering the empty area of the same column, default to end.
-      if (dragSourceCol === status) {
-        setDragOverIdx(colLength);
-      }
-    },
-    [dragSourceCol],
-  );
-
-  // Column drop handler: dispatches either onReorder or onMove.
-  const handleColDrop = useCallback(
-    (e: React.DragEvent, status: string, colLength: number) => {
-      e.preventDefault();
-      if (!dragId) return;
-      if (dragSourceCol === status) {
-        const idx = dragOverIdx >= 0 ? dragOverIdx : colLength;
-        onReorder(dragId, idx);
-      } else {
-        onMove(dragId, status);
-      }
-      setDragId(null);
-      setDragSourceCol(null);
-      setOverCol(null);
-      setDragOverIdx(-1);
-    },
-    [dragId, dragSourceCol, dragOverIdx, onReorder, onMove],
-  );
-
-  // Reset drag state on drag end (e.g. user cancels)
-  const handleDragEnd = useCallback(() => {
-    setDragId(null);
-    setDragSourceCol(null);
-    setOverCol(null);
-    setDragOverIdx(-1);
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const data = event.active.data.current;
+    setActiveDrag({ id: String(event.active.id), fromStatus: String(data?.status ?? '') });
   }, []);
+
+  // Track the hovered column so it highlights while a card is over it.
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const over = event.over;
+    if (!over) { setOverColumnId(null); return; }
+    const data = over.data.current;
+    if (data?.status && data?.columnKey) {
+      setOverColumnId(`${String(data.columnKey)}:${String(data.status)}`);
+      return;
+    }
+    setOverColumnId(String(over.id));
+  }, []);
+
+  const clearDragState = useCallback(() => {
+    setActiveDrag(null);
+    setOverColumnId(null);
+  }, []);
+
+  const handleDragCancel = useCallback(() => {
+    lastDropAt.current = Date.now(); // cancel swallows the ghost click too
+    clearDragState();
+  }, [clearDragState]);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    lastDropAt.current = Date.now();
+    const over = event.over;
+    const drag = activeDrag;
+    clearDragState();
+    if (!drag || !over) return;
+
+    const overData = over.data.current;
+    // The target column: from the card being hovered, or the column itself
+    // (when dropping onto an empty column / the empty area below the cards).
+    const targetStatus = overData?.status !== undefined ? String(overData.status) : String(over.id).split(':')[1];
+    const targetColumnKey = overData?.columnKey !== undefined ? String(overData.columnKey) : String(over.id).split(':')[0];
+    if (!targetStatus) return;
+
+    if (targetStatus !== drag.fromStatus) {
+      // Column change → status move (append semantics, same as before).
+      onMove(drag.id, targetStatus);
+      return;
+    }
+
+    // Same status but a different grouping row: the read-only swimlane rows
+    // never own another row's task, so there is nothing to change.
+    const sourceKey = sourceColumnKeyOf(drag.id, swimlaneGroups);
+    if (targetColumnKey !== sourceKey) return;
+
+    // Same column → reorder to the hovered card's index (or column end).
+    const columnTasks = tasksForColumn(sourceKey, targetStatus, filteredTasks, swimlaneGroups);
+    const newIndex = columnTasks.findIndex(t => t.id === over.id);
+    const oldIndex = columnTasks.findIndex(t => t.id === drag.id);
+    const resolvedIndex = newIndex >= 0 ? newIndex : columnTasks.length;
+    if (resolvedIndex !== oldIndex) {
+      onReorder(drag.id, resolvedIndex);
+    }
+  }, [activeDrag, clearDragState, filteredTasks, swimlaneGroups, onMove, onReorder]);
+
+  /** The swimlane key a task is currently rendered in ('main' = no grouping). */
+  function sourceColumnKeyOf(taskId: string, groups: Map<string, Task[]> | null): string {
+    if (!groups) return 'main';
+    for (const [key, groupTasks] of groups) {
+      if (groupTasks.some(t => t.id === taskId)) return key;
+    }
+    return 'main';
+  }
+
+  /** The rendered task list of one column, in view order. */
+  function tasksForColumn(columnKey: string, status: string, all: Task[], groups: Map<string, Task[]> | null): Task[] {
+    const source = groups ? (groups.get(columnKey) ?? []) : all;
+    return source.filter(t => t.status === status);
+  }
 
   /* ---------------------------------------------------------------- */
   /*  Quick-add handlers                                               */
@@ -241,16 +460,13 @@ export function BoardView({
   }, []);
 
   /* ---------------------------------------------------------------- */
-  /*  Inline insertion-line style                                       */
+  /*  Per-card bundle                                                  */
   /* ---------------------------------------------------------------- */
-  const insertLineStyle: React.CSSProperties = {
-    height: 2.5,
-    background: '#2563EB',
-    borderRadius: 1,
-    margin: '0 2px',
-    flexShrink: 0,
-    marginTop: -3,
-    marginBottom: -3,
+  const cardBundle: CardBundle = {
+    tagMap, filesByTask, tags, projects, currentProjectId, allTasks, isMobile,
+    onOpenTask, onToggleComplete, onUpdateTask, onRemoveTask, onDuplicateTask,
+    onToggleTaskTag, onMoveToProject, onPromoteSubtask, onDemoteToSubtask, onSetRecurrence,
+    lastDropAt,
   };
 
   /* ================================================================== */
@@ -259,22 +475,21 @@ export function BoardView({
   function ColumnCard({ tasksToRender, status, columnKey }: { tasksToRender: Task[]; status: string; columnKey: string }) {
     const col = tasksToRender.filter(t => t.status === status);
     const meta = STATUS_META[status];
-    const isColumnHighlighted = overCol === status;
-    const showLine = isReordering && isColumnHighlighted;
+    const droppableId = `${columnKey}:${status}`;
+    const isColumnHighlighted = !!activeDrag && overColumnId === droppableId;
     const isOverWip = !!(wipLimits[status] && col.length >= wipLimits[status]);
 
     return (
-      <div
-        key={columnKey + '-' + status}
-        onDragOver={e => handleColDragOver(e, status, col.length)}
-        onDragLeave={() => setOverCol(null)}
-        onDrop={e => handleColDrop(e, status, col.length)}
+      <DroppableShell
+        droppableId={droppableId}
+        status={status}
+        columnKey={columnKey}
         style={{
-          background: isColumnHighlighted && !isReordering ? COLORS.accentSoft : isOverWip ? `${COLORS.redSoft}33` : '#F7F7F7',
+          background: isColumnHighlighted ? COLORS.accentSoft : isOverWip ? `${COLORS.redSoft}33` : '#F7F7F7',
           borderRadius: 12,
           padding: 10,
           minHeight: 200,
-          border: isColumnHighlighted && !isReordering ? `1.5px dashed ${COLORS.accent}` : isOverWip ? `1.5px solid ${COLORS.red}` : '1.5px dashed transparent',
+          border: isColumnHighlighted ? `1.5px dashed ${COLORS.accent}` : isOverWip ? `1.5px solid ${COLORS.red}` : '1.5px dashed transparent',
           ...(stacked ? { width: isMobile ? '82vw' : 280, maxWidth: 320, flexShrink: 0 } : {}),
         }}
       >
@@ -297,101 +512,17 @@ export function BoardView({
           )}
         </div>
 
-        {/* Cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {col.map((t, idx) => {
-            const tFiles = filesByTask[t.id] || [];
-            const dueStatus = getDueDateStatus(t.dueDate, t.status);
-            const dueMeta = DUE_STATUS[dueStatus];
-            const isDone = t.status === 'done';
-            const isDragged = dragId === t.id;
-            const showLineAbove = showLine && dragOverIdx === idx;
-            const showLineBelow = showLine && dragOverIdx === col.length && idx === col.length - 1;
-
-            return (
-              <React.Fragment key={t.id}>
-                {showLineAbove && <div style={insertLineStyle} />}
-
-                <TaskContextMenu
-                  task={t}
-                  tags={tags}
-                  projects={projects}
-                  currentProjectId={currentProjectId}
-                  allTasks={allTasks}
-                  onOpenTask={onOpenTask}
-                  onToggleComplete={onToggleComplete}
-                  onUpdateTask={onUpdateTask || (() => {})}
-                  onDeleteTask={onRemoveTask || (() => {})}
-                  onDuplicateTask={onDuplicateTask}
-                  onToggleTag={onToggleTaskTag}
-                  onMoveToProject={onMoveToProject}
-                  onPromoteSubtask={onPromoteSubtask}
-                  onDemoteToSubtask={onDemoteToSubtask}
-                  onSetRecurrence={onSetRecurrence}
-                >
-                  <div
-                    draggable
-                    onDragStart={() => { setDragId(t.id); setDragSourceCol(status); }}
-                    onDragOver={e => handleCardDragOver(e, status, idx)}
-                    onDragEnd={handleDragEnd}
-                    onClick={() => onOpenTask(t.id)}
-                    style={{ background: '#FFFFFF', borderRadius: 12, padding: isMobile ? 14 : 12, cursor: 'grab', border: `1px solid ${COLORS.line}`, boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)', opacity: isDragged ? 0.4 : 1 }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                      <div onClick={e => { e.stopPropagation(); onToggleComplete(t.id); }} style={{ marginTop: 1 }}>
-                        <TaskCheckbox done={isDone} onToggle={e => { e.stopPropagation(); onToggleComplete(t.id); }} size={18} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <InlineTaskName
-                          name={t.name}
-                          isDone={isDone}
-                          style={{ fontSize: isMobile ? 14 : 13, marginBottom: 4, textDecoration: isDone ? 'line-through' : 'none', color: isDone ? COLORS.gray : COLORS.ink }}
-                          onSave={(newName) => onUpdateTask?.(t.id, { name: newName })}
-                          onOpenTask={() => onOpenTask(t.id)}
-                        />
-                        {t.description && (
-                          <div style={{ fontSize: 12, color: COLORS.gray, lineHeight: 1.4, fontFamily: FF, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden', marginBottom: 6 }}>{t.description}</div>
-                        )}
-                        {t.tags && t.tags.length > 0 && (
-                          <div style={{ marginBottom: 6 }}><TagPills tags={t.tags} tagMap={tagMap} /></div>
-                        )}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-                          {t.recurrence && (
-                            <span title={t.dueDate ? `Next: ${computeNextBoardDate(t.dueDate, t.recurrence)}` : 'Recurring task'} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, color: '#0891B2', background: '#CFFAFE', padding: '2px 7px', borderRadius: 9999, fontFamily: FF }}><Repeat size={9} />{t.recurrence}</span>
-                          )}
-                          {t.dueDate && dueStatus !== 'none' && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, fontFamily: FF, padding: '2px 8px', borderRadius: 9999, background: dueMeta.bg, color: dueMeta.color }}>{dueDateOffsetLabel(t.dueDate, t.status)}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {tFiles.length > 0 && (
-                      <div style={{ marginBottom: 8, marginLeft: 26 }}><FileThumbnailGrid files={tFiles} max={3} /></div>
-                    )}
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginLeft: 26 }}>
-                      <PriorityFlag priority={t.priority} />
-                      <Avatar id={t.assignee} size={22} />
-                    </div>
-
-                    <div style={{ marginTop: 8, height: 4, background: COLORS.line, borderRadius: 2, marginLeft: 26 }}>
-                      <div style={{ width: `${t.progress}%`, height: '100%', borderRadius: 2, background: meta.color }} />
-                    </div>
-                  </div>
-                </TaskContextMenu>
-
-                {showLineBelow && <div style={insertLineStyle} />}
-              </React.Fragment>
-            );
-          })}
-
-          {col.length === 0 && !showLine && (
-            <div style={{ fontSize: 12, color: COLORS.gray, textAlign: 'center', padding: '16px 0', fontFamily: FF }}>No tasks</div>
-          )}
-          {col.length === 0 && showLine && dragOverIdx === 0 && <div style={insertLineStyle} />}
-          {showLine && dragOverIdx === col.length && col.length > 0 && <div style={insertLineStyle} />}
-        </div>
+        {/* Cards — each wrapped in a sortable, keyboard-reachable shell */}
+        <SortableContext items={col.map(t => t.id)} strategy={verticalListSortingStrategy}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minHeight: 8 }}>
+            {col.map(t => (
+              <SortableTaskCard key={t.id} task={t} columnKey={columnKey} bundle={cardBundle} />
+            ))}
+            {col.length === 0 && (
+              <div style={{ fontSize: 12, color: COLORS.gray, textAlign: 'center', padding: '16px 0', fontFamily: FF }}>No tasks</div>
+            )}
+          </div>
+        </SortableContext>
 
         {/* Quick Add */}
         <div style={{ marginTop: 8 }}>
@@ -415,7 +546,7 @@ export function BoardView({
             </div>
           )}
         </div>
-      </div>
+      </DroppableShell>
     );
   }
 
@@ -425,6 +556,8 @@ export function BoardView({
   const columnGridStyle = stacked
     ? { display: 'flex' as const, gap: 12, overflowX: 'auto' as const, paddingBottom: 8, WebkitOverflowScrolling: 'touch' as any }
     : { display: 'grid' as const, gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 };
+
+  const draggedTask = activeDrag ? filteredTasks.find(t => t.id === activeDrag.id) : undefined;
 
   return (
     <div>
@@ -453,40 +586,62 @@ export function BoardView({
         }
       />
 
-      {/* Swimlane mode */}
-      {swimlaneGroups ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {Array.from(swimlaneGroups.entries()).map(([groupKey, groupTasks]) => {
-            const collapsed = collapsedSwimlanes.has(groupKey);
-            return (
-              <div key={groupKey}>
-                <div
-                  onClick={() => toggleSwimlaneCollapse(groupKey)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 4px', cursor: 'pointer', borderBottom: `1px solid ${COLORS.line}` }}
-                >
-                  <Layers size={14} color={COLORS.gray} />
-                  <span style={{ fontSize: 13, fontWeight: 700, fontFamily: FF, color: COLORS.ink }}>{groupKey}</span>
-                  <span style={{ fontSize: 11.5, color: COLORS.gray, fontFamily: FF }}>({groupTasks.length})</span>
-                  <span style={{ fontSize: 10, color: COLORS.gray }}>{collapsed ? '\u25B6' : '\u25BC'}</span>
-                </div>
-                {!collapsed && (
-                  <div style={{ ...columnGridStyle, marginTop: 10 }}>
-                    {STATUS_ORDER.map(status => (
-                      <ColumnCard key={groupKey + '-' + status} tasksToRender={groupTasks} status={status} columnKey={groupKey} />
-                    ))}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        {/* Swimlane mode */}
+        {swimlaneGroups ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {Array.from(swimlaneGroups.entries()).map(([groupKey, groupTasks]) => {
+              const collapsed = collapsedSwimlanes.has(groupKey);
+              return (
+                <div key={groupKey}>
+                  <div
+                    onClick={() => toggleSwimlaneCollapse(groupKey)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 4px', cursor: 'pointer', borderBottom: `1px solid ${COLORS.line}` }}
+                  >
+                    <Layers size={14} color={COLORS.gray} />
+                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: FF, color: COLORS.ink }}>{groupKey}</span>
+                    <span style={{ fontSize: 11.5, color: COLORS.gray, fontFamily: FF }}>({groupTasks.length})</span>
+                    <span style={{ fontSize: 10, color: COLORS.gray }}>{collapsed ? '\u25B6' : '\u25BC'}</span>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div style={columnGridStyle}>
-          {STATUS_ORDER.map(status => (
-            <ColumnCard key={status} tasksToRender={filteredTasks} status={status} columnKey={status} />
-          ))}
-        </div>
-      )}
+                  {!collapsed && (
+                    <div style={{ ...columnGridStyle, marginTop: 10 }}>
+                      {STATUS_ORDER.map(status => (
+                        <ColumnCard key={groupKey + '-' + status} tasksToRender={groupTasks} status={status} columnKey={groupKey} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={columnGridStyle}>
+            {STATUS_ORDER.map(status => (
+              <ColumnCard key={status} tasksToRender={filteredTasks} status={status} columnKey="main" />
+            ))}
+          </div>
+        )}
+
+        {/* The card follows the pointer/cursor while dragging */}
+        <DragOverlay dropAnimation={null}>
+          {draggedTask && (
+            <div style={{
+              background: '#FFFFFF', borderRadius: 12, padding: isMobile ? 14 : 12,
+              border: `1px solid ${COLORS.line}`, boxShadow: '0 12px 24px rgba(0,0,0,0.14)',
+              width: stacked ? (isMobile ? '82vw' : 280) : undefined, maxWidth: 320,
+            }}>
+              <BoardCardBody task={draggedTask} bundle={cardBundle} />
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 }
