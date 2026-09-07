@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { db } from '@/server/db/client';
 import { ServiceError } from '@/server/http/errors';
+import { isPaymentSupportedCurrency, PAYMENT_SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { defaultPaymentProvider, isPaymentSandboxEnabled, MarketplacePaymentProvider } from './payment.provider';
 import { ConnectPaymentAccountInput, InitializePaymentInput, RequestRefundInput } from './payment.schemas';
 
@@ -117,8 +118,11 @@ export class PaymentService {
     if (engagement.status !== 'ACTIVE') {
       throw new ServiceError('Only an active engagement can be funded.', 409);
     }
-    if (engagement.currency !== 'NGN' || input.currency !== engagement.currency) {
-      throw new ServiceError('The initial payment launch supports NGN engagements only.', 400);
+    if (!isPaymentSupportedCurrency(engagement.currency) || input.currency !== engagement.currency) {
+      throw new ServiceError(
+        `The initial payment launch supports ${PAYMENT_SUPPORTED_CURRENCIES.join('/')} engagements only.`,
+        400,
+      );
     }
 
     // Verify milestone if provided
