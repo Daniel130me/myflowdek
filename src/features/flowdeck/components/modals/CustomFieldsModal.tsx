@@ -11,6 +11,8 @@ interface CustomFieldsModalProps {
   columns: CustomColumn[];
   onAdd: (col: CustomColumn) => void;
   onRemove: (key: string) => void;
+  /** Rename a field in place (label-only) — preserves all stored task values. */
+  onRename: (key: string, label: string) => void;
   onClose: () => void;
 }
 
@@ -21,7 +23,7 @@ const TYPE_OPTIONS = [
   { value: 'select' as const, label: 'Dropdown', icon: List, desc: 'Pick from options' },
 ];
 
-export function CustomFieldsModal({ columns, onAdd, onRemove, onClose }: CustomFieldsModalProps) {
+export function CustomFieldsModal({ columns, onAdd, onRemove, onRename, onClose }: CustomFieldsModalProps) {
   const { isMobile } = useViewport();
   const [label, setLabel] = useState('');
   const [type, setType] = useState<CustomColumn['type']>('text');
@@ -43,10 +45,13 @@ export function CustomFieldsModal({ columns, onAdd, onRemove, onClose }: CustomF
     setEditLabel(col.label);
   }
 
+  /**
+   * Persist an inline label edit via onRename — an in-place PATCH that keeps
+   * the field's key (and therefore every stored task value) intact.
+   */
   function saveEdit(key: string) {
     if (!editLabel.trim()) return;
-    onRemove(key);
-    onAdd({ ...columns.find(c => c.key === key)!, label: editLabel.trim() });
+    onRename(key, editLabel.trim());
     setEditingKey(null);
     setEditLabel('');
   }

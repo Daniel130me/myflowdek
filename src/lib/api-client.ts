@@ -510,6 +510,14 @@ export function apiDeleteCustomField(projectId: string, fieldId: string) {
   return apiCall(`/api/projects/${projectId}/custom-fields/${fieldId}`, { method: 'DELETE' });
 }
 
+/**
+ * PATCH /api/projects/:projectId/custom-fields/:fieldId — rename a field
+ * definition in place. Label-only: existing task values are preserved.
+ */
+export function apiRenameCustomField(projectId: string, fieldId: string, label: string) {
+  return apiCall(`/api/projects/${projectId}/custom-fields/${fieldId}`, json('PATCH', { label }));
+}
+
 /** GET /api/projects/:projectId/custom-fields — list field definitions. */
 export async function apiListCustomFields(projectId: string) {
   try {

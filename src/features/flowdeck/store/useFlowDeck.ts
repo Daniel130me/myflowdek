@@ -34,7 +34,7 @@ import {
   apiCreateProjectStatusUpdate, apiDeleteProjectStatusUpdate,
   apiReorderTasks,
   apiSetTaskCustomField,
-  apiCreateCustomField, apiDeleteCustomField,
+  apiCreateCustomField, apiDeleteCustomField, apiRenameCustomField,
   taskToApiPayload,
 } from '@/lib/api-client';
 
@@ -191,6 +191,7 @@ export interface FlowDeckState {
   removeRaidItem: (projectId: string, id: string) => void;
   addColumn: (projectId: string, def: CustomColumn) => void;
   removeColumn: (projectId: string, key: string) => void;
+  renameColumn: (projectId: string, key: string, label: string) => void;
   openFileViewer: (fileId: string) => void;
   /* Tags */
   addTag: (projectId: string, tag: Tag) => void;
@@ -1522,6 +1523,31 @@ export function useFlowDeckStore(): FlowDeckState {
     });
   }, [customColsByProject]);
 
+  /**
+   * Rename a custom column's display label in place. The column `key` stays
+   * stable, so existing task values keep linking to the same field — this is
+   * the safe replacement for the old rename-as-delete+recreate flow, which
+   * cascaded every stored value away.
+   */
+  const renameColumn = useCallback((projectId: string, key: string, label: string) => {
+    if (!projectId) return;
+    // Snapshot for rollback — restore the old label if the server rename fails.
+    const snapshot = customColsByProject[projectId] || [];
+    const col = snapshot.find(c => c.key === key);
+    if (!col) return;
+    setCustomColsByProject(prev => ({
+      ...prev,
+      [projectId]: (prev[projectId] || []).map(c => c.key === key ? { ...c, label } : c),
+    }));
+    // Never synced to the server — the local rename above is the whole story.
+    if (!col.id) return;
+    apiRenameCustomField(projectId, col.id, label).then((res) => {
+      if (res.ok) return;
+      setCustomColsByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to rename custom field on server', { description: res.error });
+    });
+  }, [customColsByProject]);
+
   const addFiles = useCallback((projectId: string, newFiles: FileItem[]) => {
     if (!projectId) return;
     setFilesByProject(prev => ({ ...prev, [projectId]: [...newFiles, ...(prev[projectId] || [])] }));
@@ -2057,7 +2083,7 @@ export function useFlowDeckStore(): FlowDeckState {
     indentSelected, outdentSelected, linkSelected, unlinkSelected, removeTasksBulk,
     toggleBoldSelected, setColorSelected, durationUnit, toggleMilestoneSelected,
     importCSV, exportCSV, cutSelected, copySelected, paste, clipboard.items,
-    attachFilesToSelected, customCols, addColumn, removeColumn]);
+    attachFilesToSelected, customCols, addColumn, removeColumn, renameColumn]);
 
   /* ---- #30: Duplicate task with options ---- */
   const duplicateTaskWithOptions = useCallback((projectId: string, id: string, opts?: { includeSubtasks?: boolean; includeComments?: boolean; includeAttachments?: boolean }) => {
@@ -3023,7 +3049,7 @@ export function useFlowDeckStore(): FlowDeckState {
     timesheets, addTimesheetEntry, updateTimesheetEntry, deleteTimesheetEntry,
     addFiles, removeFile, linkFile,
     addRaidItem, updateRaidItem, removeRaidItem,
-    addColumn, removeColumn, openFileViewer,
+    addColumn, removeColumn, renameColumn, openFileViewer,
     addTag, removeTag, toggleTaskTag,
     addComment, deleteComment, editComment, toggleReaction,
     toggleFollower,

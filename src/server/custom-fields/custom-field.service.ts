@@ -26,6 +26,25 @@ export async function deleteCustomField(fieldId: string) {
     .catch(() => { throw new AuthError('Custom field not found', 404); });
 }
 
+export const renameCustomFieldSchema = z.object({
+  label: z.string().trim().min(1).max(100),
+});
+
+export type RenameCustomFieldInput = z.infer<typeof renameCustomFieldSchema>;
+
+/**
+ * Rename a custom-field definition in place. Only the display label changes —
+ * the key, type and every TaskCustomFieldValue row are untouched, so a rename
+ * can never destroy data (unlike the old delete+recreate flow, which cascaded
+ * all task values away).
+ */
+export async function renameCustomField(fieldId: string, input: RenameCustomFieldInput) {
+  return db.customField.update({
+    where: { id: fieldId },
+    data: { label: input.label },
+  }).catch(() => { throw new AuthError('Custom field not found', 404); });
+}
+
 /** Set a custom field value on a task. */
 export async function setTaskCustomValue(taskId: string, fieldId: string, value: string | null) {
   return db.taskCustomFieldValue.upsert({
