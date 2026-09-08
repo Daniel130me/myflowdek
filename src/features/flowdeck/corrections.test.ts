@@ -83,7 +83,9 @@ test('task detail route keeps loading until the task fetch resolves and stays ab
   assert.ok(page.includes('!tasksLoading && !tasksError'));
   assert.ok(hook.includes('useState(Boolean(projectId))'));
   assert.ok(hook.includes('requestedProjectId !== projectId'));
-  assert.ok(panel.includes('zIndex: 70'));
+  // H-23: the panel renders through the Radix-backed Modal primitive, which
+  // carries the z-index that keeps it above the bottom nav.
+  assert.ok(panel.includes('zIndex={70}'));
 });
 
 test('intercepted task route waits for hydration instead of falling through to a full-page 404', () => {
