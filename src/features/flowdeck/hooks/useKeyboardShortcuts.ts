@@ -114,15 +114,23 @@ export function useKeyboardShortcuts(opts: KeyboardShortcutsOptions): void {
       }
     }
 
-    /* ---------- `Tab` / `Shift+Tab` → indent / outdent ---------- */
-    if (e.key === 'Tab' && !isMeta(e)) {
-      e.preventDefault();
-      if (e.shiftKey) {
-        o.onOutdent();
-      } else {
+    /* ---------- Alt+Arrow → indent / outdent (Sheet grid only, with selection) ----------
+     * Plain Tab and Shift+Tab are never intercepted: they must keep driving
+     * native focus navigation everywhere in the app (WCAG 2.1 — 2.1.1 Keyboard,
+     * 2.1.2 No Keyboard Trap). Grid indent/outdent is exposed on Alt+Arrow
+     * instead, and only fires where it has meaning: the Sheet grid with at
+     * least one task selected. */
+    if (e.altKey && !isMeta(e) && o.activeView === 'sheet' && o.selectedIds.size > 0) {
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
         o.onIndent();
+        return;
       }
-      return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        o.onOutdent();
+        return;
+      }
     }
 
     /* ---------- `Backspace` / `Delete` → delete selected ---------- */

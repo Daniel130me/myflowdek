@@ -156,3 +156,29 @@ describe('Audit Remediation: Project-scoped routes and persistence (Item 6)', ()
     }
   });
 });
+
+describe('Audit Remediation: Keyboard accessibility (Tab hijack removal)', () => {
+  test('global keyboard handler never intercepts plain Tab', () => {
+    const hookPath = path.join(process.cwd(), 'src/features/flowdeck/hooks/useKeyboardShortcuts.ts');
+    const source = fs.readFileSync(hookPath, 'utf-8');
+
+    assert.ok(
+      !source.includes("e.key === 'Tab'"),
+      'useKeyboardShortcuts must not intercept Tab — it drives native focus navigation',
+    );
+  });
+
+  test('indent/outdent are gated to the Sheet grid with an active selection', () => {
+    const hookPath = path.join(process.cwd(), 'src/features/flowdeck/hooks/useKeyboardShortcuts.ts');
+    const source = fs.readFileSync(hookPath, 'utf-8');
+
+    assert.ok(
+      source.includes("o.activeView === 'sheet'"),
+      'indent/outdent shortcuts must only fire on the Sheet grid view',
+    );
+    assert.ok(
+      source.includes('o.selectedIds.size > 0'),
+      'indent/outdent shortcuts must require a task selection',
+    );
+  });
+});
