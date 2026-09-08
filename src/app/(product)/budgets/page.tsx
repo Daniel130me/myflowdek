@@ -7,6 +7,7 @@ import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { toast } from 'sonner';
 import { fetchJson } from '@/lib/fetch-json';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import { SelectProjectNotice } from '@/features/flowdeck/components/views';
 import type { Budget, Expense } from '@/features/flowdeck/model';
 import { apiUpdateBudget, apiListExpenses, apiDeleteExpense } from '@/lib/api-client';
 
@@ -134,6 +135,9 @@ export default function BudgetsRoutePage() {
     toast.error('Failed to delete expense', { description: res.error });
   }, [projectId, expenses, budgets]);
 
+  // No project open: say so instead of silently showing the last-opened
+  // project's data with dead create buttons (audit H-11).
+  if (!projectId) return <SelectProjectNotice feature="Budgets" />;
   if (loading) return <TableSkeleton />;
 
   return (

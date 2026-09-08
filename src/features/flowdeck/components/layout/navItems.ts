@@ -59,3 +59,18 @@ export const MORE_NAV = [
   { id: 'timesheets', label: 'Timesheets', icon: Clock },
   { id: 'ai', label: 'AI Assistant', icon: Sparkles },
 ];
+
+/**
+ * Views that only make sense inside an open project (audit H-12). Everything
+ * else in NAV is workspace-level and must stay clickable before a project is
+ * opened — the old blanket rule disabled 20 of 22 nav items right after login
+ * with no explanation.
+ */
+const PROJECT_SCOPED_VIEWS = new Set([
+  'dashboard', 'timeline', 'board', 'sheet', 'tasks', 'calendar',
+  'raid', 'files', 'documents', 'team', 'reports', 'deps',
+]);
+
+export function isNavItemDisabled(itemId: string, hasProject: boolean): boolean {
+  return !hasProject && PROJECT_SCOPED_VIEWS.has(itemId);
+}

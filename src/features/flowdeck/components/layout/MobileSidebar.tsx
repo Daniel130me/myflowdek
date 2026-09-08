@@ -7,7 +7,7 @@ import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { Avatar } from '../ui';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../auth';
-import { NAV } from './navItems';
+import { NAV, isNavItemDisabled } from './navItems';
 import { WorkspaceSelector } from './WorkspaceSelector';
 import type { WorkspaceSummary } from '../../hooks/useWorkspaces';
 import type { Project } from '@/features/flowdeck/model';
@@ -102,7 +102,7 @@ export function MobileSidebar({
           {NAV.map(n => {
             const Icon = n.icon;
             const active = activeView === n.id;
-            const disabled = !project && n.id !== 'talent';
+            const disabled = isNavItemDisabled(n.id, !!project);
             return (
               <button key={n.id} onClick={() => { if (!disabled) { onNavigate(n.id); onClose(); } }} disabled={disabled} style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12,

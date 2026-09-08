@@ -7,6 +7,7 @@ import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { toast } from 'sonner';
 import { fetchJson } from '@/lib/fetch-json';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import { SelectProjectNotice } from '@/features/flowdeck/components/views';
 import type { Form, FormSubmission } from '@/features/flowdeck/model';
 import { apiUpdateForm, apiListFormSubmissions } from '@/lib/api-client';
 
@@ -98,6 +99,9 @@ export default function FormsRoutePage() {
     refetch();
   }, [projectId, refetch]);
 
+  // No project open: say so instead of silently showing the last-opened
+  // project's data with dead create buttons (audit H-11).
+  if (!projectId) return <SelectProjectNotice feature="Forms" />;
   if (loading) return <TableSkeleton />;
 
   return (

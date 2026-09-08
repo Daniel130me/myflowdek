@@ -7,6 +7,7 @@ import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { fetchJson } from '@/lib/fetch-json';
 import { toast } from 'sonner';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import { SelectProjectNotice } from '@/features/flowdeck/components/views';
 import type { ApprovalRequest } from '@/features/flowdeck/model';
 
 export default function ApprovalsRoutePage() {
@@ -64,6 +65,9 @@ export default function ApprovalsRoutePage() {
     refetch();
   }, [refetch]);
 
+  // No project open: say so instead of silently showing the last-opened
+  // project's data with dead create buttons (audit H-11).
+  if (!projectId) return <SelectProjectNotice feature="Approvals" />;
   if (loading) return <TableSkeleton />;
 
   return (

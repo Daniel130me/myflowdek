@@ -504,3 +504,23 @@ describe('Audit Remediation: Data-integrity trio (H-05 tags, H-09 time logs, H-2
     assert.ok(!body.includes('setTasksByProject(prev => ({ ...prev, [pid]:'), 'local-only task insert must be gone');
   });
 });
+
+describe('Audit Remediation: Workspace IA (H-11 select-project notice, H-12 sidebar gating)', () => {
+  test('only project-scoped nav items disable without an open project', () => {
+    const nav = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/components/layout/navItems.ts'), 'utf-8');
+    assert.ok(nav.includes('PROJECT_SCOPED_VIEWS'), 'the project-scoped set must exist');
+    assert.ok(nav.includes('isNavItemDisabled'), 'the shared predicate must exist');
+    for (const f of ['Sidebar', 'MobileSidebar', 'MoreMenu']) {
+      const src = fs.readFileSync(path.join(process.cwd(), `src/features/flowdeck/components/layout/${f}.tsx`), 'utf-8');
+      assert.ok(src.includes('isNavItemDisabled('), `${f} must use the shared predicate`);
+      assert.ok(!src.includes("!== 'talent'"), `${f} must not keep the blanket talent-only rule`);
+    }
+  });
+
+  test('workspace pages show a select-project notice instead of silent stale data', () => {
+    for (const f of ['automations', 'forms', 'approvals', 'budgets', 'timesheets']) {
+      const src = fs.readFileSync(path.join(process.cwd(), `src/app/(product)/${f}/page.tsx`), 'utf-8');
+      assert.ok(src.includes("if (!projectId) return <SelectProjectNotice"), `${f} must gate on an open project`);
+    }
+  });
+});

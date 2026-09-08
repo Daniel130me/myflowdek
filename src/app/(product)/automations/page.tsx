@@ -7,6 +7,7 @@ import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { toast } from 'sonner';
 import { fetchJson } from '@/lib/fetch-json';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import { SelectProjectNotice } from '@/features/flowdeck/components/views';
 import type { AutomationRule } from '@/features/flowdeck/model';
 
 export default function AutomationsRoutePage() {
@@ -59,6 +60,9 @@ export default function AutomationsRoutePage() {
     } catch { toast.error('Failed to delete automation'); }
   }, [projectId, refetch]);
 
+  // No project open: say so instead of silently showing the last-opened
+  // project's data with dead create buttons (audit H-11).
+  if (!projectId) return <SelectProjectNotice feature="Automations" />;
   if (loading) return <TableSkeleton />;
 
   return (

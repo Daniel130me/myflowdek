@@ -19,3 +19,4 @@ export { ApprovalsView } from './ApprovalsView';
 export { BudgetView } from './BudgetView';
 export { TimesheetView } from './TimesheetView';
 export { AIAssistantView } from './AIAssistantView';
+export { SelectProjectNotice } from './SelectProjectNotice';
