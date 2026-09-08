@@ -35,6 +35,10 @@ export default function TaskDetailRoutePage() {
   const { members } = useProjectMembers(projectId);
 
   const { activity: taskActivity } = useTaskActivity(taskId || null);
+  // Hydrate this task's time logs from the server on mount (audit H-09) —
+  // previously nothing ever fetched them, so logged work vanished on reload.
+  // Called before any early return to keep hook order stable.
+  useTaskTimeLogs(projectId ?? null, taskId ?? null);
 
   const cachedTask = getTaskForProject(state.tasksByProject, projectId, taskId);
   const task = cachedTask ?? fetchedTasks.find(candidate => candidate.id === taskId) ?? null;
@@ -54,10 +58,6 @@ export default function TaskDetailRoutePage() {
   const projectComments = state.commentsByProject[projectId] ?? [];
   const projectTimeLogs = state.timeLogsByProject[projectId] ?? [];
   const projectCustomFields = state.customColsByProject[projectId] ?? [];
-
-  // Hydrate this task's time logs from the server on mount (audit H-09) —
-  // previously nothing ever fetched them, so logged work vanished on reload.
-  useTaskTimeLogs(projectId ?? null, taskId ?? null);
 
   const taskComments = projectComments.filter(comment => comment.taskId === taskId);
 
