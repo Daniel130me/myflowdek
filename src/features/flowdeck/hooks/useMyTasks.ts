@@ -24,6 +24,10 @@ interface ApiMyTask {
   duration: number;
   progress: number;
   isMilestone: boolean;
+  /** Sheet formatting fields (audit H-04) — hydrated since the fix. */
+  bold?: boolean;
+  color?: string | null;
+  level?: number;
   completedAt: string | null;
   parentId: string | null;
   sectionId: string | null;
@@ -57,6 +61,9 @@ function mapMyTask(api: ApiMyTask): MyTaskItem {
     deps: [],
     parentId: api.parentId ?? null,
     milestone: api.isMilestone,
+    bold: api.bold ?? false,
+    color: api.color ?? null,
+    level: api.level ?? 0,
     sectionId: api.sectionId ?? null,
     createdAt: api.createdAt ?? undefined,
     project: api.projectId,

@@ -212,6 +212,47 @@ describe('updateTaskSchema', () => {
     assert.equal(res.success, false);
   });
 
+  // ------------------- sheet formatting fields (H-04) -------------------
+
+  test('accepts sheet formatting fields (bold, color, level, isMilestone)', () => {
+    const res = updateTaskSchema.safeParse({
+      bold: true,
+      color: '#0891B2',
+      level: 3,
+      isMilestone: true,
+    });
+    assert.equal(res.success, true);
+    if (res.success) {
+      assert.equal(res.data.bold, true);
+      assert.equal(res.data.color, '#0891B2');
+      assert.equal(res.data.level, 3);
+      assert.equal(res.data.isMilestone, true);
+    }
+  });
+
+  test('accepts a null color (clearing the colour tag)', () => {
+    const res = updateTaskSchema.safeParse({ color: null });
+    assert.equal(res.success, true);
+    if (res.success) assert.equal(res.data.color, null);
+  });
+
+  test('rejects a non-hex color value', () => {
+    assert.equal(updateTaskSchema.safeParse({ color: 'red' }).success, false);
+    assert.equal(updateTaskSchema.safeParse({ color: '#12345' }).success, false);
+    assert.equal(updateTaskSchema.safeParse({ color: 'javascript:alert(1)' }).success, false);
+  });
+
+  test('rejects an out-of-range indent level', () => {
+    assert.equal(updateTaskSchema.safeParse({ level: -1 }).success, false);
+    assert.equal(updateTaskSchema.safeParse({ level: 5 }).success, false);
+    assert.equal(updateTaskSchema.safeParse({ level: 1.5 }).success, false);
+  });
+
+  test('accepts boundary indent levels 0 and 4', () => {
+    assert.equal(updateTaskSchema.safeParse({ level: 0 }).success, true);
+    assert.equal(updateTaskSchema.safeParse({ level: 4 }).success, true);
+  });
+
   test('rejects unknown extra fields via Zod default (strict-by-default for object?) — schemas use .object which strips unknowns, not rejects', () => {
     // Zod object schemas default to stripping unknown keys; this test
     // documents that behaviour so a future tightening to .strict() is

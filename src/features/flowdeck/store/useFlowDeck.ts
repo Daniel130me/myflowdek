@@ -1137,8 +1137,47 @@ export function useFlowDeckStore(): FlowDeckState {
     });
   }, [tasksByProject, updateTasksBulk]);
 
-  const indentSelected = useCallback((projectId: string) => updateTasksBulk(projectId, selectedIds, (t: Task) => ({ level: Math.min(4, (t.level || 0) + 1) })), [selectedIds, updateTasksBulk]);
-  const outdentSelected = useCallback((projectId: string) => updateTasksBulk(projectId, selectedIds, (t: Task) => ({ level: Math.max(0, (t.level || 0) - 1) })), [selectedIds, updateTasksBulk]);
+  /**
+   * Indent / outdent selected tasks (audit H-04). Persists each task's new
+   * indent level via `PATCH /api/tasks/:id` — the bulk API has no indent
+   * action, so we fan out per-task. Snapshot + rollback on any failure.
+   */
+  const indentSelected = useCallback((projectId: string) => {
+    if (!projectId || selectedIds.size === 0) return;
+    const snapshot = tasksByProject[projectId] || [];
+    // Optimistic local update; collect each task's computed level as we go.
+    const patches: Array<{ id: string; level: number }> = [];
+    updateTasksBulk(projectId, selectedIds, (t: Task) => {
+      const level = Math.min(4, (t.level || 0) + 1);
+      patches.push({ id: t.id, level });
+      return { level };
+    });
+    if (patches.length === 0) return;
+    Promise.all(patches.map(p => apiUpdateTask(p.id, taskToApiPayload({ level: p.level })))).then(results => {
+      const firstFailure = results.find(r => !r.ok);
+      if (!firstFailure) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save indent', { description: firstFailure.error });
+    });
+  }, [selectedIds, tasksByProject, updateTasksBulk]);
+  const outdentSelected = useCallback((projectId: string) => {
+    if (!projectId || selectedIds.size === 0) return;
+    const snapshot = tasksByProject[projectId] || [];
+    // Optimistic local update; collect each task's computed level as we go.
+    const patches: Array<{ id: string; level: number }> = [];
+    updateTasksBulk(projectId, selectedIds, (t: Task) => {
+      const level = Math.max(0, (t.level || 0) - 1);
+      patches.push({ id: t.id, level });
+      return { level };
+    });
+    if (patches.length === 0) return;
+    Promise.all(patches.map(p => apiUpdateTask(p.id, taskToApiPayload({ level: p.level })))).then(results => {
+      const firstFailure = results.find(r => !r.ok);
+      if (!firstFailure) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save outdent', { description: firstFailure.error });
+    });
+  }, [selectedIds, tasksByProject, updateTasksBulk]);
   const linkSelected = useCallback((projectId: string) => {
     if (!projectId) return;
     const projectTasks = tasksByProject[projectId] || [];
@@ -1216,16 +1255,49 @@ export function useFlowDeckStore(): FlowDeckState {
       toast.error('Failed to save recurrence', { description: firstFailure.error });
     });
   }, [selectedIds, tasksByProject, updateTasksBulk]);
+  /** Toggle bold on selected tasks; persists via per-task PATCH (H-04). */
   const toggleBoldSelected = useCallback((projectId: string) => {
-    const projectTasks = tasksByProject[projectId] || [];
-    const anyBold = projectTasks.some(t => selectedIds.has(t.id) && t.bold);
+    if (!projectId || selectedIds.size === 0) return;
+    const snapshot = tasksByProject[projectId] || [];
+    const anyBold = snapshot.some(t => selectedIds.has(t.id) && t.bold);
+    // Optimistic local update.
     updateTasksBulk(projectId, selectedIds, { bold: !anyBold });
+    toast.success(`Bold ${anyBold ? 'removed from' : 'applied to'} ${selectedIds.size} task${selectedIds.size > 1 ? 's' : ''}`);
+    Promise.all([...selectedIds].map(id => apiUpdateTask(id, taskToApiPayload({ bold: !anyBold })))).then(results => {
+      const firstFailure = results.find(r => !r.ok);
+      if (!firstFailure) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save bold formatting', { description: firstFailure.error });
+    });
   }, [selectedIds, tasksByProject, updateTasksBulk]);
-  const setColorSelected = useCallback((projectId: string, color: string | null) => updateTasksBulk(projectId, selectedIds, { color }), [selectedIds, updateTasksBulk]);
+  /** Set / clear the colour tag on selected tasks; persists per-task (H-04). */
+  const setColorSelected = useCallback((projectId: string, color: string | null) => {
+    if (!projectId || selectedIds.size === 0) return;
+    const snapshot = tasksByProject[projectId] || [];
+    // Optimistic local update.
+    updateTasksBulk(projectId, selectedIds, { color });
+    toast.success(color ? `Colour tagged ${selectedIds.size} task${selectedIds.size > 1 ? 's' : ''}` : `Colour cleared for ${selectedIds.size} task${selectedIds.size > 1 ? 's' : ''}`);
+    Promise.all([...selectedIds].map(id => apiUpdateTask(id, taskToApiPayload({ color })))).then(results => {
+      const firstFailure = results.find(r => !r.ok);
+      if (!firstFailure) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save colour tag', { description: firstFailure.error });
+    });
+  }, [selectedIds, tasksByProject, updateTasksBulk]);
+  /** Toggle the milestone flag on selected tasks; persists per-task (H-04). */
   const toggleMilestoneSelected = useCallback((projectId: string) => {
-    const projectTasks = tasksByProject[projectId] || [];
-    const anyMilestone = projectTasks.some(t => selectedIds.has(t.id) && t.milestone);
+    if (!projectId || selectedIds.size === 0) return;
+    const snapshot = tasksByProject[projectId] || [];
+    const anyMilestone = snapshot.some(t => selectedIds.has(t.id) && t.milestone);
+    // Optimistic local update.
     updateTasksBulk(projectId, selectedIds, { milestone: !anyMilestone });
+    toast.success(anyMilestone ? `Milestone removed from ${selectedIds.size} task${selectedIds.size > 1 ? 's' : ''}` : `Marked ${selectedIds.size} task${selectedIds.size > 1 ? 's' : ''} as milestone`);
+    Promise.all([...selectedIds].map(id => apiUpdateTask(id, taskToApiPayload({ milestone: !anyMilestone })))).then(results => {
+      const firstFailure = results.find(r => !r.ok);
+      if (!firstFailure) return;
+      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to save milestone flag', { description: firstFailure.error });
+    });
   }, [selectedIds, tasksByProject, updateTasksBulk]);
   const copySelected = useCallback((projectId: string) => {
     const projectTasks = tasksByProject[projectId] || [];

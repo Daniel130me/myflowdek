@@ -530,6 +530,15 @@ model Task {
   sortOrder          Int                    @default(0)
   isMilestone        Boolean                @default(false)
   /**
+   * Sheet formatting fields (audit H-04). Persisted so bold / colour-tag /
+   * indent styling survives a reload instead of silently vanishing.
+   * `color` is a hex swatch from the fixed COLOR_SWATCHES palette (null =
+   * no colour); `level` is the indent depth 0-4 rendered by Sheet/Tasks.
+   */
+  bold               Boolean                @default(false)
+  color              String?
+  level              Int                    @default(0)
+  /**
    * Recurrence pattern: 'daily' | 'weekly' | 'monthly' | null. When set,
    * a background job creates the next occurrence after completion.
    */

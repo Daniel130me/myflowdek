@@ -17,6 +17,10 @@ interface ApiTask {
   progress: number;
   sortOrder: number;
   isMilestone: boolean;
+  /** Sheet formatting fields (audit H-04) — hydrated since the fix. */
+  bold?: boolean;
+  color?: string | null;
+  level?: number;
   recurrence?: string | null;
   assigneeId: string | null;
   parentId: string | null;
@@ -69,6 +73,9 @@ function mapTask(api: ApiTask): Task {
     parentId: api.parentId ?? null,
     sectionId: api.sectionId ?? null,
     milestone: api.isMilestone,
+    bold: api.bold ?? false,
+    color: api.color ?? null,
+    level: api.level ?? 0,
     recurrence: api.recurrence ?? null,
     createdAt: api.createdAt ?? undefined,
     ...(customFields ? { customFields } : {}),

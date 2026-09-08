@@ -49,6 +49,12 @@ export function taskToApiPayload(task: Partial<Task>): Record<string, unknown> {
     ...(task.progress !== undefined ? { progress: task.progress } : {}),
     ...(task.duration !== undefined ? { duration: task.duration } : {}),
     ...(task.sortOrder !== undefined ? { sortOrder: task.sortOrder } : {}),
+    // Sheet formatting fields (audit H-04). Client `milestone` maps to the
+    // server's `isMilestone` column; bold / colour / indent persist verbatim.
+    ...(task.bold !== undefined ? { bold: task.bold } : {}),
+    ...(task.color !== undefined ? { color: task.color } : {}),
+    ...(task.level !== undefined ? { level: task.level } : {}),
+    ...(task.milestone !== undefined ? { isMilestone: task.milestone } : {}),
   };
 }
 

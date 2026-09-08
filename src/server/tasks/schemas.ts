@@ -44,6 +44,13 @@ export const updateTaskSchema = z.object({
    *  a background job creates the next occurrence after completion. Pass
    *  null to clear the recurrence. */
   recurrence: z.enum(['daily', 'weekly', 'monthly']).nullable().optional(),
+  /** Sheet formatting fields (audit H-04). `color` accepts any #RRGGBB
+   *  swatch (the UI palette is client-side); null clears the colour tag.
+   *  `level` is the indent depth clamped to the UI's 0-4 range. */
+  bold: z.boolean().optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'color must be a #RRGGBB hex value').nullable().optional(),
+  level: z.number().int().min(0).max(4).optional(),
+  isMilestone: z.boolean().optional(),
 });
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
