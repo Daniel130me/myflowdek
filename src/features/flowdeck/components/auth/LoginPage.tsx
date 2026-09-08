@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, ArrowRight, Layers, BarChart3, Users, Zap, ChevronRight, Sparkles, LogOut } from 'lucide-react';
 import { COLORS, FF } from '@/features/flowdeck/model';
+import { routes } from '@/shared/navigation/routes';
 import type { UserProfile } from './useAuth';
 
 interface LoginPageProps {
@@ -50,6 +52,7 @@ function useWindowSize() {
 }
 
 export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }: LoginPageProps) {
+  const router = useRouter();
   const viewportWidth = useWindowSize();
   const isMobile = viewportWidth < 768;
   const isTablet = viewportWidth >= 768 && viewportWidth < 1024;
@@ -187,7 +190,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
               <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>Password</span>
                 {mode === 'signin' && (
-                  <button type="button" style={{ fontSize: 12, color: COLORS.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FF, padding: 0 }}>Forgot password?</button>
+                  <button type="button" onClick={() => router.push(routes.forgotPassword())} style={{ fontSize: 12, color: COLORS.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FF, padding: 0 }}>Forgot password?</button>
                 )}
               </label>
               <div style={{ position: 'relative' }}>
@@ -389,7 +392,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>Password</span>
                   {mode === 'signin' && (
-                    <button type="button" style={{ fontSize: 12, color: COLORS.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FF, padding: 0 }}>Forgot password?</button>
+                    <button type="button" onClick={() => router.push(routes.forgotPassword())} style={{ fontSize: 12, color: COLORS.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FF, padding: 0 }}>Forgot password?</button>
                   )}
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -577,7 +580,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
               <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.ink }}>Password</span>
                 {mode === 'signin' && (
-                  <button type="button" style={{ fontSize: 12, color: COLORS.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FF, padding: 0 }}>Forgot password?</button>
+                  <button type="button" onClick={() => router.push(routes.forgotPassword())} style={{ fontSize: 12, color: COLORS.accent, background: 'none', border: 'none', cursor: 'pointer', fontFamily: FF, padding: 0 }}>Forgot password?</button>
                 )}
               </label>
               <div style={{ position: 'relative' }}>

@@ -5,6 +5,7 @@
 export const routes = {
   // Auth routes
   login: () => '/login',
+  forgotPassword: () => '/forgot-password',
   resetPassword: () => '/reset-password',
   onboarding: () => '/onboarding',
 

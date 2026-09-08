@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { COLORS, FF } from '@/features/flowdeck/model';
+import { routes } from '@/shared/navigation/routes';
 import { passwordSchema, PASSWORD_POLICY_HINT } from '@/lib/password-policy';
 
 /**
@@ -22,6 +23,15 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [status, setStatus] = useState<'form' | 'submitting' | 'success' | 'error'>('form');
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Landing here without a token means the visitor came directly (e.g. typed
+  // the URL) rather than from a reset email — send them to the email step
+  // instead of showing a dead-end error form.
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).get('token')) {
+      router.replace(routes.forgotPassword());
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
