@@ -262,3 +262,32 @@ describe('Audit Remediation: Share modal is genuine member management (C-03)', (
     assert.ok(source.includes("members/${userId}`, json('PATCH', { role })"), 'apiUpdateProjectMember must PATCH the role');
   });
 });
+
+describe('Audit Remediation: RAID log persistence (C-01)', () => {
+  test('raid API routes exist (GET/POST list route + PATCH/DELETE item route)', () => {
+    const listPath = path.join(process.cwd(), 'src/app/api/projects/[projectId]/raid/route.ts');
+    const itemPath = path.join(process.cwd(), 'src/app/api/projects/[projectId]/raid/[itemId]/route.ts');
+    const list = fs.readFileSync(listPath, 'utf-8');
+    const item = fs.readFileSync(itemPath, 'utf-8');
+    assert.ok(list.includes('export async function GET'), 'raid list route must expose GET');
+    assert.ok(list.includes('export async function POST'), 'raid list route must expose POST');
+    assert.ok(item.includes('export async function PATCH'), 'raid item route must expose PATCH');
+    assert.ok(item.includes('export async function DELETE'), 'raid item route must expose DELETE');
+    assert.ok(list.includes('requireProjectCapability'), 'raid routes must be capability-gated');
+  });
+
+  test('raid page hydrates from the server via useProjectRaid', () => {
+    const pagePath = path.join(process.cwd(), 'src/app/(product)/projects/[projectId]/raid/page.tsx');
+    const source = fs.readFileSync(pagePath, 'utf-8');
+    assert.ok(source.includes('useProjectRaid('), 'raid page must fetch server data on mount');
+  });
+
+  test('store RAID mutations call the API with optimistic rollback', () => {
+    const storePath = path.join(process.cwd(), 'src/features/flowdeck/store/useFlowDeck.ts');
+    const source = fs.readFileSync(storePath, 'utf-8');
+    assert.ok(source.includes('apiCreateRaidItem'), 'addRaidItem must persist via POST');
+    assert.ok(source.includes('apiUpdateRaidItem'), 'updateRaidItem must persist via PATCH');
+    assert.ok(source.includes('apiDeleteRaidItem'), 'removeRaidItem must persist via DELETE');
+    assert.ok(source.includes('syncRaidItems'), 'store must expose server hydration');
+  });
+});

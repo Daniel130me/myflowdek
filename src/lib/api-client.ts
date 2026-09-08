@@ -393,6 +393,60 @@ export function apiUpdateProjectMember(projectId: string, userId: string, role: 
   return apiCall(`/api/projects/${projectId}/members/${userId}`, json('PATCH', { role }));
 }
 
+/* --------------------------- RAID log mutations ------------------------ */
+
+export interface RaidItemPayload {
+  type: string;
+  description: string;
+  owner?: string | null;
+  impact: string;
+  status: string;
+  dateRaised?: string;
+}
+
+/** GET /api/projects/:projectId/raid — list RAID items. */
+export async function apiListRaidItems(projectId: string) {
+  try {
+    const res = await fetch(`/api/projects/${projectId}/raid`);
+    if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+    const data = (await res.json()) as {
+      items: {
+        id: string; type: string; description: string; ownerId: string | null;
+        impact: string; status: string; dateRaised: string;
+      }[];
+    };
+    // Map the server row (ownerId) onto the view model (owner: user id).
+    return {
+      ok: true as const,
+      items: data.items.map((i) => ({
+        id: i.id, type: i.type, description: i.description,
+        owner: i.ownerId ?? '', impact: i.impact, status: i.status,
+        dateRaised: typeof i.dateRaised === 'string' ? i.dateRaised.slice(0, 10) : '',
+      })),
+    };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : 'Network error' };
+  }
+}
+
+/** POST /api/projects/:projectId/raid — log a RAID item. */
+export function apiCreateRaidItem(projectId: string, input: RaidItemPayload) {
+  return apiCallWithData<{ item: { id: string } }>(
+    `/api/projects/${projectId}/raid`,
+    json('POST', input),
+  );
+}
+
+/** PATCH /api/projects/:projectId/raid/:itemId — update a RAID item. */
+export function apiUpdateRaidItem(projectId: string, itemId: string, patch: Partial<RaidItemPayload>) {
+  return apiCall(`/api/projects/${projectId}/raid/${itemId}`, json('PATCH', patch));
+}
+
+/** DELETE /api/projects/:projectId/raid/:itemId — remove a RAID item. */
+export function apiDeleteRaidItem(projectId: string, itemId: string) {
+  return apiCall(`/api/projects/${projectId}/raid/${itemId}`, { method: 'DELETE' });
+}
+
 /* ----------------- Project status update mutations ------------------- */
 
 /** POST /api/projects/:projectId/status-updates — post a status update. */

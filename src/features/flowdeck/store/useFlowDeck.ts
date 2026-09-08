@@ -35,6 +35,7 @@ import {
   apiReorderTasks,
   apiSetTaskCustomField,
   apiCreateCustomField, apiDeleteCustomField, apiRenameCustomField,
+  apiCreateRaidItem, apiUpdateRaidItem, apiDeleteRaidItem,
   taskToApiPayload,
 } from '@/lib/api-client';
 
@@ -189,6 +190,8 @@ export interface FlowDeckState {
   addRaidItem: (projectId: string, item: RaidItem) => void;
   updateRaidItem: (projectId: string, id: string, patch: Partial<RaidItem>) => void;
   removeRaidItem: (projectId: string, id: string) => void;
+  /** Replace the project's RAID list with server data (used by useProjectRaid). */
+  syncRaidItems: (projectId: string, items: RaidItem[]) => void;
   addColumn: (projectId: string, def: CustomColumn) => void;
   removeColumn: (projectId: string, key: string) => void;
   renameColumn: (projectId: string, key: string, label: string) => void;
@@ -1578,20 +1581,72 @@ export function useFlowDeckStore(): FlowDeckState {
     });
   }, [filesByProject]);
 
+  const syncRaidItems = useCallback((projectId: string, items: RaidItem[]) => {
+    if (!projectId) return;
+    setRaidByProject(prev => ({ ...prev, [projectId]: items }));
+  }, []);
+
+  // Server-synced RAID items carry the server cuid (which starts with 'c');
+  // pre-reconcile optimistic items carry the view's local 'r'-prefixed id.
+  // Local-only mutations skip the API for those — there is no server row yet.
+  const isServerRaidId = (id: string) => !id.startsWith('r');
+
   const addRaidItem = useCallback((projectId: string, item: RaidItem) => {
     if (!projectId) return;
+    // Optimistic insert. The server-side id is reconciled after the POST
+    // succeeds so subsequent updates/deletes hit the real row.
+    const snapshot = raidByProject[projectId] || [];
     setRaidByProject(prev => ({ ...prev, [projectId]: [item, ...(prev[projectId] || [])] }));
-  }, []);
+    apiCreateRaidItem(projectId, {
+      type: item.type,
+      description: item.description,
+      owner: item.owner || null,
+      impact: item.impact,
+      status: item.status,
+      dateRaised: item.dateRaised ? new Date(item.dateRaised).toISOString() : undefined,
+    }).then((res) => {
+      if (!res.ok) {
+        setRaidByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        toast.error('Failed to save RAID item on server', { description: res.error });
+        return;
+      }
+      const serverId = res.data?.item?.id;
+      if (!serverId) return;
+      setRaidByProject(prev => ({
+        ...prev,
+        [projectId]: (prev[projectId] || []).map(r => r.id === item.id ? { ...r, id: serverId } : r),
+      }));
+    });
+  }, [raidByProject]);
 
   const updateRaidItem = useCallback((projectId: string, id: string, patch: Partial<RaidItem>) => {
     if (!projectId) return;
+    const snapshot = raidByProject[projectId] || [];
     setRaidByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).map(r => r.id === id ? { ...r, ...patch } : r) }));
-  }, []);
+    if (!isServerRaidId(id)) return;
+    apiUpdateRaidItem(projectId, id, {
+      ...(patch.description === undefined ? {} : { description: patch.description }),
+      ...(patch.owner === undefined ? {} : { owner: patch.owner || null }),
+      ...(patch.impact === undefined ? {} : { impact: patch.impact }),
+      ...(patch.status === undefined ? {} : { status: patch.status }),
+    }).then((res) => {
+      if (res.ok) return;
+      setRaidByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to update RAID item on server', { description: res.error });
+    });
+  }, [raidByProject]);
 
   const removeRaidItem = useCallback((projectId: string, id: string) => {
     if (!projectId) return;
+    const snapshot = raidByProject[projectId] || [];
     setRaidByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).filter(r => r.id !== id) }));
-  }, []);
+    if (!isServerRaidId(id)) return;
+    apiDeleteRaidItem(projectId, id).then((res) => {
+      if (res.ok) return;
+      setRaidByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to delete RAID item on server', { description: res.error });
+    });
+  }, [raidByProject]);
 
   /* ---- Tags ---- */
   const addTag = useCallback((projectId: string, tag: Tag) => {
@@ -3043,7 +3098,7 @@ export function useFlowDeckStore(): FlowDeckState {
     /* Timesheets */
     timesheets, addTimesheetEntry, updateTimesheetEntry, deleteTimesheetEntry,
     addFiles, removeFile, linkFile,
-    addRaidItem, updateRaidItem, removeRaidItem,
+    addRaidItem, updateRaidItem, removeRaidItem, syncRaidItems,
     addColumn, removeColumn, renameColumn, openFileViewer,
     addTag, removeTag, toggleTaskTag,
     addComment, deleteComment, editComment, toggleReaction,
