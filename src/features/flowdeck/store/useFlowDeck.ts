@@ -42,6 +42,33 @@ import {
 /* ---- LocalStorage persistence ---- */
 const SAVE_DEBOUNCE = 500;
 
+/* ---- Debounced task-cell persistence (audit H-06) ---- */
+/**
+ * Sheet cells fire one change event per keystroke. Persisting each event
+ * immediately produced a PATCH storm (one request per character) with
+ * out-of-order responses able to clobber newer text on slow networks.
+ * Instead, patches are merged per task and flushed after a short idle
+ * window: typing stays optimistic/instant while N keystrokes collapse into
+ * ONE request carrying the final values. A max-wait bounds how long
+ * continuous typing can defer the network write.
+ */
+const TASK_UPDATE_DEBOUNCE_MS = 400;
+const TASK_UPDATE_MAX_WAIT_MS = 2000;
+
+/** A task's accumulated, not-yet-persisted cell edits. */
+interface PendingTaskUpdate {
+  projectId: string;
+  taskId: string;
+  /** Merged patch waiting to be sent. */
+  patch: Partial<Task>;
+  /** Pre-edit value of every pending field — enables field-level rollback. */
+  baseline: Partial<Task>;
+  /** Pre-edit custom-field values for keys touched by the patch. */
+  customFieldsBaseline: Record<string, string>;
+  firstQueuedAt: number;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 export interface NavItem {
   id: string;
   label: string;
@@ -735,17 +762,137 @@ export function useFlowDeckStore(): FlowDeckState {
     if (projectId) setTasksByProject(prev => ({ ...prev, [projectId]: nextTasksForProject }));
   }, []);
 
+  /* ---- debounced cell persistence (audit H-06) ---- */
+  // Per-task accumulation of not-yet-persisted cell edits.
+  const pendingTaskUpdatesRef = useRef<Map<string, PendingTaskUpdate>>(new Map());
+
+  /**
+   * Send one task's accumulated patch: a single PATCH for the scalar fields
+   * (diffed against the pre-edit baseline so no-op bursts hit the network
+   * zero times) plus one value-set call per changed custom-field key. Any
+   * failure rolls back only the affected fields on that task — never the
+   * whole list, so a rejected write cannot erase concurrent edits.
+   */
+  const flushTaskUpdate = useCallback((taskId: string) => {
+    const entry = pendingTaskUpdatesRef.current.get(taskId);
+    if (!entry) return;
+    pendingTaskUpdatesRef.current.delete(taskId);
+    clearTimeout(entry.timer);
+
+    // Diff scalars against the baseline; drop fields the user edited back
+    // to their original value.
+    const { customFields: patchCustom, ...scalarPatch } = entry.patch;
+    const diffedScalars: Partial<Task> = {};
+    for (const [key, value] of Object.entries(scalarPatch)) {
+      if ((entry.baseline as Record<string, unknown>)[key] !== value) {
+        (diffedScalars as Record<string, unknown>)[key] = value;
+      }
+    }
+    // Custom fields: only keys that actually left the baseline go online.
+    const changedCustomKeys = patchCustom
+      ? Object.keys(patchCustom).filter(k => patchCustom[k] !== entry.customFieldsBaseline[k])
+      : [];
+
+    // The patch goes through `taskToApiPayload` so frontend-only field names
+    // (`assignee`, `start`) are translated to the API's (`assigneeId`,
+    // `startDate`) and fields with dedicated endpoints are dropped.
+    const apiPatch = taskToApiPayload(diffedScalars);
+    if (Object.keys(apiPatch).length > 0) {
+      apiUpdateTask(entry.taskId, apiPatch).then((res) => {
+        if (res.ok) return;
+        // Field-level rollback: restore just the fields this entry carried.
+        setTasksByProject(prev => ({
+          ...prev,
+          [entry.projectId]: (prev[entry.projectId] || []).map(t =>
+            t.id === entry.taskId ? { ...t, ...entry.baseline } : t,
+          ),
+        }));
+        toast.error('Failed to save task change', { description: res.error });
+      });
+    }
+
+    for (const key of changedCustomKeys) {
+      const value = patchCustom?.[key] ?? null;
+      void apiSetTaskCustomField(entry.taskId, { key, value }).then((res) => {
+        if (res.ok) return;
+        // Roll back just this key in the task's customFields record.
+        setTasksByProject(prev => {
+          const list = prev[entry.projectId] || [];
+          return {
+            ...prev,
+            [entry.projectId]: list.map(t => {
+              if (t.id !== entry.taskId) return t;
+              const restored = { ...(t.customFields || {}) };
+              const before = entry.customFieldsBaseline[key];
+              if (before === undefined) delete restored[key];
+              else restored[key] = before;
+              return { ...t, customFields: restored };
+            }),
+          };
+        });
+        toast.error('Failed to save custom field', { description: `${key} — ${res.error}` });
+      });
+    }
+  }, []);
+
+  /**
+   * Queue one optimistic cell edit for debounced persistence. Merges into
+   * any pending patch for the same task, keeps the OLDEST pre-edit value as
+   * the rollback baseline, and restarts the idle timer (bounded by the
+   * max-wait so continuous typing still persists periodically).
+   */
+  const queueTaskUpdate = useCallback((projectId: string, taskId: string, patch: Partial<Task>, baselineTask: Task | undefined) => {
+    const now = Date.now();
+    // Past the max-wait, send what has accumulated and start a fresh window.
+    const existing = pendingTaskUpdatesRef.current.get(taskId);
+    if (existing && now - existing.firstQueuedAt >= TASK_UPDATE_MAX_WAIT_MS) {
+      flushTaskUpdate(taskId);
+    }
+    const current = pendingTaskUpdatesRef.current.get(taskId);
+    if (current) clearTimeout(current.timer);
+
+    // Baseline per field = oldest queued pre-edit value (true rollback
+    // target); new fields take this update's pre-edit value.
+    const baseline: Partial<Task> = { ...current?.baseline };
+    for (const key of Object.keys(patch)) {
+      if (key in baseline) continue;
+      (baseline as Record<string, unknown>)[key] = baselineTask
+        ? (baselineTask as unknown as Record<string, unknown>)[key]
+        : undefined;
+    }
+    // Same per-key rule for custom fields: keep the oldest value seen.
+    const customFieldsBaseline: Record<string, string> = { ...(current?.customFieldsBaseline || {}) };
+    if (patch.customFields && baselineTask?.customFields) {
+      for (const key of Object.keys(patch.customFields)) {
+        if (!(key in customFieldsBaseline) && key in baselineTask.customFields) {
+          customFieldsBaseline[key] = baselineTask.customFields[key];
+        }
+      }
+    }
+
+    pendingTaskUpdatesRef.current.set(taskId, {
+      projectId,
+      taskId,
+      patch: current ? { ...current.patch, ...patch } : { ...patch },
+      baseline,
+      customFieldsBaseline,
+      firstQueuedAt: current?.firstQueuedAt ?? now,
+      timer: setTimeout(() => flushTaskUpdate(taskId), TASK_UPDATE_DEBOUNCE_MS),
+    });
+  }, [flushTaskUpdate]);
+
+  // Provider unmount (logout): flush pending cell edits so in-flight typing
+  // is not silently dropped.
+  useEffect(() => {
+    const pending = pendingTaskUpdatesRef;
+    return () => { for (const taskId of [...pending.current.keys()]) flushTaskUpdate(taskId); };
+  }, [flushTaskUpdate]);
+
   const updateTask = useCallback((projectId: string, id: string, patch: Partial<Task>) => {
     const projectTasks = tasksByProject[projectId] || [];
     const task = projectTasks.find(t => t.id === id);
-    // Snapshot for rollback — captures the pre-update task list for this
-    // project so we can restore it if the API rejects the change.
-    const snapshot = projectTasks;
-    // Capture the task's pre-update customFields so we can roll back the
-    // customFields portion of the optimistic update independently if the
-    // value-set endpoint rejects a specific key.
-    const customFieldsBefore = task?.customFields ? { ...task.customFields } : undefined;
-    // Optimistic local update.
+    // Optimistic local update — typing reflects instantly; the network
+    // write is debounced per task below (audit H-06).
     commit(projectId, projectTasks.map(t => t.id === id ? { ...t, ...patch } : t));
     if (task && patch.status && patch.status !== task.status) {
       const actorName = resolveMemberName(userIdRef.current);
@@ -759,61 +906,12 @@ export function useFlowDeckStore(): FlowDeckState {
       const actorName = resolveMemberName(userIdRef.current);
       logActivity(projectId, id, 'due_date_change', `${actorName} changed due date`);
     }
-    // Persist to PostgreSQL. On failure, restore the snapshot (full project
-    // task list at the moment before the optimistic update) so the UI doesn't
-    // show a change the server rejected.
-    //
-    // The patch goes through `taskToApiPayload` so the frontend-only field
-    // names (`assignee`, `start`) are translated to the API's
-    // (`assigneeId`, `startDate`) and unsupported fields (`tags`,
-    // `followers`, `customFields`, `storyPoints`) are dropped before they
-    // reach the wire — those have dedicated endpoints.
-    const apiPatch = taskToApiPayload(patch);
-    if (Object.keys(apiPatch).length > 0) {
-      apiUpdateTask(id, apiPatch).then((res) => {
-        if (res.ok) return;
-        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
-        toast.error('Failed to save task change', { description: res.error });
-      });
-    }
-
-    // Persist custom-field value changes via the dedicated value-set
-    // endpoint. `taskToApiPayload` strips `customFields`, so without this
-    // branch the UI would appear to save a custom-field value but refresh
-    // would lose it (item 4). We diff the new record against the task's
-    // pre-update record so we only hit the network for keys that actually
-    // changed; each key is upserted independently so a single failure rolls
-    // back only that key.
-    if (patch.customFields !== undefined) {
-      const before = customFieldsBefore || {};
-      const after = patch.customFields || {};
-      const changedKeys = Object.keys(after).filter(k => after[k] !== before[k]);
-      if (changedKeys.length > 0) {
-        void Promise.allSettled(
-          changedKeys.map((key) =>
-            apiSetTaskCustomField(id, { key, value: after[key] ?? null }).then((res) => {
-              if (res.ok) return;
-              // Roll back just this key in the task's customFields record.
-              setTasksByProject(prev => {
-                const list = prev[projectId] || [];
-                return {
-                  ...prev,
-                  [projectId]: list.map(t => {
-                    if (t.id !== id) return t;
-                    const restored = { ...(t.customFields || {}) };
-                    if (before[key] === undefined) delete restored[key];
-                    else restored[key] = before[key];
-                    return { ...t, customFields: restored };
-                  }),
-                };
-              });
-              toast.error('Failed to save custom field', { description: `${key} — ${res.error}` });
-            }),
-          ),
-        );
-      }
-    }
-  }, [tasksByProject, commit, logActivity, resolveMemberName]);
+    // Persist to PostgreSQL via the debounced queue. Scalars and custom
+    // fields share the queue; flushTaskUpdate diffs against the baseline,
+    // coalesces the burst into one request, and rolls back per field on
+    // failure. `task` is the pre-edit record — the rollback baseline.
+    queueTaskUpdate(projectId, id, patch, task);
+  }, [tasksByProject, commit, logActivity, resolveMemberName, queueTaskUpdate]);
 
   const toggleComplete = useCallback((projectId: string, id: string) => {
     const projectTasks = tasksByProject[projectId] || [];
