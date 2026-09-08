@@ -388,6 +388,11 @@ export function apiRemoveProjectMember(projectId: string, userId: string) {
   return apiCall(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' });
 }
 
+/** PATCH /api/projects/:projectId/members/:userId — update a member's role. */
+export function apiUpdateProjectMember(projectId: string, userId: string, role: string) {
+  return apiCall(`/api/projects/${projectId}/members/${userId}`, json('PATCH', { role }));
+}
+
 /* ----------------- Project status update mutations ------------------- */
 
 /** POST /api/projects/:projectId/status-updates — post a status update. */

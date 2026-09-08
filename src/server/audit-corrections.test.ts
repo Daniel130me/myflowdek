@@ -237,3 +237,28 @@ describe('Audit Remediation: Custom-field rename preserves values (C-02)', () =>
     assert.ok(source.includes('renameColumn'), 'store must expose renameColumn');
   });
 });
+
+describe('Audit Remediation: Share modal is genuine member management (C-03)', () => {
+  test('no fabricated share link remains', () => {
+    const modalPath = path.join(process.cwd(), 'src/features/flowdeck/components/modals/ShareModal.tsx');
+    const source = fs.readFileSync(modalPath, 'utf-8');
+    assert.ok(!source.includes('flowdeck.app'), 'share modal must not fabricate links to a domain that is not this product');
+    assert.ok(!source.includes('Math.random'), 'share link must not be generated client-side with Math.random');
+    assert.ok(!source.includes('slice(0, 4)'), 'people list must show all members, not an arbitrary slice');
+  });
+
+  test('modal wires real member APIs', () => {
+    const modalPath = path.join(process.cwd(), 'src/features/flowdeck/components/modals/ShareModal.tsx');
+    const source = fs.readFileSync(modalPath, 'utf-8');
+    assert.ok(source.includes('/api/projects/${project.id}/members'), 'modal must fetch the real member list');
+    assert.ok(source.includes('apiUpdateProjectMember'), 'access dropdown must persist via PATCH');
+    assert.ok(source.includes('apiRemoveProjectMember'), 'remove action must persist via DELETE');
+    assert.ok(source.includes('apiAddProjectMember'), 'add people must persist via POST');
+  });
+
+  test('role update client exists for the PATCH members route', () => {
+    const clientPath = path.join(process.cwd(), 'src/lib/api-client.ts');
+    const source = fs.readFileSync(clientPath, 'utf-8');
+    assert.ok(source.includes("members/${userId}`, json('PATCH', { role })"), 'apiUpdateProjectMember must PATCH the role');
+  });
+});
