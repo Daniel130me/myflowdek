@@ -51,8 +51,10 @@ export function CalendarView({ tasks, onOpenTask, onQuickAdd, onUpdateTaskDueDat
     }
   }, [addingOnDate]);
 
-  // Global mousemove and mouseup for drag
-  const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
+  // Global pointermove/pointerup for drag (audit H-25: Pointer Events work
+  // for mouse, touch and pen alike — the old mouse-event API made calendar
+  // reschedule impossible on phones).
+  const handlePointerMove = useCallback((e: React.PointerEvent | PointerEvent) => {
     if (!dragStartRef.current) return;
     const dx = e.clientX - dragStartRef.current.mouseX;
     const dy = e.clientY - dragStartRef.current.mouseY;
@@ -69,7 +71,7 @@ export function CalendarView({ tasks, onOpenTask, onQuickAdd, onUpdateTaskDueDat
     }
   }, [dragTask, tasks]);
 
-  const handleMouseUp = useCallback((e: React.MouseEvent | MouseEvent) => {
+  const handlePointerUp = useCallback((e: React.PointerEvent | PointerEvent) => {
     if (!dragStartRef.current) {
       setDragTask(null);
       setDragPos(null);
@@ -112,18 +114,32 @@ export function CalendarView({ tasks, onOpenTask, onQuickAdd, onUpdateTaskDueDat
 
   useEffect(() => {
     if (!isDragging) return;
-    const onMove = (e: MouseEvent) => handleMouseMove(e);
-    const onUp = (e: MouseEvent) => handleMouseUp(e);
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+    const onMove = (e: PointerEvent) => handlePointerMove(e);
+    const onUp = (e: PointerEvent) => handlePointerUp(e);
+    // A touch gesture claimed by the OS scroll cancels the pointer — abort
+    // the drag cleanly instead of leaving a stuck overlay.
+    const onCancel = () => {
+      setDragTask(null);
+      setDragPos(null);
+      dragStartRef.current = null;
+      setIsDragging(false);
     };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+    };
+  }, [isDragging, handlePointerMove, handlePointerUp]);
 
-  function handlePillMouseDown(e: React.MouseEvent, task: Task) {
+  function handlePillPointerDown(e: React.PointerEvent, task: Task) {
     e.stopPropagation();
+    // Mouse-only drags become pointer drags (audit H-25). preventDefault
+    // stops text selection; touch-action: none on the pill keeps the browser
+    // from hijacking the gesture for scrolling.
+    e.preventDefault();
     dragStartRef.current = { taskId: task.id, mouseX: e.clientX, mouseY: e.clientY };
     setIsDragging(true);
   }
@@ -274,12 +290,17 @@ export function CalendarView({ tasks, onOpenTask, onQuickAdd, onUpdateTaskDueDat
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
                     <span style={{ fontSize: isMobile ? 11 : 11.5, fontWeight: isToday(day) ? 700 : 500, color: isToday(day) ? '#FFFFFF' : COLORS.gray, width: isMobile ? 20 : 20, height: isMobile ? 20 : 20, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: isToday(day) ? COLORS.accent : 'transparent' }}>{day.getDate()}</span>
                     {dayTasks.length === 0 && onQuickAdd && (
-                      <span
+                      // Audit H-25: was a 16px hover-only span (opacity 0) —
+                      // invisible and unreachable on touch. Now an always-
+                      // visible button with a 44px target on phones.
+                      <button
+                        type="button"
+                        aria-label={`Add task on ${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
                         onClick={() => setAddingOnDate(dateStr)}
-                        style={{ width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: COLORS.grayLight, opacity: 0, transition: 'opacity 0.15s' }}
-                        onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = COLORS.accent; }}
-                        onMouseLeave={e => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.color = COLORS.grayLight; }}
-                      ><Plus size={12} /></span>
+                        style={{ width: isMobile ? 44 : 24, height: isMobile ? 44 : 24, marginLeft: isMobile ? -10 : -4, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: COLORS.grayLight, background: 'transparent', border: 'none', touchAction: 'manipulation' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = COLORS.accent; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = COLORS.grayLight; }}
+                      ><Plus size={isMobile ? 20 : 14} /></button>
                     )}
                   </div>
                   {addingOnDate === dateStr ? (
@@ -292,7 +313,7 @@ export function CalendarView({ tasks, onOpenTask, onQuickAdd, onUpdateTaskDueDat
                         if (e.key === 'Escape') setAddingOnDate(null);
                       }}
                       onBlur={() => setAddingOnDate(null)}
-                      style={{ width: '100%', fontSize: isMobile ? 9 : 10.5, padding: '1px 4px', border: `1px solid ${COLORS.accent}`, borderRadius: 4, outline: 'none', fontFamily: FF, color: COLORS.ink, boxSizing: 'border-box' as const }}
+                      style={{ width: '100%', fontSize: isMobile ? 16 : 10.5, padding: isMobile ? '6px 8px' : '1px 4px', border: `1px solid ${COLORS.accent}`, borderRadius: 4, outline: 'none', fontFamily: FF, color: COLORS.ink, boxSizing: 'border-box' as const }}
                     />
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -372,8 +393,8 @@ export function CalendarView({ tasks, onOpenTask, onQuickAdd, onUpdateTaskDueDat
                         key={t.id}
                         title={t.name}
                         onClick={() => onOpenTask(t.id)}
-                        onMouseDown={(e) => handlePillMouseDown(e, t)}
-                        style={{ ...taskPillStyle(t.status), top: 2 + ti * 16 }}
+                        onPointerDown={(e) => handlePillPointerDown(e, t)}
+                        style={{ ...taskPillStyle(t.status), top: 2 + ti * 16, touchAction: 'none' }}
                       >{t.name}</div>
                     ))}
                   </div>
@@ -436,8 +457,8 @@ export function CalendarView({ tasks, onOpenTask, onQuickAdd, onUpdateTaskDueDat
                       key={t.id}
                       title={t.name}
                       onClick={() => onOpenTask(t.id)}
-                      onMouseDown={(e) => handlePillMouseDown(e, t)}
-                      style={{ ...taskPillStyle(t.status), top: 2 + ti * 16 }}
+                      onPointerDown={(e) => handlePillPointerDown(e, t)}
+                      style={{ ...taskPillStyle(t.status), top: 2 + ti * 16, touchAction: 'none' }}
                     >{t.name}</div>
                   ))}
                 </div>

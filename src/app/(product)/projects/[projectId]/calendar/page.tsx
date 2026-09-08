@@ -4,6 +4,7 @@ import React from 'react';
 import { useRouter, useParams, notFound } from 'next/navigation';
 import { CalendarView } from '@/features/flowdeck/components/views';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { useProjectTasks } from '@/features/flowdeck/hooks/useProjectTasks';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
 
@@ -12,6 +13,9 @@ export default function ProjectCalendarPage() {
   const params = useParams();
   const projectId = getSingleParam(params.projectId);
   const state = useFlowDeck();
+  // Hydrate the store on a cold visit (direct URL / cleared storage) —
+  // without this the calendar rendered an empty grid on first load.
+  useProjectTasks(projectId);
 
   if (!projectId) {
     notFound();
@@ -32,7 +36,12 @@ export default function ProjectCalendarPage() {
       onQuickAdd={(name, start) => {
         state.quickAddTask(projectId, name, { startOverride: start });
       }}
-      onUpdateTaskDueDate={(taskId, newDate) => state.updateTask(projectId, taskId, { start: newDate })}
+      onUpdateTaskDueDate={(taskId, newDate) =>
+        // Reschedule writes the field the calendar plots — pills are placed
+        // by `dueDate`, so updating `start` here made a dragged pill vanish
+        // while silently editing an invisible field.
+        state.updateTask(projectId, taskId, { dueDate: newDate })
+      }
     />
   );
 }
