@@ -11,6 +11,9 @@ interface CustomFieldsModalProps {
   columns: CustomColumn[];
   onAdd: (col: CustomColumn) => void;
   onRemove: (key: string) => void;
+  /** Label-only rename. Must never delete-then-recreate: that cascade wiped
+   *  every stored value for the field (audit C-02). */
+  onRename: (key: string, label: string) => void;
   onClose: () => void;
 }
 
@@ -21,7 +24,7 @@ const TYPE_OPTIONS = [
   { value: 'select' as const, label: 'Dropdown', icon: List, desc: 'Pick from options' },
 ];
 
-export function CustomFieldsModal({ columns, onAdd, onRemove, onClose }: CustomFieldsModalProps) {
+export function CustomFieldsModal({ columns, onAdd, onRemove, onRename, onClose }: CustomFieldsModalProps) {
   const { isMobile } = useViewport();
   const [label, setLabel] = useState('');
   const [type, setType] = useState<CustomColumn['type']>('text');
@@ -45,8 +48,9 @@ export function CustomFieldsModal({ columns, onAdd, onRemove, onClose }: CustomF
 
   function saveEdit(key: string) {
     if (!editLabel.trim()) return;
-    onRemove(key);
-    onAdd({ ...columns.find(c => c.key === key)!, label: editLabel.trim() });
+    // Label-only rename (PATCH). The previous delete-then-create approach
+    // cascaded away every TaskCustomFieldValue ever stored for this field.
+    onRename(key, editLabel.trim());
     setEditingKey(null);
     setEditLabel('');
   }

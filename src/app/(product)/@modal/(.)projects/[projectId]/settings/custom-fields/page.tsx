@@ -21,6 +21,7 @@ export default function InterceptedCustomFieldsPage() {
       columns={columns}
       onAdd={col => state.addColumn(projectId, col)}
       onRemove={id => state.removeColumn(projectId, id)}
+        onRename={(key, label) => state.renameColumn(projectId, key, label)}
       onClose={close}
     />
   );

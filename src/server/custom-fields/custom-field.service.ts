@@ -11,6 +11,14 @@ export const createCustomFieldSchema = z.object({
 
 export type CreateCustomFieldInput = z.infer<typeof createCustomFieldSchema>;
 
+/** Rename is label-only by design: key and type stay untouched so every
+ *  TaskCustomFieldValue row (keyed by taskId+fieldId) keeps its meaning. */
+export const renameCustomFieldSchema = z.object({
+  label: z.string().trim().min(1).max(100),
+});
+
+export type RenameCustomFieldInput = z.infer<typeof renameCustomFieldSchema>;
+
 export function listCustomFields(projectId: string) {
   return db.customField.findMany({ where: { projectId }, orderBy: { key: 'asc' } });
 }
@@ -24,6 +32,28 @@ export async function createCustomField(projectId: string, input: CreateCustomFi
 export async function deleteCustomField(fieldId: string) {
   await db.customField.delete({ where: { id: fieldId } })
     .catch(() => { throw new AuthError('Custom field not found', 404); });
+}
+
+/**
+ * Rename a custom-field definition (label-only update).
+ *
+ * A rename must never delete-then-recreate: the old path cascaded away every
+ * TaskCustomFieldValue ever set on the field. Updating the label in place
+ * preserves all values across all tasks in the project.
+ */
+export async function renameCustomField(projectId: string, fieldId: string, input: RenameCustomFieldInput) {
+  const existing = await db.customField.findUnique({
+    where: { id: fieldId },
+    select: { projectId: true },
+  });
+  if (!existing || existing.projectId !== projectId) {
+    throw new AuthError('Custom field not found in this project', 404);
+  }
+  return db.customField.update({
+    where: { id: fieldId },
+    data: { label: input.label },
+    select: { id: true, projectId: true, key: true, label: true, type: true, options: true },
+  });
 }
 
 /** Set a custom field value on a task. */

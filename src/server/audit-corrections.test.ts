@@ -212,3 +212,28 @@ describe('Audit Remediation: WCAG AA brand accent contrast (design-token gate)',
     assert.notStrictEqual(COLORS.accent, COLORS.accentBright, 'accent must not be the AA-failing vivid orange');
   });
 });
+
+describe('Audit Remediation: Custom-field rename preserves values (C-02)', () => {
+  test('PATCH rename endpoint exists on the field route', () => {
+    const routePath = path.join(process.cwd(), 'src/app/api/projects/[projectId]/custom-fields/[fieldId]/route.ts');
+    const source = fs.readFileSync(routePath, 'utf-8');
+    assert.ok(source.includes('export async function PATCH'), 'field route must expose PATCH for label-only rename');
+    assert.ok(source.includes('renameCustomField'), 'PATCH must dispatch to the rename service');
+  });
+
+  test('modal saveEdit renames in place instead of delete-then-create', () => {
+    const modalPath = path.join(process.cwd(), 'src/features/flowdeck/components/modals/CustomFieldsModal.tsx');
+    const source = fs.readFileSync(modalPath, 'utf-8');
+    assert.ok(source.includes('onRename(key, editLabel.trim())'), 'saveEdit must delegate to the label-only rename');
+    const saveEditBody = source.slice(source.indexOf('function saveEdit'), source.indexOf('const modalContent'));
+    assert.ok(!saveEditBody.includes('onRemove('), 'saveEdit must not delete the field (cascade wipes task values)');
+    assert.ok(!saveEditBody.includes('onAdd('), 'saveEdit must not recreate the field');
+  });
+
+  test('store exposes a renameColumn action wired to the PATCH client', () => {
+    const storePath = path.join(process.cwd(), 'src/features/flowdeck/store/useFlowDeck.ts');
+    const source = fs.readFileSync(storePath, 'utf-8');
+    assert.ok(source.includes('apiRenameCustomField'), 'store must call the PATCH client');
+    assert.ok(source.includes('renameColumn'), 'store must expose renameColumn');
+  });
+});

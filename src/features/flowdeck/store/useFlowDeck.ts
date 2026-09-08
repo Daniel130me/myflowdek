@@ -34,7 +34,7 @@ import {
   apiCreateProjectStatusUpdate, apiDeleteProjectStatusUpdate,
   apiReorderTasks,
   apiSetTaskCustomField,
-  apiCreateCustomField, apiDeleteCustomField,
+  apiCreateCustomField, apiDeleteCustomField, apiRenameCustomField,
   taskToApiPayload,
 } from '@/lib/api-client';
 
@@ -191,6 +191,7 @@ export interface FlowDeckState {
   removeRaidItem: (projectId: string, id: string) => void;
   addColumn: (projectId: string, def: CustomColumn) => void;
   removeColumn: (projectId: string, key: string) => void;
+  renameColumn: (projectId: string, key: string, label: string) => void;
   openFileViewer: (fileId: string) => void;
   /* Tags */
   addTag: (projectId: string, tag: Tag) => void;
@@ -1522,6 +1523,26 @@ export function useFlowDeckStore(): FlowDeckState {
     });
   }, [customColsByProject]);
 
+  const renameColumn = useCallback((projectId: string, key: string, label: string) => {
+    if (!projectId || !label.trim()) return;
+    const snapshot = customColsByProject[projectId] || [];
+    const col = snapshot.find(c => c.key === key);
+    if (!col) return;
+    // Optimistic label update. The rename is label-only on the server
+    // (PATCH), so task values stay intact — key and type never change.
+    setCustomColsByProject(prev => ({
+      ...prev,
+      [projectId]: (prev[projectId] || []).map(c => c.key === key ? { ...c, label: label.trim() } : c),
+    }));
+    // Local-only column (never synced): the optimistic update is the whole story.
+    if (!col.id) return;
+    apiRenameCustomField(projectId, col.id, label.trim()).then((res) => {
+      if (res.ok) return;
+      setCustomColsByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      toast.error('Failed to rename custom field on server', { description: res.error });
+    });
+  }, [customColsByProject]);
+
   const addFiles = useCallback((projectId: string, newFiles: FileItem[]) => {
     if (!projectId) return;
     setFilesByProject(prev => ({ ...prev, [projectId]: [...newFiles, ...(prev[projectId] || [])] }));
@@ -2051,13 +2072,13 @@ export function useFlowDeckStore(): FlowDeckState {
     onImportCSV: importCSV, onExportCSV: exportCSV, onPrint: () => window.print(),
     onCut: cutSelected, onCopy: copySelected, onPaste: paste, canPaste: clipboard.items.length > 0,
     onAttachFiles: attachFilesToSelected,
-    customCols, onAddColumn: addColumn, onRemoveColumn: removeColumn,
+    customCols, onAddColumn: addColumn, onRemoveColumn: removeColumn, onRenameColumn: renameColumn,
     onOpenShare: (pid) => { if (pid) setShareOpen(true); },
   }), [selectedIds, bulkAssign, setRecurrenceSelected, undo, redo, past.length, future.length,
     indentSelected, outdentSelected, linkSelected, unlinkSelected, removeTasksBulk,
     toggleBoldSelected, setColorSelected, durationUnit, toggleMilestoneSelected,
     importCSV, exportCSV, cutSelected, copySelected, paste, clipboard.items,
-    attachFilesToSelected, customCols, addColumn, removeColumn]);
+    attachFilesToSelected, customCols, addColumn, removeColumn, renameColumn]);
 
   /* ---- #30: Duplicate task with options ---- */
   const duplicateTaskWithOptions = useCallback((projectId: string, id: string, opts?: { includeSubtasks?: boolean; includeComments?: boolean; includeAttachments?: boolean }) => {
@@ -3023,7 +3044,7 @@ export function useFlowDeckStore(): FlowDeckState {
     timesheets, addTimesheetEntry, updateTimesheetEntry, deleteTimesheetEntry,
     addFiles, removeFile, linkFile,
     addRaidItem, updateRaidItem, removeRaidItem,
-    addColumn, removeColumn, openFileViewer,
+    addColumn, removeColumn, renameColumn, openFileViewer,
     addTag, removeTag, toggleTaskTag,
     addComment, deleteComment, editComment, toggleReaction,
     toggleFollower,

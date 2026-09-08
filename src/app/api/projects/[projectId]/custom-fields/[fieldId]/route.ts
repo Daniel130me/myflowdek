@@ -4,7 +4,11 @@ import {
   requireProjectCapability,
   authErrorResponse,
 } from '@/server/auth/authorization';
-import { deleteCustomField } from '@/server/custom-fields/custom-field.service';
+import {
+  deleteCustomField,
+  renameCustomField,
+  renameCustomFieldSchema,
+} from '@/server/custom-fields/custom-field.service';
 import { db } from '@/server/db/client';
 
 /**
@@ -42,6 +46,35 @@ export async function DELETE(
 
     await deleteCustomField(fieldId);
     return NextResponse.json({ ok: true });
+  } catch (error) {
+    return authErrorResponse(error);
+  }
+}
+
+/**
+ * PATCH /api/projects/:projectId/custom-fields/:fieldId — rename a custom-
+ * field definition (label-only update).
+ *
+ * Key and type are intentionally immutable here: task values reference the
+ * field by id/key, so a rename must never cascade. Requires
+ * MANAGE_CUSTOM_FIELDS and the same project-ownership check as DELETE.
+ */
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ projectId: string; fieldId: string }> },
+) {
+  try {
+    const user = await requireAuthenticatedUser();
+    const { projectId, fieldId } = await params;
+    await requireProjectCapability(user.id, projectId, 'MANAGE_CUSTOM_FIELDS');
+
+    const parsed = renameCustomFieldSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid label' }, { status: 400 });
+    }
+
+    const field = await renameCustomField(projectId, fieldId, parsed.data);
+    return NextResponse.json({ field });
   } catch (error) {
     return authErrorResponse(error);
   }
