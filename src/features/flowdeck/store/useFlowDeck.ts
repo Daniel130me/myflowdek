@@ -210,6 +210,8 @@ export interface FlowDeckState {
   taskTimeLogs: TimeLog[];
   addTimeLog: (projectId: string, taskId: string, minutes: number, note: string) => void;
   deleteTimeLog: (projectId: string, timeLogId: string) => void;
+  /** Merge server-fetched time logs into the store (audit H-09 hydration). */
+  syncTimeLogs: (projectId: string, logs: TimeLog[]) => void;
   /* Reorder & Quick Add */
   reorderTask: (projectId: string, taskId: string, toIndex: number) => void;
   quickAddTask: (projectId: string, name: string, opts?: { status?: string; parentId?: string | null; startOverride?: string }) => string | undefined;
@@ -909,6 +911,20 @@ export function useFlowDeckStore(): FlowDeckState {
       }
       const serverId = res.data?.task?.id;
       if (!serverId || serverId === tempId) return;
+      // Fan out tags picked at creation (audit H-05): the create payload
+      // cannot carry them, so attach each against the server id now, with
+      // per-tag rollback that drops only the failed tag locally.
+      for (const tagId of input.tags ?? []) {
+        apiAddTaskTag(serverId, tagId).then((tagRes) => {
+          if (tagRes.ok) return;
+          setTasksByProject(prev => ({
+            ...prev,
+            [projectId]: (prev[projectId] || []).map(t =>
+              t.id === serverId ? { ...t, tags: (t.tags || []).filter(id => id !== tagId) } : t),
+          }));
+          toast.error('Failed to save a task tag on server', { description: tagRes.error });
+        });
+      }
       // Replace the temp id with the canonical server id everywhere it
       // appears in this project's task list (the task itself, plus any
       // sibling deps/parentId references that pointed at the temp id).
@@ -2059,6 +2075,18 @@ export function useFlowDeckStore(): FlowDeckState {
     });
   }, [timeLogsByProject]);
 
+  // Hydration (audit H-09): time logs live in Postgres but nothing ever
+  // fetched them, so every reload showed 0h logged. Union by id — server
+  // rows win, in-flight optimistic temp entries survive until reconciled.
+  const syncTimeLogs = useCallback((projectId: string, logs: TimeLog[]) => {
+    if (!projectId) return;
+    setTimeLogsByProject(prev => {
+      const byId = new Map((prev[projectId] || []).map(l => [l.id, l]));
+      for (const log of logs) byId.set(log.id, log);
+      return { ...prev, [projectId]: [...byId.values()].sort((a, b) => a.loggedAt.localeCompare(b.loggedAt)) };
+    });
+  }, []);
+
   const selectedTask = tasks.find(t => t.id === selectedTaskId) || null;
   const viewingFile = files.find(f => f.id === viewingFileId) || null;
 
@@ -2946,9 +2974,11 @@ export function useFlowDeckStore(): FlowDeckState {
       const desc = Object.entries(submission.data).filter(([k]) => !['name', 'title', 'email'].includes(k)).map(([k, v]) => `**${k}:** ${v}`).join('\n');
       const pid = form.projectId;
       if (pid && tasksByProject[pid]) {
-        const newTask: Task = {
-          id: defaultIdGenerator.generate('t'),
-          projectId: pid,
+        // Persist through addTask (API + id reconciliation + rollback) — the
+        // auto-created task used to be a local-only insert that vanished on
+        // refresh, ghost behaviour that eroded trust in forms and tasks
+        // (audit H-21).
+        addTask(pid, {
           name: taskName,
           status: 'backlog',
           assignee: userIdRef.current,
@@ -2958,13 +2988,11 @@ export function useFlowDeckStore(): FlowDeckState {
           priority: 'medium',
           deps: [],
           description: desc,
-          createdAt: new Date().toISOString(),
-        };
-        setTasksByProject(prev => ({ ...prev, [pid]: [...(prev[pid] || []), newTask] }));
+        } as CreateTaskInput);
       }
     }
     toast.success('Submission received');
-  }, [forms, tasksByProject]);
+  }, [forms, tasksByProject, addTask]);
 
   /* ---- Approvals ---- */
   const addApproval = useCallback((approval: ApprovalRequest) => { setApprovals(prev => [...prev, approval]); toast.success('Approval requested'); }, []);
@@ -3081,7 +3109,7 @@ export function useFlowDeckStore(): FlowDeckState {
     addTag, removeTag, toggleTaskTag,
     addComment, deleteComment, editComment, toggleReaction,
     toggleFollower,
-    addTimeLog, deleteTimeLog,
+    addTimeLog, deleteTimeLog, syncTimeLogs,
     reorderTask, quickAddTask,
     /* Reset persisted state */
     resetToDefaults: () => {

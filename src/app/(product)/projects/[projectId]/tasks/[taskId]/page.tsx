@@ -15,6 +15,7 @@ import { routes } from '@/shared/navigation/routes';
 import { TaskDetailSkeleton } from '@/components/ui/skeleton';
 import { TaskLoadError } from '@/components/ui/task-load-error';
 import { useTaskActivity } from '@/features/flowdeck/hooks/useAdvancedFeatures';
+import { useTaskTimeLogs } from '@/features/flowdeck/hooks/useTaskTimeLogs';
 
 export default function TaskDetailRoutePage() {
   const params = useParams();
@@ -53,6 +54,10 @@ export default function TaskDetailRoutePage() {
   const projectComments = state.commentsByProject[projectId] ?? [];
   const projectTimeLogs = state.timeLogsByProject[projectId] ?? [];
   const projectCustomFields = state.customColsByProject[projectId] ?? [];
+
+  // Hydrate this task's time logs from the server on mount (audit H-09) —
+  // previously nothing ever fetched them, so logged work vanished on reload.
+  useTaskTimeLogs(projectId ?? null, taskId ?? null);
 
   const taskComments = projectComments.filter(comment => comment.taskId === taskId);
 

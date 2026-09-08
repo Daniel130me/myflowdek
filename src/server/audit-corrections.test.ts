@@ -480,3 +480,27 @@ describe('Audit Remediation: A11y quick wins (H-26/H-27/H-28/H-29)', () => {
     assert.ok(/<a[^>]*href="#main-content"/.test(source), 'skip link must target the main landmark');
   });
 });
+
+describe('Audit Remediation: Data-integrity trio (H-05 tags, H-09 time logs, H-21 ghost tasks)', () => {
+  test('tags chosen at task creation fan out to the server after create', () => {
+    const store = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/store/useFlowDeck.ts'), 'utf-8');
+    assert.ok(store.includes('audit H-05'), 'tag fan-out must exist in addTask');
+    assert.ok(/for \(const tagId of input\.tags \?\? \[\]\) \{\s*\n\s*apiAddTaskTag\(serverId, tagId\)/.test(store), 'each tag must be attached against the reconciled server id');
+  });
+
+  test('time logs hydrate from the server (sync action + hook + task detail wiring)', () => {
+    const store = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/store/useFlowDeck.ts'), 'utf-8');
+    assert.ok(store.includes('syncTimeLogs'), 'store must expose the sync action');
+    assert.ok(fs.existsSync(path.join(process.cwd(), 'src/features/flowdeck/hooks/useTaskTimeLogs.ts')), 'hydration hook must exist');
+    const page = fs.readFileSync(path.join(process.cwd(), 'src/app/(product)/projects/[projectId]/tasks/[taskId]/page.tsx'), 'utf-8');
+    assert.ok(page.includes('useTaskTimeLogs('), 'task detail must hydrate logs on mount');
+  });
+
+  test('form submissions persist their auto-created task via addTask', () => {
+    const store = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/store/useFlowDeck.ts'), 'utf-8');
+    const idx = store.indexOf('const addSubmission');
+    const body = store.slice(idx, store.indexOf('/* ---- Approvals ----'));
+    assert.ok(body.includes('addTask(pid,'), 'submission auto-task must persist through addTask');
+    assert.ok(!body.includes('setTasksByProject(prev => ({ ...prev, [pid]:'), 'local-only task insert must be gone');
+  });
+});
