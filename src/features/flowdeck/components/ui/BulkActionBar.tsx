@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { COLORS, PRIORITY_META, TAG_COLORS, STATUS_META, STATUS_ORDER, type Tag, type Project, type MemberInfo } from '@/features/flowdeck/model';
 import { FF } from './styles';
+import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import { useViewport } from '../../hooks/useViewport';
 
 interface BulkActionBarProps {
@@ -49,6 +50,8 @@ export function BulkActionBar({
   const [showPriority, setShowPriority] = React.useState(false);
   const [showStatus, setShowStatus] = React.useState(false);
   const [showTag, setShowTag] = React.useState(false);
+  // Bulk delete is confirmed (and typed) — never instant (audit H-03).
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [showDueDate, setShowDueDate] = React.useState(false);
   const [showProject, setShowProject] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
@@ -300,9 +303,16 @@ export function BulkActionBar({
       <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.12)', margin: '0 3px', flexShrink: 0 }} />
 
       {/* Delete */}
-      <button onClick={() => onDelete(currentProjectId)} title="Delete" style={dangerBtn}>
+      <button onClick={() => setDeleteOpen(true)} title="Delete" aria-label={`Delete ${count} selected tasks`} style={dangerBtn}>
         <Trash2 size={isMobile ? 17 : 15} />
       </button>
+
+      <ConfirmDeleteDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        count={count}
+        onConfirm={() => onDelete(currentProjectId)}
+      />
 
       {/* Dismiss */}
       <button onClick={onClearSelection} title="Clear selection" style={dismissBtn}>

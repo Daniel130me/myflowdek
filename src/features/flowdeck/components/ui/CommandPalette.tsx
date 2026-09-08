@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/command';
 import {
   Search, LayoutDashboard, GanttChart, Kanban, Table2, List, Calendar,
-  Shield, FolderOpen, Users, BarChart3, Link2, Inbox, Plus, Undo2, Redo2,
+  Shield, FolderOpen, Users, BarChart3, Link2, Inbox, Plus,
   Sun, Moon, SunMoon, Briefcase, ClipboardList,
 } from 'lucide-react';
 import { NAV_ITEMS, FF, STATUS_META, PRIORITY_META, type Task, type Project } from '@/features/flowdeck/model';
@@ -36,18 +36,12 @@ interface CommandPaletteProps {
   tasksByProject: Record<string, Task[]>;
   onOpenTask: (projectId: string, taskId: string) => void;
   onNewTask: (projectId?: string) => void;
-  /* actions */
-  onUndo: () => void;
-  onRedo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
 }
 
 export function CommandPalette({
   open, onOpenChange, activeView, onNavigate,
   projects, onOpenProject, onNewProject,
   tasksByProject, onOpenTask, onNewTask,
-  onUndo, onRedo, canUndo, canRedo,
 }: CommandPaletteProps) {
   /* Flatten all tasks across projects for search */
   const allTasks = useMemo(() => {
@@ -78,16 +72,6 @@ export function CommandPalette({
           <CommandItem onSelect={() => handleSelect(onNewProject)}>
             <Briefcase style={{ width: 16, height: 16 }} />
             <span style={{ fontFamily: FF }}>New Project</span>
-          </CommandItem>
-          <CommandItem onSelect={() => handleSelect(onUndo)} disabled={!canUndo}>
-            <Undo2 style={{ width: 16, height: 16 }} />
-            <span style={{ fontFamily: FF }}>Undo</span>
-            <CommandShortcut>⌘Z</CommandShortcut>
-          </CommandItem>
-          <CommandItem onSelect={() => handleSelect(onRedo)} disabled={!canRedo}>
-            <Redo2 style={{ width: 16, height: 16 }} />
-            <span style={{ fontFamily: FF }}>Redo</span>
-            <CommandShortcut>⌘⇧Z</CommandShortcut>
           </CommandItem>
         </CommandGroup>
 

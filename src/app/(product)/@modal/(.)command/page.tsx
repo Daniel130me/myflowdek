@@ -48,10 +48,6 @@ export default function InterceptedCommandPalettePage() {
           router.replace(routes.projects());
         }
       }}
-      onUndo={state.gridActions.onUndo}
-      onRedo={state.gridActions.onRedo}
-      canUndo={state.gridActions.canUndo}
-      canRedo={state.gridActions.canRedo}
     />
   );
 }

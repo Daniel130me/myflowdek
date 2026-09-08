@@ -9,10 +9,6 @@ export interface GridActions {
   onAddTask: (projectId: string) => void;
   onBulkAssign: (projectId: string, memberId: string) => void;
   onSetRecurrence: (projectId: string, freq: string | null) => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
   onIndent: (projectId: string) => void;
   onOutdent: (projectId: string) => void;
   onLink: (projectId: string) => void;

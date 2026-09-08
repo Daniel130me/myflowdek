@@ -114,8 +114,6 @@ export interface FlowDeckState {
 
   /* History */
   clipboard: { items: Task[]; mode: string | null };
-  past: Record<string, Task[]>[];
-  future: Record<string, Task[]>[];
 
   /* Derived */
   project: Project | null;
@@ -444,8 +442,6 @@ export function useFlowDeckStore(): FlowDeckState {
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [durationUnit, setDurationUnit] = useState('days');
   const [clipboard, setClipboard] = useState<{ items: Task[]; mode: string | null }>({ items: [], mode: null });
-  const [past, setPast] = useState<Record<string, Task[]>[]>([]);
-  const [future, setFuture] = useState<Record<string, Task[]>[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -731,27 +727,10 @@ export function useFlowDeckStore(): FlowDeckState {
   }, []);
 
   /* ---- history-tracked task mutation ---- */
+  // Task mutations write straight through to PostgreSQL, so there is no
+  // local history to maintain: undo/redo was removed as dishonest (audit H-01).
   const commit = useCallback((projectId: string, nextTasksForProject: Task[]) => {
-    setPast(p => [...p.slice(-49), tasksByProject]);
-    setFuture([]);
     if (projectId) setTasksByProject(prev => ({ ...prev, [projectId]: nextTasksForProject }));
-  }, [tasksByProject]);
-
-  /**
-   * Undo/redo is disabled for persisted task mutations. The store now writes
-   * every change through to PostgreSQL, so reverting locally would silently
-   * diverge from the server. Surface a toast so the user knows the shortcut
-   * is intentional (item: undo/redo → toast.info).
-   *
-   * The history stacks (`past`/`future`) are still maintained by `commit()`
-   * for legacy call sites that inspect `canUndo`/`canRedo`, but pressing
-   * the shortcut is a no-op.
-   */
-  const undo = useCallback(() => {
-    toast.info('Undo/Redo is not available for persisted task changes');
-  }, []);
-  const redo = useCallback(() => {
-    toast.info('Undo/Redo is not available for persisted task changes');
   }, []);
 
   const updateTask = useCallback((projectId: string, id: string, patch: Partial<Task>) => {
@@ -2116,7 +2095,6 @@ export function useFlowDeckStore(): FlowDeckState {
     onAddTask: (pid) => { if (pid) setShowNewTask(true); },
     onBulkAssign: (pid, memberId) => bulkAssign(pid, selectedIds, memberId),
     onSetRecurrence: setRecurrenceSelected,
-    onUndo: undo, onRedo: redo, canUndo: past.length > 0, canRedo: future.length > 0,
     onIndent: indentSelected, onOutdent: outdentSelected,
     onLink: linkSelected, onUnlink: unlinkSelected,
     onDeleteSelected: (pid) => removeTasksBulk(pid, selectedIds),
@@ -2129,7 +2107,7 @@ export function useFlowDeckStore(): FlowDeckState {
     onAttachFiles: attachFilesToSelected,
     customCols, onAddColumn: addColumn, onRemoveColumn: removeColumn, onRenameColumn: renameColumn,
     onOpenShare: (pid) => { if (pid) setShareOpen(true); },
-  }), [selectedIds, bulkAssign, setRecurrenceSelected, undo, redo, past.length, future.length,
+  }), [selectedIds, bulkAssign, setRecurrenceSelected,
     indentSelected, outdentSelected, linkSelected, unlinkSelected, removeTasksBulk,
     toggleBoldSelected, setColorSelected, durationUnit, toggleMilestoneSelected,
     importCSV, exportCSV, cutSelected, copySelected, paste, clipboard.items,
@@ -3064,7 +3042,7 @@ export function useFlowDeckStore(): FlowDeckState {
     registerMembers,
     currentProjectId, activeView, selectedTaskId, selectedIds, searchQuery,
     showNewTask, showNewProject, projectMenuOpen, shareOpen, sidebarOpen, moreMenuOpen,
-    durationUnit, clipboard, past, future,
+    durationUnit, clipboard,
     viewingFileId, setViewingFileId,
     project, tasks, files, raidItems, customCols, filteredTasks, selectedTask, viewingFile,
     tags, taskComments, taskActivity,

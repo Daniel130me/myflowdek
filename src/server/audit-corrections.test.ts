@@ -316,3 +316,38 @@ describe('Audit Remediation: Board drag-and-drop works on touch and keyboard (C-
     assert.ok(source.includes('Press Space to lift'), 'cards must announce keyboard drag usage');
   });
 });
+
+describe('Audit Remediation: Trust cluster (H-01 undo lie, H-02 false copy, H-03 unconfirmed deletes)', () => {
+  test('undo/redo is fully removed from the product surface', () => {
+    const store = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/store/useFlowDeck.ts'), 'utf-8');
+    assert.ok(!/const undo = useCallback/.test(store), 'store must not keep undo/redo toast stubs');
+    assert.ok(!store.includes('onUndo: undo'), 'gridActions must not expose undo/redo');
+    const toolbar = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/components/toolbar/GridToolbar.tsx'), 'utf-8');
+    assert.ok(!toolbar.includes('Undo2'), 'toolbar must not render undo buttons');
+    const palette = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/components/ui/CommandPalette.tsx'), 'utf-8');
+    assert.ok(!palette.includes('Undo'), 'command palette must not offer undo');
+    const hook = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/hooks/useKeyboardShortcuts.ts'), 'utf-8');
+    assert.ok(!hook.includes('onUndo'), 'keyboard hook must not wire Cmd+Z');
+  });
+
+  test('keyboard delete copy never promises undo', () => {
+    const hook = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/hooks/useKeyboardShortcuts.ts'), 'utf-8');
+    assert.ok(hook.includes('This cannot be undone.'), 'delete confirm must state permanence');
+    assert.ok(!hook.includes('can be undone'), 'the false Ctrl+Z promise must be gone');
+  });
+
+  test('every mouse delete path routes through the shared confirm dialog', () => {
+    const dialogPath = path.join(process.cwd(), 'src/features/flowdeck/components/ui/ConfirmDeleteDialog.tsx');
+    assert.ok(fs.existsSync(dialogPath), 'ConfirmDeleteDialog must exist');
+    const dialog = fs.readFileSync(dialogPath, 'utf-8');
+    assert.ok(dialog.includes('cannot be undone'), 'dialog copy must state permanence');
+    assert.ok(dialog.includes("=== 'DELETE'"), 'bulk deletes must require typing DELETE');
+
+    const ctx = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/components/ui/TaskContextMenu.tsx'), 'utf-8');
+    assert.ok(ctx.includes('setDeleteOpen(true)'), 'context-menu delete must open the confirm dialog');
+    const bulk = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/components/ui/BulkActionBar.tsx'), 'utf-8');
+    assert.ok(bulk.includes('setDeleteOpen(true)'), 'bulk trash must open the confirm dialog');
+    const toolbar = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/components/toolbar/GridToolbar.tsx'), 'utf-8');
+    assert.ok(toolbar.includes('setDeleteOpen(true)'), 'toolbar delete must open the confirm dialog');
+  });
+});

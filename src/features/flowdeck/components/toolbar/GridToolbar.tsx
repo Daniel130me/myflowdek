@@ -2,11 +2,12 @@
 
 import React from 'react';
 import {
-  Plus, Undo2, Redo2, MoreHorizontal, UserPlus, Repeat, Outdent, Indent,
+  Plus, MoreHorizontal, UserPlus, Repeat, Outdent, Indent,
   Link2, Unlink2, Trash2, Bold, Palette, Hash, Diamond, FileUp, FileDown,
   Printer, Scissors, Copy, ClipboardPaste, Paperclip, Columns3, Share2,
 } from 'lucide-react';
 import { COLORS, COLOR_SWATCHES, type Task, type MemberInfo } from '@/features/flowdeck/model';
+import { ConfirmDeleteDialog } from '@/features/flowdeck/components/ui/ConfirmDeleteDialog';
 import { useViewport } from '../../hooks/useViewport';
 import { Avatar } from '../ui/Avatar';
 import { selectStyle, popoverRowStyle, FF } from '../ui/styles';
@@ -21,6 +22,8 @@ export function GridToolbar({ projectId, tasks, grid, filterSlot, extraLeft, mem
   const importRef = React.useRef<HTMLInputElement>(null);
   const attachRef = React.useRef<HTMLInputElement>(null);
   const hasSelection = grid.selectedIds.size > 0;
+  // Delete selected is confirmed — typed for bulk (audit H-03).
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
   const toggle = (key: string) => setOpen(o => o === key ? null : key);
 
   /* ---- Mobile: compact toolbar + bottom sheet ---- */
@@ -36,8 +39,6 @@ export function GridToolbar({ projectId, tasks, grid, filterSlot, extraLeft, mem
           >
             <Plus size={16} /> Add
           </button>
-          <button onClick={grid.onUndo} disabled={!grid.canUndo} style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${COLORS.line}`, borderRadius: 10, background: '#F3F4F6', color: grid.canUndo ? COLORS.ink : COLORS.line, cursor: grid.canUndo ? 'pointer' : 'not-allowed', opacity: grid.canUndo ? 1 : 0.5 }}><Undo2 size={16} /></button>
-          <button onClick={grid.onRedo} disabled={!grid.canRedo} style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${COLORS.line}`, borderRadius: 10, background: '#F3F4F6', color: grid.canRedo ? COLORS.ink : COLORS.line, cursor: grid.canRedo ? 'pointer' : 'not-allowed', opacity: grid.canRedo ? 1 : 0.5 }}><Redo2 size={16} /></button>
           <div style={{ flex: 1 }} />
           {hasSelection && <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF, marginRight: 4 }}>{grid.selectedIds.size} selected</span>}
           <button onClick={() => setMobileSheet(true)} style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${COLORS.line}`, borderRadius: 10, background: '#F3F4F6', color: COLORS.ink, cursor: 'pointer' }}><MoreHorizontal size={18} /></button>
@@ -114,8 +115,6 @@ export function GridToolbar({ projectId, tasks, grid, filterSlot, extraLeft, mem
       })}
 
       <Sep />
-      {iconBtn(Undo2, 'undo', 'Undo', { onClick: grid.onUndo, disabled: !grid.canUndo })}
-      {iconBtn(Redo2, 'redo', 'Redo', { onClick: grid.onRedo, disabled: !grid.canRedo })}
 
       <Sep />
       {iconBtn(Outdent, 'outdent', 'Outdent', { onClick: () => grid.onOutdent(projectId), disabled: !hasSelection })}
@@ -124,7 +123,7 @@ export function GridToolbar({ projectId, tasks, grid, filterSlot, extraLeft, mem
       <Sep />
       {iconBtn(Link2, 'link', 'Link selected tasks', { onClick: () => grid.onLink(projectId), disabled: grid.selectedIds.size < 2 })}
       {iconBtn(Unlink2, 'unlink', 'Unlink selected tasks', { onClick: () => grid.onUnlink(projectId), disabled: !hasSelection })}
-      {iconBtn(Trash2, 'delete', 'Delete selected', { onClick: () => grid.onDeleteSelected(projectId), disabled: !hasSelection })}
+      {iconBtn(Trash2, 'delete', 'Delete selected', { onClick: () => setDeleteOpen(true), disabled: !hasSelection })}
 
       <Sep />
       {iconBtn(Bold, 'bold', 'Bold text', { onClick: () => grid.onToggleBold(projectId), disabled: !hasSelection })}
@@ -171,6 +170,13 @@ export function GridToolbar({ projectId, tasks, grid, filterSlot, extraLeft, mem
       <span style={{ marginLeft: 'auto', fontSize: 11.5, color: COLORS.gray, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: FF }}>
         {hasSelection ? `${grid.selectedIds.size} selected` : 'Select rows to enable row actions'}
       </span>
+
+      <ConfirmDeleteDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        count={grid.selectedIds.size}
+        onConfirm={() => grid.onDeleteSelected(projectId)}
+      />
     </div>
   );
 }

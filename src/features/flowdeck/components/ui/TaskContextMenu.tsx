@@ -12,6 +12,7 @@ import {
   ArrowUpCircle, ArrowDownCircle, Tag as TagIcon, Play, Eye, FolderInput, ArrowRightToLine, Repeat, LayoutList,
 } from 'lucide-react';
 import { STATUS_META, STATUS_ORDER, PRIORITY_META, COLORS, FF, type Task, type Tag, type Project, type TaskStatus, type TaskPriority } from '@/features/flowdeck/model';
+import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 
 interface TaskContextMenuProps {
   task: Task;
@@ -47,6 +48,8 @@ export function TaskContextMenu({
 }: TaskContextMenuProps) {
   const isDone = task.status === 'done';
   const isSubtask = !!task.parentId;
+  // Delete is confirmed through the shared dialog — never instant (audit H-03).
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
   const otherProjects = projects
     ? Object.values(projects).filter(p => p.id !== currentProjectId)
     : [];
@@ -246,12 +249,19 @@ export function TaskContextMenu({
           </ContextMenuItem>
         )}
 
-        <ContextMenuItem variant="destructive" onSelect={() => onDeleteTask(task.id)}>
+        <ContextMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
           <Trash2 style={{ width: 15, height: 15 }} />
           Delete task
           <ContextMenuShortcut>Del</ContextMenuShortcut>
         </ContextMenuItem>
       </ContextMenuContent>
+      <ConfirmDeleteDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        count={1}
+        title={`Delete “${task.name}”?`}
+        onConfirm={() => onDeleteTask(task.id)}
+      />
     </ContextMenu>
   );
 }
