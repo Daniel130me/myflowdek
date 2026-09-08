@@ -58,6 +58,33 @@ export function taskToApiPayload(task: Partial<Task>): Record<string, unknown> {
   };
 }
 
+/**
+ * Extract a human-readable message from any of the API's failure body
+ * shapes (audit H-16). Three coexisting server envelopes evolved
+ * independently:
+ *   1. { error: string }                    — flowdeck route handlers
+ *   2. { message: string, issues?: {...} }  — validationError / apiError (http/responses.ts)
+ *   3. { message: string }                  — talent + admin service routes
+ * Reading only `error` degraded every `{message}` failure to a meaningless
+ * "HTTP 4xx" toast. Field-level Zod issues surface the first field error.
+ */
+export function extractErrorMessage(data: unknown, status: number): string {
+  if (data && typeof data === 'object') {
+    const body = data as { error?: unknown; message?: unknown; issues?: unknown };
+    if (typeof body.error === 'string' && body.error.trim()) return body.error;
+    // Zod issues beat the generic envelope message — validationError always
+    // sends message: 'Invalid request.', which tells the user nothing.
+    const issues = body.issues;
+    if (issues && typeof issues === 'object' && !Array.isArray(issues)) {
+      for (const msgs of Object.values(issues as Record<string, unknown>)) {
+        if (Array.isArray(msgs) && typeof msgs[0] === 'string' && msgs[0].trim()) return msgs[0];
+      }
+    }
+    if (typeof body.message === 'string' && body.message.trim()) return body.message;
+  }
+  return `Request failed (HTTP ${status})`;
+}
+
 /** Generic fetch wrapper that returns { ok, error } instead of throwing. */
 async function apiCall(
   url: string,
@@ -67,7 +94,7 @@ async function apiCall(
     const res = await fetch(url, options);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      return { ok: false, error: data.error ?? `HTTP ${res.status}` };
+      return { ok: false, error: extractErrorMessage(data, res.status) };
     }
     return { ok: true };
   } catch {
@@ -88,7 +115,7 @@ async function apiCallWithData<T = unknown>(
     const res = await fetch(url, options);
     const data = (await res.json().catch(() => ({}))) as T & { error?: string };
     if (!res.ok) {
-      return { ok: false, error: (data as { error?: string }).error ?? `HTTP ${res.status}` };
+      return { ok: false, error: extractErrorMessage(data, res.status) };
     }
     return { ok: true, data };
   } catch {
@@ -372,7 +399,10 @@ export function apiRestoreProject(projectId: string) {
 export async function apiListProjectMembers(projectId: string) {
   try {
     const res = await fetch(`/api/projects/${projectId}/members`);
-    if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      return { ok: false as const, error: extractErrorMessage(errBody, res.status) };
+    }
     const data = (await res.json()) as { members: { userId: string; role: string }[] };
     return { ok: true as const, members: data.members };
   } catch {
@@ -414,7 +444,10 @@ export interface RaidItemPayload {
 export async function apiListRaidItems(projectId: string) {
   try {
     const res = await fetch(`/api/projects/${projectId}/raid`);
-    if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      return { ok: false as const, error: extractErrorMessage(errBody, res.status) };
+    }
     const data = (await res.json()) as {
       items: {
         id: string; type: string; description: string; ownerId: string | null;
@@ -509,7 +542,10 @@ export function apiUpdateForm(projectId: string, formId: string, patch: Record<s
 export async function apiListFormSubmissions(projectId: string, formId: string) {
   try {
     const res = await fetch(`/api/projects/${projectId}/forms/${formId}/submissions`);
-    if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      return { ok: false as const, error: extractErrorMessage(errBody, res.status) };
+    }
     const data = (await res.json()) as { submissions: unknown[] };
     return { ok: true as const, submissions: data.submissions };
   } catch {
@@ -543,7 +579,10 @@ export function apiDeleteTaskCustomField(taskId: string, fieldId: string) {
 export async function apiListTaskCustomFields(taskId: string) {
   try {
     const res = await fetch(`/api/tasks/${taskId}/custom-fields`);
-    if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      return { ok: false as const, error: extractErrorMessage(errBody, res.status) };
+    }
     const data = (await res.json()) as {
       values: { fieldId: string; value: string | null; field: { key: string } }[];
     };
@@ -591,7 +630,10 @@ export function apiRenameCustomField(projectId: string, fieldId: string, label: 
 export async function apiListCustomFields(projectId: string) {
   try {
     const res = await fetch(`/api/projects/${projectId}/custom-fields`);
-    if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      return { ok: false as const, error: extractErrorMessage(errBody, res.status) };
+    }
     const data = (await res.json()) as {
       fields: { id: string; key: string; label: string; type: string; options?: string[] }[];
     };
@@ -612,7 +654,10 @@ export function apiUpdateBudget(projectId: string, budgetId: string, patch: Reco
 export async function apiListExpenses(projectId: string, budgetId: string) {
   try {
     const res = await fetch(`/api/projects/${projectId}/budgets/${budgetId}`);
-    if (!res.ok) return { ok: false as const, error: `HTTP ${res.status}` };
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      return { ok: false as const, error: extractErrorMessage(errBody, res.status) };
+    }
     const data = (await res.json()) as { expenses: unknown[] };
     return { ok: true as const, expenses: data.expenses };
   } catch {
