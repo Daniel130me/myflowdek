@@ -400,3 +400,39 @@ describe('Audit Remediation: Feedback & approvals cluster (H-10/H-13/H-14/H-15)'
     assert.ok(!workspacePage.includes('state.deleteApproval'), 'workspace approvals delete must not mutate local-only store state');
   });
 });
+
+describe('Audit Remediation: Security cluster (H-17/H-18/H-19/H-22)', () => {
+  test('auth cookies use SameSite=Lax (implicit CSRF defence restored)', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/lib/auth.ts'), 'utf-8');
+    assert.ok(!source.includes("sameSite: 'none'"), 'no auth cookie may be SameSite=None');
+    assert.strictEqual((source.match(/sameSite: 'lax'/g) || []).length, 3, 'session/callback/CSRF cookies must all be Lax');
+  });
+
+  test('demo account auto-provision is dev-only and the button is hidden in prod', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/lib/auth.ts'), 'utf-8');
+    assert.ok(/NODE_ENV !== 'production' &&\s*\n\s*email === 'wale\.johnson@flowdeck\.io'/.test(source), 'demo provisioning must be gated');
+    const login = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/components/auth/LoginPage.tsx'), 'utf-8');
+    const gated = (login.match(/NODE_ENV !== 'production' && \(/g) || []).length;
+    assert.ok(gated >= 3, `all three demo buttons must be gated (found ${gated})`);
+  });
+
+  test('email verification enforcement is env-gated with an unauthenticated resend path', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/lib/auth.ts'), 'utf-8');
+    assert.ok(source.includes('REQUIRE_EMAIL_VERIFICATION'), 'enforcement gate must exist');
+    assert.ok(source.includes('EMAIL_NOT_VERIFIED'), 'authorize must signal the reason');
+    assert.ok(source.includes("err.message === 'EMAIL_NOT_VERIFIED'"), 'the catch must not flatten the verification error');
+    const resend = fs.readFileSync(path.join(process.cwd(), 'src/app/api/auth/resend-verification/route.ts'), 'utf-8');
+    assert.ok(!resend.includes('requireAuthenticatedUser'), 'resend must not require auth (unverified users cannot sign in)');
+    assert.ok(resend.includes('rateLimit'), 'resend must be rate-limited');
+    const login = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/components/auth/LoginPage.tsx'), 'utf-8');
+    assert.ok(login.includes('Resend verification email'), 'login must offer a resend action');
+  });
+
+  test('POST /api/ai requires a session, rate limit and generic errors', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/ai/route.ts'), 'utf-8');
+    assert.ok(source.includes('requireAuthenticatedUser'), 'route must authenticate');
+    assert.ok(source.includes('rateLimit'), 'route must rate-limit');
+    assert.ok(!source.includes('error instanceof Error ? error.message'), 'raw SDK errors must not reach clients');
+    assert.ok(source.includes('instanceof AuthError'), 'auth failures must keep their status');
+  });
+});

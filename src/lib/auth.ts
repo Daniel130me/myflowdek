@@ -29,7 +29,10 @@ export const authOptions: NextAuthOptions = {
       name: 'next-auth.session-token',
       options: {
         httpOnly: true,
-        sameSite: 'none',
+        // Same-site SPA: 'lax' restores the implicit CSRF defence that
+        // cookie-authenticated custom API routes relied on (audit H-17 —
+        // SameSite=None removed it with no compensating CSRF tokens).
+        sameSite: 'lax',
         path: '/',
         secure: true,
       },
@@ -37,7 +40,7 @@ export const authOptions: NextAuthOptions = {
     callbackUrl: {
       name: 'next-auth.callback-url',
       options: {
-        sameSite: 'none',
+        sameSite: 'lax',
         path: '/',
         secure: true,
       },
@@ -46,7 +49,7 @@ export const authOptions: NextAuthOptions = {
       name: 'next-auth.csrf-token',
       options: {
         httpOnly: true,
-        sameSite: 'none',
+        sameSite: 'lax',
         path: '/',
         secure: true,
       },
@@ -85,8 +88,16 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          // Auto-provision demo account if requested and not yet created in DB
-          if (email === 'wale.johnson@flowdeck.io' && password === 'flowdeck123') {
+          // Auto-provision demo account if requested and not yet created in
+          // DB. NEVER available in production — this is a convenience for
+          // local/dev demos, not a public signup path (audit H-18: the
+          // credentials ship in the client bundle, so an ungated path here is
+          // a permanent backdoor). The button is hidden in prod too.
+          if (
+            process.env.NODE_ENV !== 'production' &&
+            email === 'wale.johnson@flowdeck.io' &&
+            password === 'flowdeck123'
+          ) {
             const existingDemo = await db.user.findUnique({ where: { email } });
             if (!existingDemo) {
               const demoHash = await bcrypt.hash('flowdeck123', 10);
@@ -140,6 +151,21 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
+          // Email verification enforcement (audit H-19). The subsystem was
+          // fully built (hashed single-use tokens, 24h TTL) but login never
+          // checked it, making it dead weight. Opt-in via env so the cutover
+          // is a deliberate launch decision — existing accounts with null
+          // emailVerifiedAt are not locked out by surprise.
+          if (
+            process.env.REQUIRE_EMAIL_VERIFICATION === 'true' &&
+            !user.emailVerifiedAt
+          ) {
+            await audit({ userId: user.id, action: 'login_failed', ip, userAgent, meta: { reason: 'email_unverified' } });
+            // NextAuth surfaces this message to signIn({redirect:false}),
+            // which the login page maps to a verify notice + resend path.
+            throw new Error('EMAIL_NOT_VERIFIED');
+          }
+
           const valid = await bcrypt.compare(password, user.passwordHash);
           if (!valid) {
             await audit({ userId: user.id, action: 'login_failed', ip, userAgent, meta: { reason: 'wrong_password' } });
@@ -157,6 +183,9 @@ export const authOptions: NextAuthOptions = {
             sessionVersion: user.sessionVersion,
           };
         } catch (err) {
+          // Verification gate must reach the client — don't let the generic
+          // handler flatten it into "invalid credentials".
+          if (err instanceof Error && err.message === 'EMAIL_NOT_VERIFIED') throw err;
           console.error('[auth] authorize error:', err);
           await audit({ action: 'login_failed', ip, userAgent, meta: { reason: 'internal_error', email } });
           return null;

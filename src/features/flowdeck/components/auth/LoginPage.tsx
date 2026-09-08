@@ -66,10 +66,31 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
   const [focused, setFocused] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Set when the server enforces email verification (H-19): shows a banner
+  // with a resend action instead of a dead-end message.
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resendSent, setResendSent] = useState(false);
+
+  const handleResendVerification = useCallback(async () => {
+    if (!unverifiedEmail || resendSent) return;
+    try {
+      await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: unverifiedEmail }),
+      });
+    } catch {
+      // Enumeration-safe endpoint: always behaves the same. Show "sent".
+    } finally {
+      setResendSent(true);
+    }
+  }, [unverifiedEmail, resendSent]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setUnverifiedEmail(null);
+    setResendSent(false);
     if (!email.trim()) { setError('Email is required'); return; }
     if (mode === 'signup' && !name.trim()) { setError('Name is required'); return; }
     if (!password || password.length < 6) { setError('Password must be at least 6 characters'); return; }
@@ -77,7 +98,12 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
     try {
       const result = await onLogin(email.trim(), password, mode === 'signup' ? name.trim() : undefined);
       if (!result?.ok) {
-        setError(result?.error || 'Authentication failed');
+        if (result?.error === 'EMAIL_NOT_VERIFIED') {
+          setUnverifiedEmail(email.trim());
+          setError('Please verify your email address before signing in.');
+        } else {
+          setError(result?.error || 'Authentication failed');
+        }
       }
     } catch {
       setError('Something went wrong. Please try again.');
@@ -131,7 +157,9 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
               : 'Get started with FlowDeck in seconds'}
           </p>
 
-          {/* Demo button */}
+          {/* Demo button — dev-only: the credentials ship in the client
+              bundle, so an ungated path is a public backdoor (audit H-18). */}
+          {process.env.NODE_ENV !== 'production' && (
           <button
             onClick={handleDemo}
             disabled={loading}
@@ -146,6 +174,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
             <Sparkles size={16} />
             {loading ? 'Signing in…' : 'Try demo workspace'}
           </button>
+          )}
 
           {/* Divider */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
@@ -217,6 +246,15 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
             {error && (
               <div style={{ fontSize: 13, color: COLORS.red, background: COLORS.redSoft, padding: '8px 12px', borderRadius: 8 }}>
                 {error}
+                {unverifiedEmail && (
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    style={{ display: 'block', marginTop: 6, fontSize: 12.5, fontWeight: 700, color: COLORS.accent, background: 'none', border: 'none', cursor: resendSent ? 'default' : 'pointer', padding: 0, fontFamily: FF }}
+                  >
+                    {resendSent ? 'Verification email sent — check your inbox.' : 'Resend verification email'}
+                  </button>
+                )}
               </div>
             )}
 
@@ -342,6 +380,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
                 : 'Get started with FlowDeck in seconds'}
             </p>
 
+            {process.env.NODE_ENV !== 'production' && (
             <button
               onClick={handleDemo}
               disabled={loading}
@@ -356,6 +395,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
               <Sparkles size={16} />
               {loading ? 'Signing in…' : 'Try demo workspace'}
             </button>
+            )}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
               <div style={{ flex: 1, height: 1, background: COLORS.line }} />
@@ -410,7 +450,18 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
               </div>
 
               {error && (
-                <div style={{ fontSize: 13, color: COLORS.red, background: COLORS.redSoft, padding: '8px 12px', borderRadius: 8 }}>{error}</div>
+                <div style={{ fontSize: 13, color: COLORS.red, background: COLORS.redSoft, padding: '8px 12px', borderRadius: 8 }}>
+                  {error}
+                  {unverifiedEmail && (
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      style={{ display: 'block', marginTop: 6, fontSize: 12.5, fontWeight: 700, color: COLORS.accent, background: 'none', border: 'none', cursor: resendSent ? 'default' : 'pointer', padding: 0, fontFamily: FF }}
+                    >
+                      {resendSent ? 'Verification email sent — check your inbox.' : 'Resend verification email'}
+                    </button>
+                  )}
+                </div>
               )}
 
               <button type="submit" disabled={loading} style={{
@@ -530,6 +581,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
               : 'Get started with FlowDeck in seconds'}
           </p>
 
+          {process.env.NODE_ENV !== 'production' && (
           <button
             onClick={handleDemo}
             disabled={loading}
@@ -544,6 +596,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
             <Sparkles size={16} />
             {loading ? 'Signing in…' : 'Try demo workspace'}
           </button>
+          )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
             <div style={{ flex: 1, height: 1, background: COLORS.line }} />
@@ -598,7 +651,18 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
             </div>
 
             {error && (
-              <div style={{ fontSize: 13, color: COLORS.red, background: COLORS.redSoft, padding: '8px 12px', borderRadius: 8 }}>{error}</div>
+              <div style={{ fontSize: 13, color: COLORS.red, background: COLORS.redSoft, padding: '8px 12px', borderRadius: 8 }}>
+                {error}
+                {unverifiedEmail && (
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    style={{ display: 'block', marginTop: 6, fontSize: 12.5, fontWeight: 700, color: COLORS.accent, background: 'none', border: 'none', cursor: resendSent ? 'default' : 'pointer', padding: 0, fontFamily: FF }}
+                  >
+                    {resendSent ? 'Verification email sent — check your inbox.' : 'Resend verification email'}
+                  </button>
+                )}
+              </div>
             )}
 
             <button type="submit" disabled={loading} style={{

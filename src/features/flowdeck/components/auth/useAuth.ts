@@ -113,6 +113,12 @@ export function useAuth() {
       });
 
       if (result?.error) {
+        // authorize() throws this when REQUIRE_EMAIL_VERIFICATION is on and
+        // the account has no verified email — the login page turns it into a
+        // verify notice with a resend action.
+        if (result.error === 'EMAIL_NOT_VERIFIED') {
+          return { ok: false, error: 'EMAIL_NOT_VERIFIED' };
+        }
         return { ok: false, error: 'Invalid email or password' };
       }
       return { ok: true };
