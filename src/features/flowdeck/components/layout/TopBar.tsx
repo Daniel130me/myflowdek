@@ -172,7 +172,7 @@ export const TopBar = forwardRef<TopBarHandle, {
         )}
         <button onClick={() => project ? onShowNewTask() : onShowNewProject()} style={{
           display: 'flex', alignItems: 'center', gap: 6,
-          background: '#FE8029', color: '#FFFFFF', border: 'none', borderRadius: 10,
+          background: COLORS.accent, color: '#FFFFFF', border: 'none', borderRadius: 10,
           padding: isMobile ? '0 12px' : '9px 16px', height: isMobile ? 38 : 'auto', fontSize: 13, fontWeight: 600, cursor: 'pointer',
           flexShrink: 0, fontFamily: FF, boxShadow: '0 1px 3px rgba(254,128,41,0.3)', transition: 'background 0.15s ease',
         }}>

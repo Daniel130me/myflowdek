@@ -9,9 +9,13 @@ export const COLORS = {
   card: "#FFFFFF",
   line: "#E5E7EB",
   lineLight: "#F3F4F6",
-  accent: "#FE8029",
-  accentDark: "#E67422",
+  // Brand accent (WCAG AA on white: 5.18:1, and with white text: 5.18:1).
+  // The vivid original #FE8029 (2.52:1 with white) failed AA on every primary
+  // CTA — it remains available as accentBright for decorative accents only.
+  accent: "#C2410C",
+  accentDark: "#9A3412",
   accentSoft: "#FFF4EB",
+  accentBright: "#FE8029",
   teal: "#0891B2",
   tealSoft: "#CFFAFE",
   amber: "#D97706",
@@ -31,7 +35,7 @@ export const COLORS = {
 
 export const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   backlog: { label: "Backlog", color: "#6B7280", bg: "#F3F4F6" },
-  in_progress: { label: "In Progress", color: "#FE8029", bg: "#FFF4EB" },
+  in_progress: { label: "In Progress", color: "#9A3412", bg: "#FFF4EB" },
   review: { label: "In Review", color: "#7C3AED", bg: "#EDE9FE" },
   done: { label: "Done", color: "#16A34A", bg: "#DCFCE7" },
 };
@@ -124,7 +128,7 @@ export const LAYOUT = {
   topbar: { height: 56, bg: '#FFFFFF', border: '#E5E7EB', searchBg: '#F3F4F6', searchBorder: '#E5E7EB' },
   content: { bg: '#F7F7F7', padding: 24, radius: 0 },
   card: { bg: '#FFFFFF', border: '#E5E7EB', radius: 16, shadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)', shadowLg: '0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04)' },
-  btn: { primary: '#FE8029', primaryHover: '#E67422', radius: 10 },
+  btn: { primary: '#C2410C', primaryHover: '#9A3412', radius: 10 },
   text: { primary: '#1F2124', secondary: '#6B7280', muted: '#9CA3AF' },
 };
 
@@ -133,7 +137,7 @@ export const FONT_FAMILY = "'Inter', -apple-system, BlinkMacSystemFont, sans-ser
 /* ---------------------------------- epic palette ---------------------------------- */
 export interface ColorInfo { bg: string; bar: string; barLight: string; text: string; }
 export const EPIC_PALETTE: ColorInfo[] = [
-  { bg: '#FFF4EB', bar: '#FE8029', barLight: '#FED7AA', text: '#9A3412' },
+  { bg: '#FFF4EB', bar: '#C2410C', barLight: '#FED7AA', text: '#9A3412' },
   { bg: '#CFFAFE', bar: '#0891B2', barLight: '#A5F3FC', text: '#155E75' },
   { bg: '#FEF3C7', bar: '#D97706', barLight: '#FDE68A', text: '#92400E' },
   { bg: '#FEE2E2', bar: '#DC2626', barLight: '#FECACA', text: '#991B1B' },

@@ -39,3 +39,13 @@ export const APP_BASE_URL = process.env.APP_BASE_URL ?? process.env.NEXTAUTH_URL
 
 /** Length of the generated token (URL-safe hex). */
 export const TOKEN_LENGTH = 48;
+
+/**
+ * Brand accent used inside email HTML bodies.
+ *
+ * Emails cannot read the app's design tokens (standalone static markup), so
+ * this mirrors COLORS.accent. Value chosen for WCAG AA: 5.18:1 with white
+ * button text and 5.18:1 as text on the white email background. The vivid
+ * marketing orange #FE8029 measured 2.52:1 and failed AA everywhere.
+ */
+export const EMAIL_BRAND_COLOR = '#C2410C';

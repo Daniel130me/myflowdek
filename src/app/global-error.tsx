@@ -19,7 +19,7 @@ export default function GlobalError({
             onClick={() => reset()}
             style={{ 
               padding: '12px 24px', 
-              backgroundColor: '#FE8029', 
+              backgroundColor: '#C2410C', // WCAG AA on white (see COLORS.accent) 
               color: 'white', 
               border: 'none',
               borderRadius: '8px', 

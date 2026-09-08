@@ -320,7 +320,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
           {/* Social proof */}
           <div style={{ marginTop: 24, display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
             <div style={{ display: 'flex' }}>
-              {['#FE8029', '#0891B2', '#D97706', '#16A34A'].map((c, i) => (
+              {['#C2410C', '#0891B2', '#D97706', '#16A34A'].map((c, i) => (
                 <div key={i} style={{ width: 26, height: 26, borderRadius: '50%', background: c, border: '2px solid #2D2F33', marginLeft: i > 0 ? -7 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: '#FFF' }}>
                   {['AC', 'TB', 'NE', 'SA'][i]}
                 </div>
@@ -492,7 +492,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
 
         <div style={{ marginTop: 48, display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ display: 'flex' }}>
-            {['#FE8029', '#0891B2', '#D97706', '#16A34A'].map((c, i) => (
+            {['#C2410C', '#0891B2', '#D97706', '#16A34A'].map((c, i) => (
               <div key={i} style={{ width: 28, height: 28, borderRadius: '50%', background: c, border: '2px solid #2D2F33', marginLeft: i > 0 ? -8 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#FFF' }}>
                 {['AC', 'TB', 'NE', 'SA'][i]}
               </div>

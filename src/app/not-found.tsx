@@ -11,7 +11,7 @@ export default function NotFound() {
         href="/" 
         style={{ 
           padding: '12px 24px', 
-          backgroundColor: '#FE8029', 
+          backgroundColor: '#C2410C', // WCAG AA on white (see COLORS.accent) 
           color: 'white', 
           textDecoration: 'none', 
           borderRadius: '8px', 

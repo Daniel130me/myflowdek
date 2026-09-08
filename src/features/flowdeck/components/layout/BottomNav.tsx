@@ -27,9 +27,9 @@ export function BottomNav({ activeView, onNav }: { activeView: string; onNav: (i
             padding: '6px 12px', borderRadius: 12, minWidth: 52, minHeight: 48,
             transition: 'all 0.15s ease', position: 'relative',
           }}>
-            {isActive && <span style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 20, height: 3, borderRadius: '0 0 3px 3px', background: '#FE8029' }} />}
-            <Icon size={20} strokeWidth={isActive ? 2 : 1.5} color={isActive ? '#FE8029' : colors.grayLight} />
-            <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 500, color: isActive ? '#FE8029' : colors.grayLight, fontFamily: FF, lineHeight: 1 }}>{item.label}</span>
+            {isActive && <span style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 20, height: 3, borderRadius: '0 0 3px 3px', background: colors.accent }} />}
+            <Icon size={20} strokeWidth={isActive ? 2 : 1.5} color={isActive ? colors.accent : colors.grayLight} />
+            <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 500, color: isActive ? colors.accent : colors.grayLight, fontFamily: FF, lineHeight: 1 }}>{item.label}</span>
           </button>
         );
       })}

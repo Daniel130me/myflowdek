@@ -105,7 +105,7 @@ export default function AdminDashboardPage() {
           <Shield size={48} color="#DC2626" style={{ marginBottom: 16 }} />
           <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1F2124', marginBottom: 8 }}>Access Denied</h2>
           <p style={{ fontSize: 14, color: '#9CA3AF', marginBottom: 20 }}>{error}</p>
-          <button onClick={() => router.push('/projects')} style={{ padding: '10px 20px', borderRadius: 10, border: 'none', background: '#FE8029', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>
+          <button onClick={() => router.push('/projects')} style={{ padding: '10px 20px', borderRadius: 10, border: 'none', background: COLORS.accent, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: FF }}>
             Go to app
           </button>
         </div>
@@ -128,7 +128,7 @@ export default function AdminDashboardPage() {
             <StatCard icon={Users} label="Total Users" value={overview.users.total} subtext={`${overview.users.active} active, ${overview.users.disabled} disabled`} color="#0891B2" />
             <StatCard icon={TrendingUp} label="New (7 days)" value={overview.users.newRegistrations7d} subtext={`${overview.users.onboarded} onboarded, ${overview.users.verified} verified`} color="#16A34A" />
             <StatCard icon={Building2} label="Workspaces" value={overview.workspaces} subtext={`${overview.projects} projects`} color="#7C3AED" />
-            <StatCard icon={Activity} label="Tasks" value={overview.tasks} subtext={`${overview.comments} comments, ${overview.files} files`} color="#FE8029" />
+            <StatCard icon={Activity} label="Tasks" value={overview.tasks} subtext={`${overview.comments} comments, ${overview.files} files`} color={COLORS.accent} />
             <StatCard icon={HardDrive} label="Storage" value={`${overview.storage.mbUsed} MB`} subtext={`${overview.files} files`} color="#D97706" />
             <StatCard icon={AlertTriangle} label="Failed Logins (24h)" value={overview.security.failedLogins24h} subtext="Security monitor" color="#DC2626" />
           </div>
@@ -158,7 +158,7 @@ export default function AdminDashboardPage() {
             <div style={{ maxHeight: 360, overflowY: 'auto' }}>
               {users.map(u => (
                 <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid #F3F4F6' }}>
-                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#FE8029', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: COLORS.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
                     {u.email[0]?.toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>

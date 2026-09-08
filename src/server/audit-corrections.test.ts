@@ -15,6 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import { hashToken } from './invitations/service';
 import { routes } from '../shared/navigation/routes';
+import { COLORS } from '../features/flowdeck/model';
 
 describe('Audit Remediation: Onboarding invitations and hashing (Item 1)', () => {
   test('hashToken produces consistent SHA-256 hex digest', () => {
@@ -180,5 +181,34 @@ describe('Audit Remediation: Keyboard accessibility (Tab hijack removal)', () =>
       source.includes('o.selectedIds.size > 0'),
       'indent/outdent shortcuts must require a task selection',
     );
+  });
+});
+
+describe('Audit Remediation: WCAG AA brand accent contrast (design-token gate)', () => {
+  const luminance = (hex: string): number => {
+    const c = hex.replace('#', '');
+    const channels = [0, 2, 4].map((i) => parseInt(c.slice(i, i + 2), 16) / 255).map(
+      (v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)),
+    );
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const contrast = (fg: string, bg: string): number => {
+    const [l1, l2] = [luminance(fg), luminance(bg)].sort((a, b) => b - a);
+    return (l1 + 0.05) / (l2 + 0.05);
+  };
+
+  test('accent token passes AA both as fill (white text) and as text on white/paper', () => {
+    assert.ok(contrast('#FFFFFF', COLORS.accent) >= 4.5, `white on accent must be >= 4.5, got ${contrast('#FFFFFF', COLORS.accent).toFixed(2)}`);
+    assert.ok(contrast(COLORS.accent, '#FFFFFF') >= 4.5, `accent on white must be >= 4.5, got ${contrast(COLORS.accent, '#FFFFFF').toFixed(2)}`);
+    assert.ok(contrast(COLORS.accent, COLORS.paper) >= 4.5, `accent on paper must be >= 4.5, got ${contrast(COLORS.accent, COLORS.paper).toFixed(2)}`);
+  });
+
+  test('accentDark hover token passes AA with white text', () => {
+    assert.ok(contrast('#FFFFFF', COLORS.accentDark) >= 4.5, `white on accentDark must be >= 4.5, got ${contrast('#FFFFFF', COLORS.accentDark).toFixed(2)}`);
+  });
+
+  test('vivid orange is quarantined as decorative-only (accentBright)', () => {
+    assert.strictEqual(COLORS.accentBright, '#FE8029', 'the original brand orange must stay available for decorative use only');
+    assert.notStrictEqual(COLORS.accent, COLORS.accentBright, 'accent must not be the AA-failing vivid orange');
   });
 });

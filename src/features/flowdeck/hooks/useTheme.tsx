@@ -20,6 +20,7 @@ const DARK_COLORS = {
   accent: '#FE8029',
   accentDark: '#E67422',
   accentSoft: '#2A1A0A',
+  accentBright: '#FE8029',
   teal: '#0891B2',
   tealSoft: '#0C2D33',
   amber: '#D97706',
@@ -64,7 +65,7 @@ const DARK_LAYOUT = {
     shadow: '0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.12)',
     shadowLg: '0 10px 15px -3px rgba(0,0,0,0.35), 0 4px 6px -4px rgba(0,0,0,0.2)',
   },
-  btn: { primary: '#FE8029', primaryHover: '#E67422', radius: 10 },
+  btn: { primary: '#C2410C', primaryHover: '#9A3412', radius: 10 },
   text: { primary: '#F3F4F6', secondary: '#9CA3AF', muted: '#6B7280' },
 } as const;
 
