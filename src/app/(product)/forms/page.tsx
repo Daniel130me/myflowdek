@@ -5,6 +5,7 @@ import { FormsView } from '@/features/flowdeck/components/views';
 import { useForms } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { toast } from 'sonner';
+import { fetchJson } from '@/lib/fetch-json';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import type { Form, FormSubmission } from '@/features/flowdeck/model';
 import { apiUpdateForm, apiListFormSubmissions } from '@/lib/api-client';
@@ -88,11 +89,13 @@ export default function FormsRoutePage() {
 
   const handleDeleteForm = useCallback(async (id: string) => {
     if (!projectId) return;
-    try {
-      await fetch(`/api/projects/${projectId}/forms/${id}`, { method: 'DELETE' });
-      toast.success('Form deleted');
-      refetch();
-    } catch { toast.error('Failed to delete form'); }
+    const res = await fetchJson(`/api/projects/${projectId}/forms/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      toast.error('Failed to delete form', { description: res.error });
+      return;
+    }
+    toast.success('Form deleted');
+    refetch();
   }, [projectId, refetch]);
 
   if (loading) return <TableSkeleton />;

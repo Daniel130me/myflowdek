@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { toast } from 'sonner';
 import { useAuth, OnboardingFlow } from '@/features/flowdeck/components/auth';
 import { ThemeProvider } from '@/features/flowdeck/hooks/useTheme';
 import { routes } from '@/shared/navigation/routes';
@@ -13,6 +14,7 @@ export default function AuthOnboardingPage() {
   const router = useRouter();
   const { update: updateSession } = useSession();
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Redirect unauthenticated users to login; fully-onboarded users to the app.
   useEffect(() => {
@@ -40,9 +42,11 @@ export default function AuthOnboardingPage() {
       router.push(routes.projects());
     } else {
       setSubmitting(false);
-      // On error the wizard stays mounted; the OnboardingFlow can surface the
-      // message via a toast (not wired here to keep the diff minimal).
-      console.error('[onboarding] failed:', result.error);
+      // Failures must be visible: the wizard stays mounted, so surface both a
+      // toast and an inline banner above it (audit H-15 — this used to be a
+      // console.error with zero user feedback).
+      setSubmitError(result.error ?? 'Something went wrong. Please try again.');
+      toast.error(result.error ?? 'Something went wrong. Please try again.');
     }
   };
 
@@ -51,7 +55,7 @@ export default function AuthOnboardingPage() {
   const handleSkip = () =>
     submitOnboarding({
       projectName: '',
-      projectColor: '#FE8029',
+      projectColor: '#C2410C',
       projectDesc: '',
       invitedMembers: [],
       preferences: { defaultView: 'dashboard', enableNotifications: true, theme: 'light' },
@@ -59,6 +63,11 @@ export default function AuthOnboardingPage() {
 
   return (
     <ThemeProvider>
+      {submitError && (
+        <div role="alert" style={{ position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 10000, background: '#FEF2F2', color: '#B91C1C', border: '1px solid #FECACA', borderRadius: 10, padding: '10px 16px', fontSize: 13.5, fontFamily: 'inherit', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', maxWidth: 420, textAlign: 'center' }}>
+          {submitError}
+        </div>
+      )}
       <OnboardingFlow
         user={auth.user}
         onComplete={handleComplete}

@@ -5,6 +5,7 @@ import { BudgetView } from '@/features/flowdeck/components/views';
 import { useBudgets } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { toast } from 'sonner';
+import { fetchJson } from '@/lib/fetch-json';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import type { Budget, Expense } from '@/features/flowdeck/model';
 import { apiUpdateBudget, apiListExpenses, apiDeleteExpense } from '@/lib/api-client';
@@ -89,11 +90,13 @@ export default function BudgetsRoutePage() {
 
   const handleDeleteBudget = useCallback(async (id: string) => {
     if (!projectId) return;
-    try {
-      await fetch(`/api/projects/${projectId}/budgets/${id}`, { method: 'DELETE' });
-      toast.success('Budget deleted');
-      refetch();
-    } catch { toast.error('Failed to delete budget'); }
+    const res = await fetchJson(`/api/projects/${projectId}/budgets/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      toast.error('Failed to delete budget', { description: res.error });
+      return;
+    }
+    toast.success('Budget deleted');
+    refetch();
   }, [projectId, refetch]);
 
   const handleAddExpense = useCallback(async (budgetId: string, expense: Partial<Expense>) => {

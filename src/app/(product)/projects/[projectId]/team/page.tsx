@@ -9,6 +9,8 @@ import { getSingleParam } from '@/shared/utils/routeParams';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { toast } from 'sonner';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import { fetchJson } from '@/lib/fetch-json';
+import { useOptionalWorkspaceContext } from '@/providers/WorkspaceProvider';
 
 interface ProjectMember {
   userId: string;
@@ -31,6 +33,7 @@ export default function ProjectTeamPage() {
   const projectId = getSingleParam(params.projectId);
   const state = useFlowDeck();
   const auth = useAuth();
+  const workspace = useOptionalWorkspaceContext();
 
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,6 +41,16 @@ export default function ProjectTeamPage() {
   const [showAddModal, setShowAddModal] = useState(false);
 
   if (!projectId) notFound();
+
+  // Populate the Add Member picker with the workspace directory (minus
+  // existing project members) — the modal used to be a dead-end (audit H-13).
+  useEffect(() => {
+    if (!showAddModal || !workspace?.selectedWorkspaceId) return;
+    (async () => {
+      const res = await fetchJson<{ members: ProjectMember[] }>(`/api/workspaces/${workspace.selectedWorkspaceId}/members`);
+      if (res.ok) setWorkspaceMembers(res.data.members ?? []);
+    })();
+  }, [showAddModal, workspace?.selectedWorkspaceId]);
 
   const fetchMembers = useCallback(async () => {
     if (!projectId) return;
@@ -56,35 +69,40 @@ export default function ProjectTeamPage() {
   const canManage = currentMember?.role === 'OWNER' || currentMember?.role === 'ADMIN';
 
   const handleChangeRole = async (userId: string, role: string) => {
-    try {
-      await fetch(`/api/projects/${projectId}/members/${userId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role }),
-      });
-      toast.success('Role updated');
-      fetchMembers();
-    } catch { toast.error('Failed to update role'); }
+    const res = await fetchJson(`/api/projects/${projectId}/members/${userId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+    });
+    if (!res.ok) {
+      toast.error('Failed to update role', { description: res.error });
+      return;
+    }
+    toast.success('Role updated');
+    fetchMembers();
   };
 
   const handleRemove = async (userId: string) => {
-    try {
-      await fetch(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' });
-      toast.success('Member removed');
-      fetchMembers();
-    } catch { toast.error('Failed to remove member'); }
+    const res = await fetchJson(`/api/projects/${projectId}/members/${userId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      toast.error('Failed to remove member', { description: res.error });
+      return;
+    }
+    toast.success('Member removed');
+    fetchMembers();
   };
 
   const handleAddMember = async (userId: string) => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}/members`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, role: 'MEMBER' }),
-      });
-      if (!res.ok) throw new Error();
-      toast.success('Member added');
-      setShowAddModal(false);
-      fetchMembers();
-    } catch { toast.error('Failed to add member'); }
+    const res = await fetchJson(`/api/projects/${projectId}/members`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, role: 'MEMBER' }),
+    });
+    if (!res.ok) {
+      toast.error('Failed to add member', { description: res.error });
+      return;
+    }
+    toast.success('Member added');
+    setShowAddModal(false);
+    fetchMembers();
   };
 
   const tasks = state.tasksByProject[projectId!] ?? [];
@@ -172,14 +190,33 @@ export default function ProjectTeamPage() {
             <p style={{ fontSize: 13, color: COLORS.gray, marginBottom: 16 }}>
               Select a workspace member to add to this project. They will be added as a MEMBER.
             </p>
-            {/* List workspace members not already in the project */}
-            {members.length > 0 && (
-              <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                <p style={{ fontSize: 12, color: COLORS.gray, marginBottom: 8 }}>
-                  To add new members, invite them to the workspace first from Workspace Settings.
-                </p>
-              </div>
-            )}
+            {/* Addable = workspace directory minus current project members */}
+            {(() => {
+              const addable = workspaceMembers.filter(w => !members.some(m => m.user.id === w.user.id));
+              if (addable.length === 0) {
+                return (
+                  <p style={{ fontSize: 13, color: COLORS.gray, marginBottom: 8 }}>
+                    Everyone in the workspace already has access, or the directory is still loading. To add new
+                    people, invite them from Workspace Settings first.
+                  </p>
+                );
+              }
+              return (
+                <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {addable.map(w => (
+                    <div key={w.user.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ flex: 1, fontSize: 13.5, color: COLORS.ink }}>
+                        {w.user.name ?? w.user.email}
+                        <span style={{ color: COLORS.gray, fontSize: 12 }}> · {w.user.email}</span>
+                      </span>
+                      <button onClick={() => handleAddMember(w.user.id)} style={{ ...btnStyle, width: 'auto', padding: '7px 14px' }}>
+                        Add
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
             <button onClick={() => setShowAddModal(false)} style={{ ...btnStyle, background: COLORS.line, color: COLORS.ink, marginTop: 16 }}>
               Close
             </button>

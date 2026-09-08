@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { ApprovalsView } from '@/features/flowdeck/components/views';
 import { useApprovals } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { fetchJson } from '@/lib/fetch-json';
 import { getSingleParam } from '@/shared/utils/routeParams';
 import { toast } from 'sonner';
 import { TableSkeleton } from '@/components/ui/skeleton';
@@ -82,14 +83,13 @@ export default function ProjectApprovalsPage() {
 
   const handleDeleteApproval = useCallback(
     async (id: string) => {
-      try {
-        const res = await fetch(`/api/approvals/${id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error();
-        toast.success('Approval deleted');
-        refetch();
-      } catch {
-        toast.error('Failed to delete approval');
+      const res = await fetchJson(`/api/approvals/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        toast.error('Failed to delete approval', { description: res.error });
+        return;
       }
+      toast.success('Approval deleted');
+      refetch();
     },
     [refetch],
   );

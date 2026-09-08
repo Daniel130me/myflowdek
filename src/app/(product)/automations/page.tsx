@@ -5,6 +5,7 @@ import { AutomationsView } from '@/features/flowdeck/components/views';
 import { useAutomations } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { toast } from 'sonner';
+import { fetchJson } from '@/lib/fetch-json';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import type { AutomationRule } from '@/features/flowdeck/model';
 
@@ -38,13 +39,15 @@ export default function AutomationsRoutePage() {
 
   const handleUpdate = useCallback(async (id: string, patch: Partial<AutomationRule>) => {
     if (!projectId) return;
-    try {
-      await fetch(`/api/projects/${projectId}/automations/${id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      });
-      refetch();
-    } catch { toast.error('Failed to update automation'); }
+    const res = await fetchJson(`/api/projects/${projectId}/automations/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+      toast.error('Failed to update automation', { description: res.error });
+      return;
+    }
+    refetch();
   }, [projectId, refetch]);
 
   const handleDelete = useCallback(async (id: string) => {

@@ -351,3 +351,52 @@ describe('Audit Remediation: Trust cluster (H-01 undo lie, H-02 false copy, H-03
     assert.ok(toolbar.includes('setDeleteOpen(true)'), 'toolbar delete must open the confirm dialog');
   });
 });
+
+describe('Audit Remediation: Feedback & approvals cluster (H-10/H-13/H-14/H-15)', () => {
+  test('fetchJson helper exists and maps both legacy error shapes', () => {
+    const p = path.join(process.cwd(), 'src/lib/fetch-json.ts');
+    const source = fs.readFileSync(p, 'utf-8');
+    assert.ok(source.includes('d.error'), 'must read {error}');
+    assert.ok(source.includes('d.message'), 'must read legacy {message}');
+    assert.ok(source.includes('issues'), 'must read zod {issues}');
+    assert.ok(source.includes('HTTP'), 'must fall back to a status-bearing message');
+  });
+
+  test('mutation handlers no longer toast success unconditionally', () => {
+    const team = fs.readFileSync(path.join(process.cwd(), 'src/app/(product)/projects/[projectId]/team/page.tsx'), 'utf-8');
+    assert.ok(!/await fetch\([^\n]*\);\s*\n\s*toast\.success/.test(team), 'team handlers must check the result before toasting success');
+    const settings = fs.readFileSync(path.join(process.cwd(), 'src/app/(product)/settings/page.tsx'), 'utf-8');
+    assert.ok(settings.includes('fetchJson'), 'settings must use the checked helper');
+    const budgets = fs.readFileSync(path.join(process.cwd(), 'src/app/(product)/budgets/page.tsx'), 'utf-8');
+    assert.ok(budgets.includes('fetchJson'), 'budgets delete must be checked');
+    const forms = fs.readFileSync(path.join(process.cwd(), 'src/app/(product)/forms/page.tsx'), 'utf-8');
+    assert.ok(forms.includes('fetchJson'), 'forms delete must be checked');
+    const automations = fs.readFileSync(path.join(process.cwd(), 'src/app/(product)/automations/page.tsx'), 'utf-8');
+    assert.ok(automations.includes('fetchJson'), 'automations PATCH must be checked');
+  });
+
+  test('team Add Member modal renders the real workspace directory', () => {
+    const team = fs.readFileSync(path.join(process.cwd(), 'src/app/(product)/projects/[projectId]/team/page.tsx'), 'utf-8');
+    assert.ok(team.includes('workspaces/${workspace.selectedWorkspaceId}/members'), 'modal must fetch the workspace directory');
+    assert.ok(team.includes('handleAddMember(w.user.id)'), 'modal entries must wire the add action');
+  });
+
+  test('onboarding failure is visible (toast + banner), not console-only', () => {
+    const p = path.join(process.cwd(), 'src/app/(auth)/onboarding/page.tsx');
+    const source = fs.readFileSync(p, 'utf-8');
+    assert.ok(source.includes('toast.error'), 'onboarding failure must toast');
+    assert.ok(source.includes('role="alert"'), 'onboarding failure must render an inline banner');
+    assert.ok(!source.includes('not wired here'), 'the TODO comment must be gone');
+  });
+
+  test('approvals use the real member directory and a DELETE endpoint', () => {
+    const view = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/components/views/ApprovalsView.tsx'), 'utf-8');
+    assert.ok(!view.includes('teamById'), 'approvals must not use the demo team map');
+    assert.ok(view.includes('useMemberDirectory'), 'approvals must resolve real members');
+    const route = fs.readFileSync(path.join(process.cwd(), 'src/app/api/approvals/[approvalId]/route.ts'), 'utf-8');
+    assert.ok(route.includes('export async function DELETE'), 'approvals route must expose DELETE');
+    const workspacePage = fs.readFileSync(path.join(process.cwd(), 'src/app/(product)/approvals/page.tsx'), 'utf-8');
+    assert.ok(workspacePage.includes('fetchJson(`/api/approvals/${id}`, { method: \'DELETE\' })'), 'workspace approvals delete must call the API');
+    assert.ok(!workspacePage.includes('state.deleteApproval'), 'workspace approvals delete must not mutate local-only store state');
+  });
+});

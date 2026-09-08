@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser, authErrorResponse } from '@/server/auth/authorization';
-import { resolveApproval, resolveApprovalSchema } from '@/server/approvals/approval.service';
+import { resolveApproval, resolveApprovalSchema, deleteApproval } from '@/server/approvals/approval.service';
 
 /** PATCH /api/approvals/:approvalId — approve or reject. Only the assigned approver. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ approvalId: string }> }) {
@@ -12,5 +12,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ approv
     if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid' }, { status: 400 });
     const approval = await resolveApproval(approvalId, user.id, parsed.data);
     return NextResponse.json({ approval });
+  } catch (e) { return authErrorResponse(e); }
+}
+
+/** DELETE /api/approvals/:approvalId — remove an approval request.
+ *  The service allows the requester/approver or a project OWNER/ADMIN. */
+export async function DELETE(_req: Request, { params }: { params: Promise<{ approvalId: string }> }) {
+  try {
+    const user = await requireAuthenticatedUser();
+    const { approvalId } = await params;
+    const result = await deleteApproval(approvalId, user.id);
+    return NextResponse.json(result);
   } catch (e) { return authErrorResponse(e); }
 }

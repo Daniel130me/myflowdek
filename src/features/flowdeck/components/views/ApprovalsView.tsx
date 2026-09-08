@@ -18,13 +18,11 @@ import {
   FF,
   fmtDate,
   TODAY,
-  teamById,
-  CURRENT_USER_ID,
   type ApprovalRequest,
   type Task,
   type Project,
 } from '@/features/flowdeck/model';
-import { SectionHeader, Avatar } from '../ui';
+import { SectionHeader, Avatar, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 import { toast } from 'sonner';
 
@@ -84,6 +82,11 @@ export function ApprovalsView({
   onDeleteApproval,
 }: ApprovalsViewProps) {
   const { isMobile } = useViewport();
+  // Real member directory (registered by the members hooks) — replaces the
+  // hard-coded demo teamById map, which never contained actual colleagues
+  // and whose ids could not satisfy the approvals FK (audit H-10).
+  const { members: memberDirectory } = useMemberDirectory();
+  const memberList = useMemo(() => Object.values(memberDirectory), [memberDirectory]);
 
   /* ---- State ---- */
   const [activeTab, setActiveTab] = useState<FilterTab>('pending');
@@ -282,10 +285,10 @@ export function ApprovalsView({
                 style={selectStyle}
               >
                 <option value="">Select an approver...</option>
-                {Object.values(teamById)
+                {memberList
                   .filter(m => m.id !== currentUserId)
                   .map(m => (
-                    <option key={m.id} value={m.id}>{m.name} — {m.role}</option>
+                    <option key={m.id} value={m.id}>{m.name}{m.role ? ` — ${m.role}` : ''}</option>
                   ))}
               </select>
             </div>
@@ -377,8 +380,8 @@ export function ApprovalsView({
           {filteredApprovals.map(approval => {
             const task = tasks.find(t => t.id === approval.taskId);
             const project = projects[approval.projectId];
-            const requester = teamById[approval.requesterId];
-            const approver = teamById[approval.approverId];
+            const requester = memberDirectory[approval.requesterId];
+            const approver = memberDirectory[approval.approverId];
 
             return (
               <ApprovalCard
@@ -386,8 +389,8 @@ export function ApprovalsView({
                 approval={approval}
                 task={task}
                 project={project}
-                requester={requester}
-                approver={approver}
+                requester={requester ? { ...requester, role: requester.role ?? '', color: requester.color ?? '' } : undefined}
+                approver={approver ? { ...approver, role: approver.role ?? '', color: approver.color ?? '' } : undefined}
                 isMobile={isMobile}
                 onResolve={handleResolve}
                 onDelete={handleDelete}

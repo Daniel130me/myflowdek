@@ -8,6 +8,7 @@ import { useAuth } from '@/features/flowdeck/components/auth';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { useViewport } from '@/features/flowdeck/hooks/useViewport';
 import { toast } from 'sonner';
+import { fetchJson } from '@/lib/fetch-json';
 
 interface WorkspaceMember {
   userId: string;
@@ -173,33 +174,39 @@ export default function WorkspaceSettingsPage() {
 
   const handleRemoveMember = async (userId: string) => {
     if (!workspaceId) return;
-    try {
-      await fetch(`/api/workspaces/${workspaceId}/members/${userId}`, { method: 'DELETE' });
-      toast.success('Member removed');
-      fetchAll();
-    } catch { toast.error('Failed to remove member'); }
+    const res = await fetchJson(`/api/workspaces/${workspaceId}/members/${userId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      toast.error('Failed to remove member', { description: res.error });
+      return;
+    }
+    toast.success('Member removed');
+    fetchAll();
   };
 
   const handleChangeRole = async (userId: string, role: string) => {
     if (!workspaceId) return;
-    try {
-      await fetch(`/api/workspaces/${workspaceId}/members/${userId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role }),
-      });
-      toast.success('Role updated');
-      fetchAll();
-    } catch { toast.error('Failed to update role'); }
+    const res = await fetchJson(`/api/workspaces/${workspaceId}/members/${userId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+    });
+    if (!res.ok) {
+      toast.error('Failed to update role', { description: res.error });
+      return;
+    }
+    toast.success('Role updated');
+    fetchAll();
   };
 
   const handleDelete = async () => {
     if (!workspaceId) return;
     if (!confirm('Are you sure? This will permanently delete the workspace and all its projects.')) return;
-    try {
-      await fetch(`/api/workspaces/${workspaceId}`, { method: 'DELETE' });
-      toast.success('Workspace deleted');
-      router.push('/projects');
-    } catch { toast.error('Failed to delete workspace'); }
+    const res = await fetchJson(`/api/workspaces/${workspaceId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      toast.error('Failed to delete workspace', { description: res.error });
+      return;
+    }
+    toast.success('Workspace deleted');
+    router.push('/projects');
   };
 
   const handleDisconnectStorage = async (slug: string) => {

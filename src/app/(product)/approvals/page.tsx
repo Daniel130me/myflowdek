@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ApprovalsView } from '@/features/flowdeck/components/views';
 import { useApprovals } from '@/features/flowdeck/hooks/useAdvancedFeatures';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { fetchJson } from '@/lib/fetch-json';
 import { toast } from 'sonner';
 import { TableSkeleton } from '@/components/ui/skeleton';
 import type { ApprovalRequest } from '@/features/flowdeck/model';
@@ -50,6 +51,19 @@ export default function ApprovalsRoutePage() {
     } catch { toast.error('Failed to resolve approval'); }
   }, [refetch]);
 
+  // Delete goes through the real API (the service enforces requester/approver
+  // or OWNER/ADMIN) — it used to mutate a store array this page never rendered,
+  // so the button did nothing (audit H-10).
+  const handleDeleteApproval = useCallback(async (id: string) => {
+    const res = await fetchJson(`/api/approvals/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      toast.error('Failed to delete approval', { description: res.error });
+      return;
+    }
+    toast.success('Approval deleted');
+    refetch();
+  }, [refetch]);
+
   if (loading) return <TableSkeleton />;
 
   return (
@@ -61,7 +75,7 @@ export default function ApprovalsRoutePage() {
       currentUserId={state.currentUserId}
       onAddApproval={handleAddApproval as any}
       onResolveApproval={handleResolveApproval as any}
-      onDeleteApproval={(id: string) => state.deleteApproval(id)}
+      onDeleteApproval={handleDeleteApproval}
     />
   );
 }
