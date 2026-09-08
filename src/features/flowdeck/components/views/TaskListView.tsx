@@ -198,7 +198,7 @@ interface TaskListViewProps {
   onOpenTask: (id: string) => void;
   onMove: (id: string, status: string) => void;
   onToggleComplete: (id: string) => void;
-  onReorder: (taskId: string, toIndex: number) => void;
+  onReorder: (taskId: string, anchor?: { beforeTaskId?: string | null; afterTaskId?: string | null } | null) => void;
   onQuickAdd: (name: string) => void;
   onUpdateTask?: (id: string, patch: Partial<Task>) => void;
   onRemoveTask?: (id: string) => void;
@@ -276,7 +276,11 @@ export function TaskListView({ tasks, tags = [], projects, currentProjectId, all
     e.preventDefault();
     if (dragIdx !== null && dragIdx !== idx) {
       const taskId = sorted[dragIdx].id;
-      onReorder(taskId, idx);
+      // Anchor on the neighbour occupying the drop position (audit H-07):
+      // `sorted` is filtered/sorted, so its index is meaningless to the
+      // store's global order — the target task's id travels with the drop.
+      const target = sorted[idx];
+      onReorder(taskId, target ? { beforeTaskId: target.id } : null);
     }
     setDragIdx(null);
     setOverIdx(null);

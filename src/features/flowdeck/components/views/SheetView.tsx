@@ -14,7 +14,7 @@ interface SheetViewProps {
   onAdd: (task: Task) => void;
   onRemove: (id: string) => void;
   grid: GridActions;
-  onReorder: (taskId: string, toIndex: number) => void;
+  onReorder: (taskId: string, anchor?: { beforeTaskId?: string | null; afterTaskId?: string | null } | null) => void;
   onQuickAdd: (name: string) => void;
   onToggleComplete: (id: string) => void;
 }
@@ -88,7 +88,11 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
       return;
     }
     const taskId = filtered[dragIdx].id;
-    onReorder(taskId, targetIdx);
+    // Anchor on the neighbour occupying the drop position (audit H-07):
+    // `filtered` may be a search-filtered subset, so its index is meaningless
+    // to the store's global order — the target task's id travels instead.
+    const target = filtered[targetIdx];
+    onReorder(taskId, target ? { beforeTaskId: target.id } : null);
     setDragIdx(null);
     setDragOverIdx(null);
   }, [dragIdx, filtered, onReorder]);

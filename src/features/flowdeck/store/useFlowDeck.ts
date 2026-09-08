@@ -9,6 +9,7 @@ import {
   INITIAL_TAGS, initialComments, initialTimeLogs, CURRENT_USER_ID,
   PROJECT_TEMPLATES,
   FONT_FAMILY as FF,
+  applyReorderAnchor,
   type Task, type Project, type FileItem, type RaidItem, type CustomColumn, type TaskStatus, type TaskPriority,
   type Tag, type Comment, type ActivityEntry, type TimeLog, type SearchFilters, type Section, type Reaction, type Goal, type KeyResult, type SavedFilter, EMPTY_FILTERS,
   type AutomationRule, type Form, type FormSubmission, type ApprovalRequest, type Budget, type Expense, type TimesheetEntry, type CreateTaskInput,
@@ -240,7 +241,13 @@ export interface FlowDeckState {
   /** Merge server-fetched time logs into the store (audit H-09 hydration). */
   syncTimeLogs: (projectId: string, logs: TimeLog[]) => void;
   /* Reorder & Quick Add */
-  reorderTask: (projectId: string, taskId: string, toIndex: number) => void;
+  /**
+   * Reorder by drop ANCHOR, not index (audit H-07): views are filtered /
+   * sorted / grouped, so an index inside a view's list is meaningless in the
+   * global order. The anchor names a neighbouring task the drop is relative
+   * to; `null` anchors mean the boundaries of the manual order.
+   */
+  reorderTask: (projectId: string, taskId: string, anchor?: { /** Insert immediately before this task. */ beforeTaskId?: string | null; /** Insert immediately after this task. */ afterTaskId?: string | null } | null) => void;
   quickAddTask: (projectId: string, name: string, opts?: { status?: string; parentId?: string | null; startOverride?: string }) => string | undefined;
   /* Batch 6 */
   duplicateTaskWithOptions: (projectId: string, id: string, opts: { includeSubtasks: boolean; includeComments: boolean; includeAttachments: boolean }) => void;
@@ -1893,13 +1900,13 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [tasksByProject, tagsByProject, commit, logActivity]);
 
   /* ---- Reorder ---- */
-  const reorderTask = useCallback((projectId: string, taskId: string, toIndex: number) => {
+  const reorderTask = useCallback((projectId: string, taskId: string, anchor?: { beforeTaskId?: string | null; afterTaskId?: string | null } | null) => {
     const projectTasks = tasksByProject[projectId] || [];
-    const idx = projectTasks.findIndex(t => t.id === taskId);
-    if (idx === -1 || idx === toIndex) return;
-    const arr = [...projectTasks];
-    const [removed] = arr.splice(idx, 1);
-    arr.splice(toIndex, 0, removed);
+    // Translate the drop anchor into a position in the GLOBAL array (see
+    // `applyReorderAnchor` — an index computed inside a filtered/sorted view
+    // list did not survive the translation, audit H-07).
+    const arr = applyReorderAnchor(projectTasks, taskId, anchor);
+    if (!arr) return;
     // Snapshot for rollback.
     const snapshot = projectTasks;
     // Optimistic local update — reassign sortOrder based on new positions.

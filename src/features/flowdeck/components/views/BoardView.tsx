@@ -154,7 +154,7 @@ interface BoardViewProps {
   onOpenTask: (id: string) => void;
   onMove: (id: string, status: string) => void;
   onToggleComplete: (id: string) => void;
-  onReorder: (taskId: string, toIndex: number) => void;
+  onReorder: (taskId: string, anchor?: { beforeTaskId?: string | null; afterTaskId?: string | null } | null) => void;
   onQuickAdd: (name: string, status: string) => void;
   onUpdateTask?: (id: string, patch: Partial<Task>) => void;
   onRemoveTask?: (id: string) => void;
@@ -304,8 +304,31 @@ export function BoardView({
         const targetStatus = (over.data.current.status as string | undefined) ?? null;
         if (targetStatus) {
           if (dragSourceCol === targetStatus) {
-            const idx = dragOverIdx >= 0 ? dragOverIdx : ((over.data.current.colLength as number | undefined) ?? 0);
-            onReorder(dragId, idx);
+            // Anchor-based reorder (audit H-07): the view's column index is
+            // meaningless against the store's global, unfiltered array, so
+            // the drop names the neighbouring CARD it lands on instead.
+            // Placement is recomputed here from live rects rather than read
+            // from dragover state — a fast release must not reorder against
+            // a stale anchor. Ids survive any filtering/sorting; a bare
+            // index never did.
+            let anchor: { beforeTaskId?: string; afterTaskId?: string } | null;
+            if (String(over.id).startsWith('card:')) {
+              const overTaskId = String(over.id).replace(/^card:/, '');
+              const activeRect = e.active.rect.current.translated;
+              const overNode = document.querySelector(`[data-dnd-card="${String(over.id)}"]`);
+              if (activeRect && overNode) {
+                const overRect = overNode.getBoundingClientRect();
+                const belowMid = (activeRect.top + activeRect.height / 2) > (overRect.top + overRect.height / 2);
+                anchor = belowMid ? { afterTaskId: overTaskId } : { beforeTaskId: overTaskId };
+              } else {
+                anchor = { beforeTaskId: overTaskId };
+              }
+            } else {
+              // Column body: anchor below the column's visible bottom card.
+              const lastTaskId = over.data.current.lastTaskId as string | undefined;
+              anchor = lastTaskId ? { afterTaskId: lastTaskId } : null;
+            }
+            onReorder(dragId, anchor);
           } else {
             onMove(dragId, targetStatus);
           }
@@ -316,7 +339,7 @@ export function BoardView({
       setOverCol(null);
       setDragOverIdx(-1);
     },
-    [dragId, dragSourceCol, dragOverIdx, onReorder, onMove],
+    [dragId, dragSourceCol, onReorder, onMove],
   );
 
   // Reset drag state on cancel (Escape during keyboard drag).
@@ -400,9 +423,11 @@ export function BoardView({
     const isOverWip = !!(wipLimits[status] && col.length >= wipLimits[status]);
     // Drop target for a column's empty area (below the last card). Ids are
     // unique per swimlane group because a status can render once per group.
+    // `lastTaskId` anchors the drop to the column's visible bottom card so
+    // the store can insert in the right place of the GLOBAL order (H-07).
     const { setNodeRef: setColDropRef } = useDroppable({
       id: `col:${columnKey}:${status}`,
-      data: { status, colLength: col.length },
+      data: { status, colLength: col.length, lastTaskId: col.length ? col[col.length - 1].id : null },
     });
 
     return (

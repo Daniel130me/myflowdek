@@ -66,7 +66,7 @@ export default function ProjectBoardPage() {
       }}
       onMove={(id, status) => state.moveStatus(projectId, id, status)}
       onToggleComplete={(id) => state.toggleComplete(projectId, id)}
-      onReorder={(taskId, toIndex) => state.reorderTask(projectId, taskId, toIndex)}
+      onReorder={(taskId, anchor) => state.reorderTask(projectId, taskId, anchor ?? undefined)}
       onQuickAdd={(name, status) => {
         state.quickAddTask(projectId, name, { status });
       }}

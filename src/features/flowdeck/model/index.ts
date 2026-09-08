@@ -6,3 +6,4 @@ export { FONT_FAMILY as FF } from './constants';
 export * from './helpers';
 export * from './data';
 export { PROJECT_TEMPLATES } from './templates';
+export { applyReorderAnchor, type ReorderAnchor } from './reorder';

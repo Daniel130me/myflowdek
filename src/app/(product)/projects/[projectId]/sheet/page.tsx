@@ -33,7 +33,7 @@ export default function ProjectSheetPage() {
       onAdd={(task) => state.addTask(projectId, task)}
       onRemove={(id) => state.removeTask(projectId, id)}
       grid={state.gridActions}
-      onReorder={(taskId, toIndex) => state.reorderTask(projectId, taskId, toIndex)}
+      onReorder={(taskId, anchor) => state.reorderTask(projectId, taskId, anchor ?? undefined)}
       onQuickAdd={name => {
         state.quickAddTask(projectId, name, { status: 'backlog' });
       }}
