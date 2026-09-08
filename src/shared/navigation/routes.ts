@@ -9,6 +9,10 @@ export const routes = {
   resetPassword: () => '/reset-password',
   onboarding: () => '/onboarding',
 
+  // Public legal pages (linked from the auth layouts; no session required)
+  terms: () => '/legal/terms',
+  privacy: () => '/legal/privacy',
+
   // Top-level product routes
   projects: () => '/projects',
   newProject: () => '/projects/new',

@@ -21,6 +21,35 @@ const FEATURES = [
   { icon: Zap, title: '13 Powerful Views', desc: 'Timeline, Board, Sheet, Calendar, Gantt, RAID log, and more.' },
 ];
 
+/**
+ * Legal footer shared by all three auth layouts (mobile / tablet / desktop).
+ *
+ * Renders REAL links to the public legal pages — the audit flagged the
+ * previous <span> placeholders as fake legal links (clickable-looking but
+ * inert), which is a launch blocker. Links open in a new tab so an
+ * in-progress sign-in / sign-up form is not lost.
+ */
+function AuthLegalLinks({ marginTop }: { marginTop: number }) {
+  const linkStyle: React.CSSProperties = {
+    color: COLORS.accent,
+    fontWeight: 600,
+    textDecoration: 'underline',
+    textUnderlineOffset: 2,
+  };
+  return (
+    <p style={{ textAlign: 'center', fontSize: 11, color: COLORS.grayLight, marginTop, lineHeight: 1.5 }}>
+      By continuing, you agree to our{' '}
+      <a href={routes.terms()} target="_blank" rel="noopener noreferrer" style={linkStyle}>
+        Terms of Service
+      </a>
+      {' '}and{' '}
+      <a href={routes.privacy()} target="_blank" rel="noopener noreferrer" style={linkStyle}>
+        Privacy Policy
+      </a>
+    </p>
+  );
+}
+
 const inputStyle: React.CSSProperties = {
   width: '100%',
   border: `1px solid ${COLORS.line}`,
@@ -287,13 +316,8 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
             </button>
           </p>
 
-          {/* Terms */}
-          <p style={{ textAlign: 'center', fontSize: 11, color: COLORS.grayLight, marginTop: 14, lineHeight: 1.5 }}>
-            By continuing, you agree to our{' '}
-            <span style={{ color: COLORS.accent, cursor: 'pointer' }}>Terms of Service</span>
-            {' '}and{' '}
-            <span style={{ color: COLORS.accent, cursor: 'pointer' }}>Privacy Policy</span>
-          </p>
+          {/* Terms — real links to the public legal pages */}
+          <AuthLegalLinks marginTop={14} />
         </div>
       </div>
     );
@@ -485,12 +509,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
               </button>
             </p>
 
-            <p style={{ textAlign: 'center', fontSize: 11, color: COLORS.grayLight, marginTop: 16, lineHeight: 1.5 }}>
-              By continuing, you agree to our{' '}
-              <span style={{ color: COLORS.accent, cursor: 'pointer' }}>Terms of Service</span>
-              {' '}and{' '}
-              <span style={{ color: COLORS.accent, cursor: 'pointer' }}>Privacy Policy</span>
-            </p>
+            <AuthLegalLinks marginTop={16} />
           </div>
         </div>
       </div>
@@ -686,12 +705,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
             </button>
           </p>
 
-          <p style={{ textAlign: 'center', fontSize: 11, color: COLORS.grayLight, marginTop: 20, lineHeight: 1.5 }}>
-            By continuing, you agree to our{' '}
-            <span style={{ color: COLORS.accent, cursor: 'pointer' }}>Terms of Service</span>
-            {' '}and{' '}
-            <span style={{ color: COLORS.accent, cursor: 'pointer' }}>Privacy Policy</span>
-          </p>
+          <AuthLegalLinks marginTop={20} />
         </div>
       </div>
     </div>
