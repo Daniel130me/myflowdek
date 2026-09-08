@@ -2,6 +2,21 @@
 
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Plus, Repeat, Layers } from 'lucide-react';
+import {
+  DndContext,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  pointerWithin,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+  type DragOverEvent,
+  type DragEndEvent,
+  type KeyboardCoordinateGetter,
+} from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import { PRIORITY_META, COLORS, STATUS_META, STATUS_ORDER, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task, type FileItem, type Tag, type Project } from '@/features/flowdeck/model';
 import { Avatar, PriorityFlag, SectionHeader, FileThumbnailGrid, TaskCheckbox, TagPills, TagFilterBar, FF, TaskContextMenu, InlineTaskName, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
@@ -18,6 +33,113 @@ function computeNextBoardDate(dateStr: string, recurrence: string): string {
   }
   return d.toISOString().slice(0, 10);
 }
+
+/**
+ * A kanban card wrapper wired into dnd-kit.
+ *
+ * Replaces the previous HTML5 drag attributes, which never fired on touch
+ * devices and gave the card no keyboard path (audit C-08). The wrapper is:
+ *   - focusable (tabIndex=0, role=button) so Tab reaches it
+ *   - keyboard-draggable: Space lifts, arrows move, Space drops (the sensor
+ *     is configured to start on Space only, leaving Enter to open the task)
+ *   - touch-draggable: TouchSensor long-press (180ms) lifts the card
+ *   - also a drop target so cards above/below resolve precise insert indexes
+ * The Radix context menu wrapping it remains as a no-drag fallback.
+ */
+function DraggableCard({
+  taskId,
+  taskName,
+  status,
+  idx,
+  isDragged,
+  onOpenTask,
+  padding,
+  children,
+}: {
+  taskId: string;
+  taskName: string;
+  status: string;
+  idx: number;
+  isDragged: boolean;
+  onOpenTask: (id: string) => void;
+  padding: number;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef: setDragRef, attributes, listeners, transform } = useDraggable({
+    id: taskId,
+    data: { status, idx },
+  });
+  const { setNodeRef: setDropRef } = useDroppable({
+    id: `card:${taskId}`,
+    data: { status, idx },
+  });
+
+  // Enter opens the task (the sensor only claims Space). While a drag is
+  // active the keyboard sensor owns the keys — don't double-handle.
+  // dnd-kit's keyboard listener arrives via `listeners.onKeyDown`; it must
+  // run, so compose it with ours instead of letting one clobber the other.
+  const handleCardKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      listeners?.onKeyDown?.(e);
+      if (isDragged) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        onOpenTask(taskId);
+      }
+    },
+    [listeners, isDragged, onOpenTask, taskId],
+  );
+
+  return (
+    <div
+      ref={el => { setDragRef(el); setDropRef(el); }}
+      data-dnd-card={taskId}
+      {...attributes}
+      {...listeners}
+      onKeyDown={handleCardKeyDown}
+      // Ours win over the sensor defaults: Space (not Enter) lifts, so Enter
+      // stays free for opening the task.
+      tabIndex={0}
+      role="button"
+      aria-label={`${taskName}. Press Space to lift and arrow keys to move, then Space to drop. Press Enter to open.`}
+      onClick={() => { if (!isDragged) onOpenTask(taskId); }}
+      style={{
+        background: '#FFFFFF',
+        borderRadius: 12,
+        padding,
+        cursor: 'grab',
+        border: `1px solid ${COLORS.line}`,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+        opacity: isDragged ? 0.4 : 1,
+        transform: CSS.Translate.toString(transform),
+        touchAction: 'pan-y',
+        outline: 'none',
+      }}
+      onFocus={e => { e.currentTarget.style.borderColor = COLORS.accent; }}
+      onBlur={e => { e.currentTarget.style.borderColor = COLORS.line; }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/*
+ * Fixed-step keyboard coordinate getter. The sortable preset snaps to
+ * sortable containers, which the board doesn't use — plain droppables need
+ * plain deltas. 60px per keypress crosses a column in ~5 presses.
+ */
+const keyboardBoardCoordinates: KeyboardCoordinateGetter = (event, { currentCoordinates }) => {
+  const deltas: Record<string, { x: number; y: number }> = {
+    ArrowDown: { x: 0, y: 60 },
+    ArrowUp: { x: 0, y: -60 },
+    ArrowLeft: { x: -60, y: 0 },
+    ArrowRight: { x: 60, y: 0 },
+  };
+  const delta = deltas[event.key];
+  if (!delta) return currentCoordinates;
+  event.preventDefault();
+  return { x: currentCoordinates.x + delta.x, y: currentCoordinates.y + delta.y };
+};
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -147,47 +269,47 @@ export function BoardView({
   /* ---------------------------------------------------------------- */
 
   // Per-card dragover: compute insertion index within the hovered column.
-  // Uses stopPropagation so the column's onDragOver won't fire and
-  // overwrite the precise index with a fallback.
-  const handleCardDragOver = useCallback(
-    (e: React.DragEvent, status: string, idx: number) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!dragId) return;
-      setOverCol(status);
-      if (dragSourceCol === status) {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const midY = rect.top + rect.height / 2;
-        setDragOverIdx(e.clientY < midY ? idx : idx + 1);
-      }
-    },
-    [dragId, dragSourceCol],
-  );
-
-  // Column background dragover (fires when NOT hovering a card,
-  // because card handler stops propagation).
-  const handleColDragOver = useCallback(
-    (e: React.DragEvent, status: string, colLength: number) => {
-      e.preventDefault();
-      setOverCol(status);
-      // When hovering the empty area of the same column, default to end.
-      if (dragSourceCol === status) {
-        setDragOverIdx(colLength);
+  // Uses the over target's data (cards carry {status, idx}, columns carry
+  // {status, colLength}) so the precise insertion index survives; hovering a
+  // card's upper/lower half resolves above/below placement.
+  const handleDragOver = useCallback(
+    (e: DragOverEvent) => {
+      const over = e.over;
+      if (!over?.data.current) { setOverCol(null); setDragOverIdx(-1); return; }
+      const overStatus = (over.data.current.status as string | undefined) ?? null;
+      setOverCol(overStatus);
+      if (dragSourceCol && overStatus === dragSourceCol && typeof over.data.current.idx === 'number') {
+        const activeRect = e.active.rect.current.translated;
+        // dnd-kit doesn't give the over rect on the event; measure from DOM.
+        const overNode = document.querySelector(`[data-dnd-card="${String(over.id)}"]`);
+        if (activeRect && overNode) {
+          const overRect = overNode.getBoundingClientRect();
+          const overMid = overRect.top + overRect.height / 2;
+          const activeMid = activeRect.top + activeRect.height / 2;
+          setDragOverIdx(activeMid > overMid ? over.data.current.idx + 1 : over.data.current.idx);
+        }
+      } else {
+        setDragOverIdx(-1);
       }
     },
     [dragSourceCol],
   );
 
-  // Column drop handler: dispatches either onReorder or onMove.
-  const handleColDrop = useCallback(
-    (e: React.DragEvent, status: string, colLength: number) => {
-      e.preventDefault();
-      if (!dragId) return;
-      if (dragSourceCol === status) {
-        const idx = dragOverIdx >= 0 ? dragOverIdx : colLength;
-        onReorder(dragId, idx);
-      } else {
-        onMove(dragId, status);
+  // Drop handler: dispatches either onReorder (same column) or onMove
+  // (cross column) — identical semantics to the previous HTML5 drop path.
+  const handleDragEnd = useCallback(
+    (e: DragEndEvent) => {
+      const over = e.over;
+      if (dragId && over?.data.current) {
+        const targetStatus = (over.data.current.status as string | undefined) ?? null;
+        if (targetStatus) {
+          if (dragSourceCol === targetStatus) {
+            const idx = dragOverIdx >= 0 ? dragOverIdx : ((over.data.current.colLength as number | undefined) ?? 0);
+            onReorder(dragId, idx);
+          } else {
+            onMove(dragId, targetStatus);
+          }
+        }
       }
       setDragId(null);
       setDragSourceCol(null);
@@ -197,13 +319,27 @@ export function BoardView({
     [dragId, dragSourceCol, dragOverIdx, onReorder, onMove],
   );
 
-  // Reset drag state on drag end (e.g. user cancels)
-  const handleDragEnd = useCallback(() => {
+  // Reset drag state on cancel (Escape during keyboard drag).
+  const handleDragCancel = useCallback(() => {
     setDragId(null);
     setDragSourceCol(null);
     setOverCol(null);
     setDragOverIdx(-1);
   }, []);
+
+  const sensors = useSensors(
+    // Mouse: drag starts after 5px of movement so clicks keep working.
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    // Touch: long-press lifts the card; moving scrolls are tolerated so the
+    // board can still be scrolled vertically (HTML5 DnD never fired here).
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+    // Keyboard: Tab to a card, Space lifts, arrows move, Space drops.
+    // Activation is Space-only so Enter stays reserved for opening the task.
+    useSensor(KeyboardSensor, {
+      coordinateGetter: keyboardBoardCoordinates,
+      keyboardCodes: { start: ['Space'], cancel: ['Escape'], end: ['Space'] },
+    }),
+  );
 
   /* ---------------------------------------------------------------- */
   /*  Quick-add handlers                                               */
@@ -262,13 +398,17 @@ export function BoardView({
     const isColumnHighlighted = overCol === status;
     const showLine = isReordering && isColumnHighlighted;
     const isOverWip = !!(wipLimits[status] && col.length >= wipLimits[status]);
+    // Drop target for a column's empty area (below the last card). Ids are
+    // unique per swimlane group because a status can render once per group.
+    const { setNodeRef: setColDropRef } = useDroppable({
+      id: `col:${columnKey}:${status}`,
+      data: { status, colLength: col.length },
+    });
 
     return (
       <div
         key={columnKey + '-' + status}
-        onDragOver={e => handleColDragOver(e, status, col.length)}
-        onDragLeave={() => setOverCol(null)}
-        onDrop={e => handleColDrop(e, status, col.length)}
+        ref={setColDropRef}
         style={{
           background: isColumnHighlighted && !isReordering ? COLORS.accentSoft : isOverWip ? `${COLORS.redSoft}33` : '#F7F7F7',
           borderRadius: 12,
@@ -329,13 +469,14 @@ export function BoardView({
                   onDemoteToSubtask={onDemoteToSubtask}
                   onSetRecurrence={onSetRecurrence}
                 >
-                  <div
-                    draggable
-                    onDragStart={() => { setDragId(t.id); setDragSourceCol(status); }}
-                    onDragOver={e => handleCardDragOver(e, status, idx)}
-                    onDragEnd={handleDragEnd}
-                    onClick={() => onOpenTask(t.id)}
-                    style={{ background: '#FFFFFF', borderRadius: 12, padding: isMobile ? 14 : 12, cursor: 'grab', border: `1px solid ${COLORS.line}`, boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)', opacity: isDragged ? 0.4 : 1 }}
+                  <DraggableCard
+                    taskId={t.id}
+                    taskName={t.name}
+                    status={status}
+                    idx={idx}
+                    isDragged={isDragged}
+                    onOpenTask={onOpenTask}
+                    padding={isMobile ? 14 : 12}
                   >
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                       <div onClick={e => { e.stopPropagation(); onToggleComplete(t.id); }} style={{ marginTop: 1 }}>
@@ -378,7 +519,7 @@ export function BoardView({
                     <div style={{ marginTop: 8, height: 4, background: COLORS.line, borderRadius: 2, marginLeft: 26 }}>
                       <div style={{ width: `${t.progress}%`, height: '100%', borderRadius: 2, background: meta.color }} />
                     </div>
-                  </div>
+                  </DraggableCard>
                 </TaskContextMenu>
 
                 {showLineBelow && <div style={insertLineStyle} />}
@@ -454,6 +595,18 @@ export function BoardView({
       />
 
       {/* Swimlane mode */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={e => {
+          const activeData = e.active.data.current as { status?: string } | undefined;
+          setDragId(String(e.active.id));
+          setDragSourceCol(activeData?.status ?? null);
+        }}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
       {swimlaneGroups ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {Array.from(swimlaneGroups.entries()).map(([groupKey, groupTasks]) => {
@@ -487,6 +640,7 @@ export function BoardView({
           ))}
         </div>
       )}
+      </DndContext>
     </div>
   );
 }

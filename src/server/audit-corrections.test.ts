@@ -291,3 +291,28 @@ describe('Audit Remediation: RAID log persistence (C-01)', () => {
     assert.ok(source.includes('syncRaidItems'), 'store must expose server hydration');
   });
 });
+
+describe('Audit Remediation: Board drag-and-drop works on touch and keyboard (C-08)', () => {
+  test('Board is wired to dnd-kit sensors (mouse, touch long-press, keyboard)', () => {
+    const boardPath = path.join(process.cwd(), 'src/features/flowdeck/components/views/BoardView.tsx');
+    const source = fs.readFileSync(boardPath, 'utf-8');
+    assert.ok(source.includes('DndContext'), 'board must render a DndContext');
+    assert.ok(source.includes('TouchSensor'), 'board must register the touch sensor');
+    assert.ok(source.includes('KeyboardSensor'), 'board must register the keyboard sensor');
+    assert.ok(source.includes("delay: 180"), 'touch activation must use a long-press delay');
+  });
+
+  test('cards are focusable with keyboard drag semantics and no HTML5 DnD', () => {
+    const boardPath = path.join(process.cwd(), 'src/features/flowdeck/components/views/BoardView.tsx');
+    const source = fs.readFileSync(boardPath, 'utf-8');
+    // HTML5 DnD specifics: a bare `draggable` JSX attribute, a no-arg
+    // onDragStart arrow, and an onDrop prop (DndContext never uses onDrop).
+    const lines = source.split('\n').map(l => l.trim());
+    assert.ok(!lines.includes('draggable'), 'HTML5 draggable attribute must be gone from cards');
+    assert.ok(!source.includes('onDragStart={()'), 'HTML5 onDragStart must be gone');
+    assert.ok(!source.includes('onDrop='), 'HTML5 onDrop must be gone');
+    assert.ok(source.includes('tabIndex={0}'), 'cards must be keyboard-focusable');
+    assert.ok(source.includes('role="button"'), 'cards must expose button semantics');
+    assert.ok(source.includes('Press Space to lift'), 'cards must announce keyboard drag usage');
+  });
+});
