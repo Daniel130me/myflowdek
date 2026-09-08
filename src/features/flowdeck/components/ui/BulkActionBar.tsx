@@ -67,7 +67,12 @@ export function BulkActionBar({
     display: 'flex', alignItems: 'center', gap: isMobile ? 5 : 4,
     boxShadow: '0 10px 25px rgba(0,0,0,0.25), 0 4px 10px rgba(0,0,0,0.15)',
     maxWidth: 'calc(100vw - 32px)',
-    overflow: 'visible',
+    // Horizontal scroll keeps every action (incl. Delete) reachable on
+    // phones instead of clipping them offscreen (audit H-24).
+    overflowX: 'auto',
+    overflowY: 'visible',
+    scrollbarWidth: 'thin',
+    WebkitOverflowScrolling: 'touch' as any,
   };
 
   const countBadge: React.CSSProperties = {
@@ -120,7 +125,7 @@ export function BulkActionBar({
       <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.12)', margin: '0 3px', flexShrink: 0 }} />
 
       {/* Complete */}
-      <button onClick={() => onComplete(currentProjectId)} title="Mark complete" style={btnStyle()}>
+      <button onClick={() => onComplete(currentProjectId)} title="Mark complete" aria-label="Mark complete" style={btnStyle()}>
         <CheckCircle2 size={isMobile ? 17 : 15} />
       </button>
 
@@ -270,33 +275,33 @@ export function BulkActionBar({
       )}
 
       {/* Link / Unlink deps */}
-      <button onClick={() => onLink(currentProjectId)} title="Link dependencies" style={btnStyle()}>
+      <button onClick={() => onLink(currentProjectId)} title="Link dependencies" aria-label="Link dependencies" style={btnStyle()}>
         <Link2 size={isMobile ? 17 : 15} />
       </button>
-      <button onClick={() => onUnlink(currentProjectId)} title="Unlink dependencies" style={btnStyle()}>
+      <button onClick={() => onUnlink(currentProjectId)} title="Unlink dependencies" aria-label="Unlink dependencies" style={btnStyle()}>
         <Unlink2 size={isMobile ? 17 : 15} />
       </button>
 
       {/* Bold */}
-      <button onClick={() => onBold(currentProjectId)} title="Toggle bold" style={btnStyle()}>
+      <button onClick={() => onBold(currentProjectId)} title="Toggle bold" aria-label="Toggle bold" style={btnStyle()}>
         <Bold size={isMobile ? 17 : 15} />
       </button>
 
       {/* Milestone */}
-      <button onClick={() => onMilestone(currentProjectId)} title="Toggle milestone" style={btnStyle()}>
+      <button onClick={() => onMilestone(currentProjectId)} title="Toggle milestone" aria-label="Toggle milestone" style={btnStyle()}>
         <Milestone size={isMobile ? 17 : 15} />
       </button>
 
       {/* #30: Bulk duplicate */}
       {onDuplicateBulk && (
-        <button onClick={() => onDuplicateBulk(currentProjectId)} title="Duplicate selected" style={btnStyle()}>
+        <button onClick={() => onDuplicateBulk(currentProjectId)} title="Duplicate selected" aria-label="Duplicate selected" style={btnStyle()}>
           <Copy size={isMobile ? 17 : 15} />
         </button>
       )}
 
       {/* Attach files */}
       <input ref={fileRef} type="file" multiple style={{ display: 'none' }} onChange={e => { if (e.target.files?.length) onAttachFiles(currentProjectId, e.target.files); e.target.value = ''; }} />
-      <button onClick={() => fileRef.current?.click()} title="Attach files" style={btnStyle()}>
+      <button onClick={() => fileRef.current?.click()} title="Attach files" aria-label="Attach files" style={btnStyle()}>
         <FileUp size={isMobile ? 17 : 15} />
       </button>
 

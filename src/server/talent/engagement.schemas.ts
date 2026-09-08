@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_CURRENCY } from '../config/currency';
 
 const currencyRegex = /^[A-Z]{3}$/;
 const priceSchema = z
@@ -22,7 +23,7 @@ export const createEngagementSchema = z.object({
   title: z.string().trim().min(3, 'Title must be at least 3 characters').max(200),
   scopeDescription: z.string().trim().min(10, 'Scope description must be at least 10 characters').max(10000),
   agreedPrice: priceSchema,
-  currency: z.string().regex(currencyRegex, 'Currency must be a 3-letter ISO code').default('USD'),
+  currency: z.string().regex(currencyRegex, 'Currency must be a 3-letter ISO code').default(DEFAULT_CURRENCY),
   startDate: z.string().datetime().optional().nullable(),
   deadline: z.string().datetime().optional().nullable(),
   milestones: z.array(milestoneInputSchema).optional(),

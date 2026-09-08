@@ -1,4 +1,5 @@
 import { db } from '@/server/db/client';
+import { SUPPORTED_PAYMENT_CURRENCIES } from '@/server/config/currency';
 import { Prisma } from '@prisma/client';
 import { AuthError } from '@/server/auth/authorization';
 import {
@@ -25,6 +26,17 @@ export { ServiceError };
  * Creates a new engagement in DRAFT state.
  */
 export async function createDraftEngagement(userId: string, input: CreateEngagementInput) {
+  // Currency must be fundable at launch (audit H-20): engagements defaulted
+  // to USD while funding only supports NGN, so a default-currency engagement
+  // could never be paid. Reject unsupported currencies here, up front, with
+  // a clear error instead of a 400 at fund time.
+  if (!SUPPORTED_PAYMENT_CURRENCIES.includes(input.currency as (typeof SUPPORTED_PAYMENT_CURRENCIES)[number])) {
+    throw new ServiceError(
+      `Currency "${input.currency}" cannot be funded yet. The payment launch supports ${SUPPORTED_PAYMENT_CURRENCIES.join('/')} engagements only.`,
+      400,
+    );
+  }
+
   // 1. Verify task access (must be project member with EDIT_TASK capability)
   const task = await db.task.findUnique({
     where: { id: input.taskId },

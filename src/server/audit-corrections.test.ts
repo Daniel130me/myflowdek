@@ -524,3 +524,22 @@ describe('Audit Remediation: Workspace IA (H-11 select-project notice, H-12 side
     }
   });
 });
+
+describe('Audit Remediation: Currency single source (H-20) + bulk bar mobile (H-24)', () => {
+  test('one DEFAULT_CURRENCY constant backs engagements and budgets', () => {
+    assert.ok(fs.existsSync(path.join(process.cwd(), 'src/server/config/currency.ts')), 'currency config must exist');
+    const schemas = fs.readFileSync(path.join(process.cwd(), 'src/server/talent/engagement.schemas.ts'), 'utf-8');
+    assert.ok(schemas.includes('.default(DEFAULT_CURRENCY)'), 'engagements must default to the launch currency');
+    assert.ok(!schemas.includes(".default('USD')"), 'the USD default must be gone');
+    const budgets = fs.readFileSync(path.join(process.cwd(), 'src/server/budgets/budget.service.ts'), 'utf-8');
+    assert.ok(budgets.includes('.default(DEFAULT_CURRENCY)'), 'budgets must default to the launch currency');
+    const service = fs.readFileSync(path.join(process.cwd(), 'src/server/talent/engagement.service.ts'), 'utf-8');
+    assert.ok(service.includes('SUPPORTED_PAYMENT_CURRENCIES'), 'creation must validate currency up front');
+  });
+
+  test('bulk action bar scrolls horizontally and its buttons are labelled', () => {
+    const bar = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/components/ui/BulkActionBar.tsx'), 'utf-8');
+    assert.ok(bar.includes("overflowX: 'auto'"), 'the bar must scroll instead of clipping actions offscreen');
+    assert.ok((bar.match(/aria-label=/g) || []).length >= 5, 'icon-only buttons must carry aria-labels');
+  });
+});

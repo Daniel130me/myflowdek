@@ -1,4 +1,5 @@
 import { db } from '@/server/db/client';
+import { DEFAULT_CURRENCY } from '@/server/config/currency';
 import { Prisma } from '@prisma/client';
 import { AuthError } from '@/server/auth/authorization';
 import { z } from 'zod';
@@ -6,7 +7,7 @@ import { z } from 'zod';
 export const createBudgetSchema = z.object({
   name: z.string().trim().min(1).max(200),
   totalBudget: z.number().min(0).default(0),
-  currency: z.string().trim().max(3).default('USD'),
+  currency: z.string().trim().max(3).default(DEFAULT_CURRENCY),
   startDate: z.iso.datetime().optional().nullable(),
   endDate: z.iso.datetime().optional().nullable(),
 });
