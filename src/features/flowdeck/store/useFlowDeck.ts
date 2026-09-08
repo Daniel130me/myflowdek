@@ -1408,83 +1408,21 @@ export function useFlowDeckStore(): FlowDeckState {
     const projectTasks = tasksByProject[projectId] || [];
     setClipboard({ items: projectTasks.filter(t => selectedIds.has(t.id)).map(t => ({ ...t })), mode: 'copy' });
   }, [selectedIds, tasksByProject]);
+  /**
+   * Cut selected tasks (audit H-08). NON-DESTRUCTIVE: the tasks stay exactly
+   * where they are — only the clipboard records the pending move. The old
+   * behaviour fired the bulk DELETE immediately, so cutting without pasting
+   * (or closing the tab) destroyed the tasks server-side with no undo.
+   * `paste` completes the move via the existing bulk move action, which
+   * preserves task ids, comments and time logs.
+   */
   const cutSelected = useCallback((projectId: string) => {
     const projectTasks = tasksByProject[projectId] || [];
-    setClipboard({ items: projectTasks.filter(t => selectedIds.has(t.id)).map(t => ({ ...t })), mode: 'cut' });
-    removeTasksBulk(projectId, selectedIds);
-  }, [selectedIds, tasksByProject, removeTasksBulk]);
-  /**
-   * Paste the clipboard tasks into the current project.
-   *
-   * Phase 4 (item 3): each pasted task is now created via the API
-   * (`POST /api/projects/:id/tasks`) instead of just being cloned locally.
-   * We optimistically insert temp-id clones, then issue parallel POSTs and
-   * reconcile each clone's id with the server's canonical id. On any
-   * failure we remove the corresponding optimistic clone + surface a toast.
-   */
-  const paste = useCallback((projectId: string) => {
-    if (!clipboard.items.length || !projectId) return;
-    const projectTasks = tasksByProject[projectId] || [];
-    // Snapshot for rollback — remove all pasted clones if the first
-    // creation fails (subsequent failures are reported per-task but the
-    // clones are left in place; the next project load reconciles).
-    const snapshot = projectTasks;
-    const clones = clipboard.items.map(t => ({
-      ...t,
-      id: defaultIdGenerator.generate('t'),
-      projectId,
-      name: t.name + ' (copy)',
-      // Pasted tasks start fresh — no point carrying over the source's
-      // completion state.
-      status: 'backlog' as TaskStatus,
-      progress: 0,
-      deps: [],
-      createdAt: new Date().toISOString(),
-    }));
-    // Optimistic local insert.
-    commit(projectId, [...projectTasks, ...clones]);
-    toast.success(`Pasted ${clones.length} task${clones.length > 1 ? 's' : ''}`);
-    // Persist each clone via POST. Reconcile the temp id with the server id
-    // on success; remove the clone on failure.
-    Promise.all(clones.map(clone => apiCreateTask(projectId, taskToApiPayload({
-      name: clone.name,
-      description: clone.description,
-      status: clone.status,
-      priority: clone.priority,
-      assignee: clone.assignee || undefined,
-      parentId: clone.parentId,
-      sectionId: clone.sectionId,
-      dueDate: clone.dueDate,
-      start: clone.start,
-      duration: clone.duration,
-    })).then(res => ({ cloneId: clone.id, res })))).then(results => {
-      let anyFailure = false;
-      for (const { cloneId, res } of results) {
-        if (!res.ok) {
-          anyFailure = true;
-          // Remove the failed clone from the local list.
-          setTasksByProject(prev => ({
-            ...prev,
-            [projectId]: (prev[projectId] || []).filter(t => t.id !== cloneId),
-          }));
-          continue;
-        }
-        const serverId = res.data?.task?.id;
-        if (!serverId || serverId === cloneId) continue;
-        // Swap the temp id for the canonical server id.
-        setTasksByProject(prev => ({
-          ...prev,
-          [projectId]: (prev[projectId] || []).map(t => t.id === cloneId ? { ...t, id: serverId } : t),
-        }));
-      }
-      if (anyFailure) {
-        toast.error('Failed to paste some tasks on server');
-        // If every paste failed, restore the snapshot.
-        const allFailed = results.every(r => !r.res.ok);
-        if (allFailed) setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
-      }
-    });
-  }, [clipboard.items, tasksByProject, commit]);
+    const items = projectTasks.filter(t => selectedIds.has(t.id)).map(t => ({ ...t }));
+    if (items.length === 0) return;
+    setClipboard({ items, mode: 'cut' });
+    toast.info(`Cut ${items.length} task${items.length > 1 ? 's' : ''}`, { description: 'Open another project and paste to move them' });
+  }, [selectedIds, tasksByProject]);
 
   /**
    * Import tasks from a CSV file.
@@ -2295,28 +2233,8 @@ export function useFlowDeckStore(): FlowDeckState {
     return result;
   }, [tasks, searchQuery, searchFilters, resolveMemberName]);
 
-  const gridActions: GridActions = useMemo(() => ({
-    selectedIds, setSelectedIds,
-    onAddTask: (pid) => { if (pid) setShowNewTask(true); },
-    onBulkAssign: (pid, memberId) => bulkAssign(pid, selectedIds, memberId),
-    onSetRecurrence: setRecurrenceSelected,
-    onIndent: indentSelected, onOutdent: outdentSelected,
-    onLink: linkSelected, onUnlink: unlinkSelected,
-    onDeleteSelected: (pid) => removeTasksBulk(pid, selectedIds),
-    onToggleBold: toggleBoldSelected,
-    onSetColor: setColorSelected,
-    durationUnit, onToggleDurationUnit: () => setDurationUnit(u => u === 'days' ? 'hours' : 'days'),
-    onToggleMilestone: toggleMilestoneSelected,
-    onImportCSV: importCSV, onExportCSV: exportCSV, onPrint: () => window.print(),
-    onCut: cutSelected, onCopy: copySelected, onPaste: paste, canPaste: clipboard.items.length > 0,
-    onAttachFiles: attachFilesToSelected,
-    customCols, onAddColumn: addColumn, onRemoveColumn: removeColumn, onRenameColumn: renameColumn,
-    onOpenShare: (pid) => { if (pid) setShareOpen(true); },
-  }), [selectedIds, bulkAssign, setRecurrenceSelected,
-    indentSelected, outdentSelected, linkSelected, unlinkSelected, removeTasksBulk,
-    toggleBoldSelected, setColorSelected, durationUnit, toggleMilestoneSelected,
-    importCSV, exportCSV, cutSelected, copySelected, paste, clipboard.items,
-    attachFilesToSelected, customCols, addColumn, removeColumn, renameColumn]);
+  /* gridActions is defined after `paste` (which it references) — see below
+     moveTasksToProjectBulk. */
 
   /* ---- #30: Duplicate task with options ---- */
   const duplicateTaskWithOptions = useCallback((projectId: string, id: string, opts?: { includeSubtasks?: boolean; includeComments?: boolean; includeAttachments?: boolean }) => {
@@ -2731,6 +2649,122 @@ export function useFlowDeckStore(): FlowDeckState {
       toast.error('Failed to move tasks', { description: res.error });
     });
   }, [tasksByProject, commentsByProject, activityByProject, timeLogsByProject, filesByProject, projects, selectedIds]);
+
+  /**
+   * Paste the clipboard tasks into the current project.
+   *
+   * Cut mode (audit H-08): cut is non-destructive, so pasting MOVES the
+   * tasks via the existing bulk move action — ids, comments, time logs and
+   * files travel with the task instead of being re-created from a snapshot.
+   * Pasting a cut back into its own project is a no-op.
+   *
+   * Copy mode: each pasted task is created via the API
+   * (`POST /api/projects/:id/tasks`). We optimistically insert temp-id
+   * clones, then issue parallel POSTs and reconcile each clone's id with the
+   * server's canonical id. On any failure we remove the corresponding
+   * optimistic clone + surface a toast. The clipboard survives so the same
+   * items can be pasted again.
+   */
+  const paste = useCallback((projectId: string) => {
+    if (!clipboard.items.length || !projectId) return;
+    if (clipboard.mode === 'cut') {
+      const sourceProjectId = clipboard.items[0]?.projectId;
+      if (!sourceProjectId || sourceProjectId === projectId) {
+        toast.info('Cut tasks are already in this project');
+        return;
+      }
+      moveTasksToProjectBulk(sourceProjectId, new Set(clipboard.items.map(t => t.id)), projectId);
+      // The move is done — clear the clipboard so a second paste cannot
+      // double-move the same tasks.
+      setClipboard({ items: [], mode: 'copy' });
+      return;
+    }
+    const projectTasks = tasksByProject[projectId] || [];
+    // Snapshot for rollback — remove all pasted clones if the first
+    // creation fails (subsequent failures are reported per-task but the
+    // clones are left in place; the next project load reconciles).
+    const snapshot = projectTasks;
+    const clones = clipboard.items.map(t => ({
+      ...t,
+      id: defaultIdGenerator.generate('t'),
+      projectId,
+      name: t.name + ' (copy)',
+      // Pasted tasks start fresh — no point carrying over the source's
+      // completion state.
+      status: 'backlog' as TaskStatus,
+      progress: 0,
+      deps: [],
+      createdAt: new Date().toISOString(),
+    }));
+    // Optimistic local insert.
+    commit(projectId, [...projectTasks, ...clones]);
+    toast.success(`Pasted ${clones.length} task${clones.length > 1 ? 's' : ''}`);
+    // Persist each clone via POST. Reconcile the temp id with the server id
+    // on success; remove the clone on failure.
+    Promise.all(clones.map(clone => apiCreateTask(projectId, taskToApiPayload({
+      name: clone.name,
+      description: clone.description,
+      status: clone.status,
+      priority: clone.priority,
+      assignee: clone.assignee || undefined,
+      parentId: clone.parentId,
+      sectionId: clone.sectionId,
+      dueDate: clone.dueDate,
+      start: clone.start,
+      duration: clone.duration,
+    })).then(res => ({ cloneId: clone.id, res })))).then(results => {
+      let anyFailure = false;
+      for (const { cloneId, res } of results) {
+        if (!res.ok) {
+          anyFailure = true;
+          // Remove the failed clone from the local list.
+          setTasksByProject(prev => ({
+            ...prev,
+            [projectId]: (prev[projectId] || []).filter(t => t.id !== cloneId),
+          }));
+          continue;
+        }
+        const serverId = res.data?.task?.id;
+        if (!serverId || serverId === cloneId) continue;
+        // Swap the temp id for the canonical server id.
+        setTasksByProject(prev => ({
+          ...prev,
+          [projectId]: (prev[projectId] || []).map(t => t.id === cloneId ? { ...t, id: serverId } : t),
+        }));
+      }
+      if (anyFailure) {
+        toast.error('Failed to paste some tasks on server');
+        // If every paste failed, restore the snapshot.
+        const allFailed = results.every(r => !r.res.ok);
+        if (allFailed) setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      }
+    });
+  }, [clipboard, tasksByProject, commit, moveTasksToProjectBulk]);
+
+  /* ---- Grid actions shared by the Sheet/Board toolbars ----
+   * Declared here because the cut/paste actions above feed it. */
+  const gridActions: GridActions = useMemo(() => ({
+    selectedIds, setSelectedIds,
+    onAddTask: (pid) => { if (pid) setShowNewTask(true); },
+    onBulkAssign: (pid, memberId) => bulkAssign(pid, selectedIds, memberId),
+    onSetRecurrence: setRecurrenceSelected,
+    onIndent: indentSelected, onOutdent: outdentSelected,
+    onLink: linkSelected, onUnlink: unlinkSelected,
+    onDeleteSelected: (pid) => removeTasksBulk(pid, selectedIds),
+    onToggleBold: toggleBoldSelected,
+    onSetColor: setColorSelected,
+    durationUnit, onToggleDurationUnit: () => setDurationUnit(u => u === 'days' ? 'hours' : 'days'),
+    onToggleMilestone: toggleMilestoneSelected,
+    onImportCSV: importCSV, onExportCSV: exportCSV, onPrint: () => window.print(),
+    onCut: cutSelected, onCopy: copySelected, onPaste: paste, canPaste: clipboard.items.length > 0,
+    onAttachFiles: attachFilesToSelected,
+    customCols, onAddColumn: addColumn, onRemoveColumn: removeColumn, onRenameColumn: renameColumn,
+    onOpenShare: (pid) => { if (pid) setShareOpen(true); },
+  }), [selectedIds, bulkAssign, setRecurrenceSelected,
+    indentSelected, outdentSelected, linkSelected, unlinkSelected, removeTasksBulk,
+    toggleBoldSelected, setColorSelected, durationUnit, toggleMilestoneSelected,
+    importCSV, exportCSV, cutSelected, copySelected, paste, clipboard.items,
+    attachFilesToSelected, customCols, addColumn, removeColumn, renameColumn]);
 
   /* ---- #33: Promote subtask to top-level ---- */
   const promoteSubtask = useCallback((projectId: string, taskId: string) => {
