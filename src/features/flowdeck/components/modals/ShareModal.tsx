@@ -7,6 +7,7 @@ import { COLORS, type Project } from '@/features/flowdeck/model';
 import { useViewport } from '../../hooks/useViewport';
 import { Avatar } from '../ui/Avatar';
 import { Field } from '../ui/Field';
+import { Modal } from '../ui/Modal';
 import { selectStyle, FF } from '../ui/styles';
 import { useOptionalWorkspaceContext } from '@/providers/WorkspaceProvider';
 import {
@@ -136,13 +137,18 @@ export function ShareModal({ project, onClose }: { project: Project; onClose: ()
     role === 'OWNER' ? 'Owner' : role === 'ADMIN' ? 'Admin' : role === 'MEMBER' ? 'Editor' : 'Viewer';
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center' }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)' }} />
-      <div style={{ position: 'relative', background: '#FFFFFF', borderRadius: isMobile ? '20px 20px 0 0' : 16, padding: '20px 20px 28px', width: isMobile ? '100%' : 440, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 -4px 20px rgba(0,0,0,0.1)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-          <h3 style={{ fontFamily: FF, fontSize: 18, margin: 0 }}>Share {project.name}</h3>
-          <button onClick={onClose} aria-label="Close" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
-        </div>
+    <Modal
+      open
+      onClose={onClose}
+      label={`Share ${project.name}`}
+      variant={isMobile ? 'bottom-sheet' : 'center'}
+      zIndex={50}
+      style={isMobile ? undefined : { width: 440, maxHeight: '85vh', padding: '20px 20px 28px', boxShadow: '0 -4px 20px rgba(0,0,0,0.1)' }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+        <h3 style={{ fontFamily: FF, fontSize: 18, margin: 0 }}>Share {project.name}</h3>
+        <button onClick={onClose} aria-label="Close" style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+      </div>
 
         <Field label="Add people">
           {addable.length === 0 ? (
@@ -220,7 +226,6 @@ export function ShareModal({ project, onClose }: { project: Project; onClose: ()
             ))}
           </div>
         </Field>
-      </div>
-    </div>
+    </Modal>
   );
 }

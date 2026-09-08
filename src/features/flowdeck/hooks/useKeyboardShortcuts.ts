@@ -135,9 +135,11 @@ export function useKeyboardShortcuts(opts: KeyboardShortcutsOptions): void {
       return;
     }
 
-    /* ---------- `Escape` → no-op placeholder ---------- */
+    /* ---------- `Escape` ----------
+     * Modals close themselves: every overlay now renders through the Radix
+     * Dialog-based Modal primitive (audit H-23), which owns Escape via its
+     * content. The global handler deliberately stays out of the way. */
     if (e.key === 'Escape') {
-      // Could close modals later
       return;
     }
   }, []);

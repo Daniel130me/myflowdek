@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search as SearchIcon, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
+import { Modal } from './Modal';
 import { routes } from '@/shared/navigation/routes';
 
 interface SearchResult {
@@ -54,14 +55,8 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
     return () => clearTimeout(timer);
   }, [query, open]);
 
-  // Close on Escape.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
-
+  // Escape-to-close is handled by the Radix Dialog inside Modal; the old
+  // document-level listener fought other overlays for the key.
   if (!open) return null;
 
   const hasResults = results && (
@@ -70,18 +65,7 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
   );
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 999,
-      background: 'rgba(0,0,0,0.4)', display: 'flex',
-      alignItems: 'flex-start', justifyContent: 'center', paddingTop: '10vh',
-    }} onClick={onClose}>
-      <div
-        style={{
-          width: '90%', maxWidth: 560, background: '#fff', borderRadius: 16,
-          boxShadow: '0 16px 48px rgba(0,0,0,0.2)', overflow: 'hidden', fontFamily: FF,
-        }}
-        onClick={e => e.stopPropagation()}
-      >
+    <Modal open onClose={onClose} label="Global search" variant="search" zIndex={999}>
         {/* Search input */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px',
@@ -98,7 +82,7 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
               fontFamily: FF, color: COLORS.ink, background: 'transparent',
             }}
           />
-          <button onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4 }}>
+          <button onClick={onClose} aria-label="Close search" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4 }}>
             <X size={16} color={COLORS.gray} />
           </button>
         </div>
@@ -166,8 +150,7 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
             </>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

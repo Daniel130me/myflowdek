@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { LayoutGrid, Menu, Sun, Moon, Settings, LogOut } from 'lucide-react';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { Avatar } from '../ui';
+import { Modal } from '../ui/Modal';
 import { useTheme } from '../../hooks/useTheme';
 import { useAuth } from '../auth';
 import { NAV, isNavItemDisabled } from './navItems';
@@ -48,16 +49,17 @@ export function MobileSidebar({
   const myUserId = me?.id ?? '';
 
   return (
-    <>
-      {open && <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 55, backdropFilter: 'blur(4px)' }} />}
-      <aside style={{
-        width: 280, background: S.bg, display: 'flex', flexDirection: 'column', flexShrink: 0,
-        position: 'fixed' as const, top: 0, bottom: 0, left: 0, zIndex: 60,
-        transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
-        transform: open ? 'translateX(0)' : 'translateX(-100%)',
-        boxShadow: open ? '12px 0 32px rgba(0,0,0,0.2)' : 'none',
+    <Modal
+      open={open}
+      onClose={onClose}
+      label="Navigation menu"
+      variant="left-panel"
+      zIndex={60}
+      style={{
+        width: 280, background: S.bg, display: 'flex', flexDirection: 'column',
         paddingBottom: bottomNavHeight,
-      }}>
+      }}
+    >
         <div style={{ padding: '20px 16px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(135deg, #FE8029 0%, #FF9F5A 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(254,128,41,0.3)' }}>
@@ -177,7 +179,6 @@ export function MobileSidebar({
             </div>
           </div>
         </div>
-      </aside>
-    </>
+    </Modal>
   );
 }

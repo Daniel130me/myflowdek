@@ -52,6 +52,14 @@ export function NotificationBell() {
     return () => clearInterval(interval);
   }, []);
 
+  // Close on Escape (audit H-23 — the cheat sheet promises Esc dismisses).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
   // Close on outside click.
   useEffect(() => {
     if (!open) return;
@@ -99,6 +107,8 @@ export function NotificationBell() {
     <div ref={ref} style={{ position: 'relative' }}>
       <button
         onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
         style={{
           width: 36, height: 36, borderRadius: 10, border: 'none',
           background: 'transparent', cursor: 'pointer', position: 'relative',
@@ -120,7 +130,11 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div style={{
+        <div
+          role="dialog"
+          aria-modal="false"
+          aria-label="Notifications"
+          style={{
           position: 'absolute', top: '100%', right: 0, marginTop: 8,
           width: 360, maxHeight: 480, overflowY: 'auto',
           background: '#fff', borderRadius: 12,

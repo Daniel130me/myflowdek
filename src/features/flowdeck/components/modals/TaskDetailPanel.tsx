@@ -8,6 +8,7 @@ import { useViewport } from '../../hooks/useViewport';
 import { StatusPill } from '../ui/StatusPill';
 import { FileThumbnail } from '../ui/FileThumbnail';
 import { Field } from '../ui/Field';
+import { Modal } from '../ui/Modal';
 import { SubtasksSection } from '../ui/SubtasksSection';
 import { TagPill, TagPills, CommentsSection, FollowersSection, TimeTrackingSection, DuplicateTaskDialog, MarkdownDescription } from '../ui';
 import { selectStyle, FF } from '../ui/styles';
@@ -479,8 +480,8 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
   /* Mobile: full-screen panel */
   if (isMobile) {
     return (
-      <>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', flexDirection: 'column', background: '#FFFFFF' }}>
+      <Modal open onClose={onClose} label="Task details" variant="full" zIndex={70}>
+      <div style={{ display: 'flex', flexDirection: 'column', background: '#FFFFFF', minHeight: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: `1px solid ${COLORS.line}`, background: '#FFFFFF', flexShrink: 0 }}>
           <button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', color: COLORS.ink, padding: 6, borderRadius: 10, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ArrowLeft size={20} /></button>
           <span style={{ fontSize: 15, fontWeight: 700, fontFamily: FF, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Task details</span>
@@ -562,17 +563,14 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
           {commentsSection}
         </div>
       </div>
-      {actionDialogs}
-    </>
+    {actionDialogs}
+    </Modal>
     );
   }
 
   /* Desktop: slide-over panel */
   return (
-    <>
-    <div style={{ position: 'fixed', inset: 0, zIndex: 70, display: 'flex', justifyContent: 'flex-end' }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)' }} />
-      <div style={{ position: 'relative', width: 'min(440px, 100vw)', background: '#FFFFFF', height: '100%', padding: 22, overflowY: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.12)', borderTopLeftRadius: 16, borderBottomLeftRadius: 16 }}>
+    <Modal open onClose={onClose} label="Task details" variant="right-panel" zIndex={70}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <StatusPill status={task.status} />
@@ -635,9 +633,7 @@ export function TaskDetailPanel({ task, allTasks, files = [], tags = [], comment
         {timeTrackingSection}
         {followersSection}
         {commentsSection}
-      </div>
-    </div>
     {actionDialogs}
-  </>
+    </Modal>
   );
 }
