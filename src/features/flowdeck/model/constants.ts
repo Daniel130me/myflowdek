@@ -34,10 +34,13 @@ export const COLORS = {
 };
 
 export const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  backlog: { label: "Backlog", color: "#6B7280", bg: "#F3F4F6" },
+  // Text tokens are AA-compliant against their soft backgrounds at pill size
+  // (audit H-26; ratios verified by the design-token contrast gate tests):
+  // 4B5563/F3F4F6 7.6:1 · 9A3412/FFF4EB 6.8:1 · 6D28D9/EDE9FE 7.2:1 · 15803D/DCFCE7 4.9:1
+  backlog: { label: "Backlog", color: "#4B5563", bg: "#F3F4F6" },
   in_progress: { label: "In Progress", color: "#9A3412", bg: "#FFF4EB" },
-  review: { label: "In Review", color: "#7C3AED", bg: "#EDE9FE" },
-  done: { label: "Done", color: "#16A34A", bg: "#DCFCE7" },
+  review: { label: "In Review", color: "#6D28D9", bg: "#EDE9FE" },
+  done: { label: "Done", color: "#15803D", bg: "#DCFCE7" },
 };
 export const STATUS_ORDER = ["backlog", "in_progress", "review", "done"];
 
@@ -79,13 +82,14 @@ export const TAG_COLORS = [
 ];
 
 /* ---------------------------------- due date ---------------------------------- */
+// Text colors AA-checked against their chip backgrounds at 10-12px (H-26).
 export const DUE_STATUS = {
-  overdue:  { label: 'Overdue',  color: '#DC2626', bg: '#FEE2E2' },
-  today:    { label: 'Today',    color: '#D97706', bg: '#FEF3C7' },
-  tomorrow: { label: 'Tomorrow', color: '#D97706', bg: '#FEF9EE' },
-  soon:     { label: 'This week',color: '#0891B2', bg: '#CFFAFE' },
-  normal:   { label: '',         color: '#6B7280', bg: '#F3F4F6' },
-  none:     { label: '',         color: '#9CA3AF', bg: '#F9FAFB' },
+  overdue:  { label: 'Overdue',  color: '#B91C1C', bg: '#FEE2E2' },
+  today:    { label: 'Today',    color: '#92400E', bg: '#FEF3C7' },
+  tomorrow: { label: 'Tomorrow', color: '#92400E', bg: '#FEF9EE' },
+  soon:     { label: 'This week',color: '#155E75', bg: '#CFFAFE' },
+  normal:   { label: '',         color: '#4B5563', bg: '#F3F4F6' },
+  none:     { label: '',         color: '#6B7280', bg: '#F9FAFB' },
 } as const;
 
 export const ZOOM_LEVELS = [

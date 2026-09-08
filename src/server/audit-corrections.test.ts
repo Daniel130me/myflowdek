@@ -15,7 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import { hashToken } from './invitations/service';
 import { routes } from '../shared/navigation/routes';
-import { COLORS } from '../features/flowdeck/model';
+import { COLORS, STATUS_META, DUE_STATUS } from '../features/flowdeck/model';
 
 describe('Audit Remediation: Onboarding invitations and hashing (Item 1)', () => {
   test('hashToken produces consistent SHA-256 hex digest', () => {
@@ -434,5 +434,49 @@ describe('Audit Remediation: Security cluster (H-17/H-18/H-19/H-22)', () => {
     assert.ok(source.includes('rateLimit'), 'route must rate-limit');
     assert.ok(!source.includes('error instanceof Error ? error.message'), 'raw SDK errors must not reach clients');
     assert.ok(source.includes('instanceof AuthError'), 'auth failures must keep their status');
+  });
+});
+
+describe('Audit Remediation: A11y quick wins (H-26/H-27/H-28/H-29)', () => {
+  const luminance = (hex: string): number => {
+    const c = hex.replace('#', '');
+    const ch = [0, 2, 4].map((i) => parseInt(c.slice(i, i + 2), 16) / 255).map(
+      (v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)),
+    );
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  };
+  const contrast = (fg: string, bg: string): number => {
+    const [l1, l2] = [luminance(fg), luminance(bg)].sort((a, b) => b - a);
+    return (l1 + 0.05) / (l2 + 0.05);
+  };
+
+  test('status and due-date pill text passes AA on every chip background', () => {
+    for (const [key, meta] of Object.entries(STATUS_META)) {
+      assert.ok(contrast(meta.color, meta.bg) >= 4.5, `STATUS_META.${key} ${meta.color} on ${meta.bg} must be >= 4.5`);
+    }
+    for (const [key, meta] of Object.entries(DUE_STATUS)) {
+      if (!meta.label) continue; // empty labels render nothing
+      assert.ok(contrast(meta.color, meta.bg) >= 4.5, `DUE_STATUS.${key} ${meta.color} on ${meta.bg} must be >= 4.5`);
+    }
+  });
+
+  test('bottom nav conveys active state beyond color and meets contrast', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/components/layout/BottomNav.tsx'), 'utf-8');
+    assert.ok(source.includes('aria-current'), 'active tab must set aria-current');
+    assert.ok(!source.includes('colors.grayLight'), '10px grayLight labels (2.54:1) must be gone');
+    assert.ok(source.includes('11.5'), 'labels must be >= 11px');
+  });
+
+  test('Field renders a real label element (implicit control association)', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/features/flowdeck/components/ui/Field.tsx'), 'utf-8');
+    assert.ok(source.includes('<label'), 'Field must render a <label> wrapper');
+    assert.ok(!source.includes('<div style={{ fontSize: 11.5'), 'the div-as-label pattern must be gone');
+  });
+
+  test('product shell has a skip link and a main landmark', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/app/(product)/layout.tsx'), 'utf-8');
+    assert.ok(source.includes('Skip to content'), 'skip link must exist');
+    assert.ok(source.includes('id="main-content"'), 'main landmark must exist');
+    assert.ok(/<a[^>]*href="#main-content"/.test(source), 'skip link must target the main landmark');
   });
 });

@@ -21,15 +21,15 @@ export function BottomNav({ activeView, onNav }: { activeView: string; onNav: (i
         const Icon = item.icon;
         const isActive = item.id === '_more' ? false : activeView === item.id;
         return (
-          <button key={item.id} onClick={e => { e.stopPropagation(); onNav(item.id); }} style={{
+          <button key={item.id} onClick={e => { e.stopPropagation(); onNav(item.id); }} aria-current={isActive ? 'page' : undefined} style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             gap: 2, border: 'none', background: 'none', cursor: 'pointer',
             padding: '6px 12px', borderRadius: 12, minWidth: 52, minHeight: 48,
             transition: 'all 0.15s ease', position: 'relative',
           }}>
             {isActive && <span style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 20, height: 3, borderRadius: '0 0 3px 3px', background: colors.accent }} />}
-            <Icon size={20} strokeWidth={isActive ? 2 : 1.5} color={isActive ? colors.accent : colors.grayLight} />
-            <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 500, color: isActive ? colors.accent : colors.grayLight, fontFamily: FF, lineHeight: 1 }}>{item.label}</span>
+            <Icon size={20} strokeWidth={isActive ? 2 : 1.5} color={isActive ? colors.accent : colors.gray} />
+            <span style={{ fontSize: 11.5, fontWeight: isActive ? 700 : 500, color: isActive ? colors.accent : colors.gray, fontFamily: FF, lineHeight: 1 }}>{item.label}</span>
           </button>
         );
       })}

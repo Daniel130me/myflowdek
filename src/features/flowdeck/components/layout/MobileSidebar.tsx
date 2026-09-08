@@ -31,7 +31,7 @@ export function MobileSidebar({
   onClose: () => void;
   onNavigate: (id: string) => void;
   goToPortfolio: () => void;
-  bottomNavHeight: number;
+  bottomNavHeight: number | string;
   workspaces?: WorkspaceSummary[];
   selectedWorkspace?: WorkspaceSummary | null;
   onSelectWorkspace?: (id: string) => void;

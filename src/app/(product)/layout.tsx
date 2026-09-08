@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { usePathname, useRouter, useParams } from 'next/navigation';
-import { FONT_FAMILY as FF, type TaskPriority } from '@/features/flowdeck/model';
+import { FONT_FAMILY as FF, COLORS, type TaskPriority } from '@/features/flowdeck/model';
 import { useViewport } from '@/features/flowdeck/hooks/useViewport';
 import { useWorkspaces } from '@/features/flowdeck/hooks/useWorkspaces';
 import { useKeyboardShortcuts } from '@/features/flowdeck/hooks/useKeyboardShortcuts';
@@ -129,7 +129,9 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
     router.push(replaceProjectInPath(pathname, projId));
   };
 
-  const bottomNavHeight = isMobile ? 64 : 0;
+  // Reserve the nav height plus the iOS home-indicator inset so content is
+  // never overlapped (audit H-27).
+  const bottomNavHeight = isMobile ? 'calc(64px + env(safe-area-inset-bottom, 0px))' : 0;
   const topbarHeight = isMobile ? 52 : theme.layout.topbar.height;
 
   function mobileNavTo(id: string) {
@@ -144,6 +146,21 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100%', background: theme.layout.content.bg, fontFamily: FF, color: theme.colors.ink, overflow: 'hidden' }}>
+      {/* Skip link: first focusable element, lets keyboard users bypass the
+          whole nav chrome on every page (audit H-29). */}
+      <a
+        href="#main-content"
+        style={{
+          position: 'fixed', top: -48, left: 12, zIndex: 10000,
+          background: COLORS.ink, color: '#FFFFFF', padding: '10px 16px',
+          borderRadius: 8, fontSize: 13, fontWeight: 700, fontFamily: FF,
+          textDecoration: 'none', transition: 'top 0.15s',
+        }}
+        onFocus={e => { e.currentTarget.style.top = '12px'; }}
+        onBlur={e => { e.currentTarget.style.top = '-48px'; }}
+      >
+        Skip to content
+      </a>
       {!isMobile && (
         <Sidebar
           project={project}
@@ -217,17 +234,20 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
           />
         )}
 
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: 0,
-          padding: isTalentRoute ? 0 : isMobile ? '18px 14px 0' : '28px 32px 40px',
-          paddingBottom: isTalentRoute ? 0 : isMobile ? bottomNavHeight : 40,
-        }}>
+        <main
+          id="main-content"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+            padding: isTalentRoute ? 0 : isMobile ? '18px 14px 0' : '28px 32px 40px',
+            paddingBottom: isTalentRoute ? 0 : isMobile ? bottomNavHeight : 40,
+          }}
+        >
           {children}
-        </div>
+        </main>
         {state.showNewTask && routeProjectId && (
           <NewTaskModal
             projectStart={state.projects[routeProjectId]?.start || ''}
