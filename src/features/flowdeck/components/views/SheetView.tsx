@@ -37,11 +37,28 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
   const [quickAddValue, setQuickAddValue] = useState('');
   const quickAddRef = useRef<HTMLInputElement>(null);
 
-  const cellPad = '8px 10px';
+  const cellPad = isMobile ? '8px 8px' : '8px 10px';
   const cellStyle: React.CSSProperties = { border: `1px solid ${COLORS.line}`, padding: 0 };
-  const inputCell: React.CSSProperties = { width: '100%', border: 'none', outline: 'none', padding: cellPad, fontSize: 12.5, background: 'transparent', fontFamily: 'inherit', minHeight: 36, boxSizing: 'border-box' };
+  // Audit H-30: 12.5px inputs trigger iOS focus zoom; >= 14px keeps the
+  // software keyboard from blowing the layout up.
+  const inputCell: React.CSSProperties = { width: '100%', border: 'none', outline: 'none', padding: cellPad, fontSize: isMobile ? 14 : 12.5, background: 'transparent', fontFamily: 'inherit', minHeight: 36, boxSizing: 'border-box' };
 
-  const visibleCols = allColumns.filter(c => !hidden.has(c.key));
+  // Audit H-30: phones cannot carry all eight columns — auto-hide the
+  // schedule-detail trio (the ColumnManager can bring them back) so the
+  // important context fits in ~360px of horizontal space.
+  const MOBILE_AUTO_HIDE_COLS = new Set(['start', 'duration', 'progress']);
+  // Sticky left offsets for the frozen control columns + Task column, so row
+  // identity survives horizontal scrolling. Cumulative widths of the fixed
+  // columns: sel(34) + done(34) + grip(32) + num(36) = 136.
+  const STICKY_LEFT = { done: 34, grip: 68, num: 100, name: 136 } as const;
+  const stickyCell = (left: number, selected: boolean): React.CSSProperties => ({
+    position: 'sticky',
+    left,
+    zIndex: 1,
+    background: selected ? COLORS.accentSoft : '#FFFFFF',
+  });
+
+  const visibleCols = allColumns.filter(c => !hidden.has(c.key) && !(isMobile && MOBILE_AUTO_HIDE_COLS.has(c.key)));
   const filtered = query.trim() ? tasks.filter(t => t.name.toLowerCase().includes(query.toLowerCase()) || (members.find(m => m.id === t.assignee)?.name || '').toLowerCase().includes(query.toLowerCase())) : tasks;
   const isSearching = query.trim().length > 0;
 
@@ -180,15 +197,17 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
         </div>
       </div>
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: 12, overflow: 'auto' }}>
-        <table style={{ borderCollapse: 'collapse', width: 'max-content', minWidth: '100%' }}>
+        {/* border-collapse: separate — collapsed borders belong to the table
+            and stop following sticky cells once they start scrolling. */}
+        <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: 'max-content', minWidth: '100%' }}>
           <thead>
             <tr style={{ background: '#F9FAFB' }}>{[
-              <th key="sel-all" style={{ ...cellStyle, width: 34, textAlign: 'center' }}><input type="checkbox" checked={grid.selectedIds.size > 0 && grid.selectedIds.size === filtered.length} onChange={toggleAll} /></th>,
-              <th key="done-hdr" style={{ ...cellStyle, width: 34, textAlign: 'center' }}><span style={{ fontSize: 11, fontWeight: 700, color: COLORS.gray, fontFamily: FF }}>DONE</span></th>,
-              <th key="grip-hdr" style={{ ...cellStyle, width: 32 }} />,
-              <th key="num-hdr" style={{ ...cellStyle, width: 36, fontSize: 11, color: COLORS.gray, fontWeight: 700 }}>#</th>,
+              <th key="sel-all" style={{ ...cellStyle, width: 34, textAlign: 'center', position: 'sticky', left: 0, top: 0, zIndex: 3, background: '#F9FAFB' }}><input type="checkbox" style={isMobile ? { width: 18, height: 18 } : undefined} checked={grid.selectedIds.size > 0 && grid.selectedIds.size === filtered.length} onChange={toggleAll} /></th>,
+              <th key="done-hdr" style={{ ...cellStyle, width: 34, textAlign: 'center', position: 'sticky', left: STICKY_LEFT.done, top: 0, zIndex: 3, background: '#F9FAFB' }}><span style={{ fontSize: 11, fontWeight: 700, color: COLORS.gray, fontFamily: FF }}>DONE</span></th>,
+              <th key="grip-hdr" style={{ ...cellStyle, width: 32, position: 'sticky', left: STICKY_LEFT.grip, top: 0, zIndex: 3, background: '#F9FAFB' }} />,
+              <th key="num-hdr" style={{ ...cellStyle, width: 36, fontSize: 11, color: COLORS.gray, fontWeight: 700, textAlign: 'center', position: 'sticky', left: STICKY_LEFT.num, top: 0, zIndex: 3, background: '#F9FAFB' }}>#</th>,
               ...visibleCols.map(c => (
-                <th key={c.key} style={{ ...cellStyle, width: widthOf(c.key), position: 'relative', textAlign: 'left', padding: '9px 10px', fontSize: 11, fontWeight: 700, color: COLORS.gray }}>
+                <th key={c.key} style={{ ...cellStyle, width: widthOf(c.key), position: 'sticky', top: 0, zIndex: 2, background: '#F9FAFB', textAlign: 'left', padding: '9px 10px', fontSize: 11, fontWeight: 700, color: COLORS.gray, ...(c.key === 'name' ? { left: STICKY_LEFT.name, zIndex: 3 } : {}) }}>
                   {c.key === 'duration' ? `Duration (${grid.durationUnit === 'hours' ? 'h' : 'd'})` : c.label}
                   {!isMobile && <div onMouseDown={e => startResize(c.key, e)} style={{ position: 'absolute', top: 0, right: -2, width: 5, height: '100%', cursor: 'col-resize' }} />}
                 </th>
@@ -202,13 +221,13 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
                 rowCells.push(<td key="drop-ind" colSpan={totalCols} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: COLORS.accent, zIndex: 1, pointerEvents: 'none', padding: 0, border: 'none' }} />);
               }
               rowCells.push(
-                <td key="sel" style={{ ...cellStyle, textAlign: 'center' }}><input type="checkbox" checked={grid.selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} /></td>,
-                <td key="done" style={{ ...cellStyle, textAlign: 'center', width: 34 }}><TaskCheckbox done={t.status === 'done'} onToggle={e => { e.stopPropagation(); onToggleComplete(t.id); }} size={16} /></td>,
-                <td key="grip" style={{ ...cellStyle, textAlign: 'center', width: 32 }}><span className="fd-grip-handle" style={{ display: 'inline-flex', alignItems: 'center' }}><GripVertical size={14} color={COLORS.gray} /></span></td>,
-                <td key="num" style={{ ...cellStyle, fontSize: 11.5, color: COLORS.gray, textAlign: 'center' }}>{idx + 1}</td>,
+                <td key="sel" style={{ ...cellStyle, textAlign: 'center', ...stickyCell(0, grid.selectedIds.has(t.id)) }}><input type="checkbox" style={isMobile ? { width: 18, height: 18 } : undefined} checked={grid.selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} /></td>,
+                <td key="done" style={{ ...cellStyle, textAlign: 'center', width: 34, ...stickyCell(STICKY_LEFT.done, grid.selectedIds.has(t.id)) }}><TaskCheckbox done={t.status === 'done'} onToggle={e => { e.stopPropagation(); onToggleComplete(t.id); }} size={isMobile ? 20 : 16} /></td>,
+                <td key="grip" style={{ ...cellStyle, textAlign: 'center', width: 32, ...stickyCell(STICKY_LEFT.grip, grid.selectedIds.has(t.id)) }}><span className="fd-grip-handle" style={{ display: 'inline-flex', alignItems: 'center' }}><GripVertical size={14} color={COLORS.gray} /></span></td>,
+                <td key="num" style={{ ...cellStyle, fontSize: 11.5, color: COLORS.gray, textAlign: 'center', ...stickyCell(STICKY_LEFT.num, grid.selectedIds.has(t.id)) }}>{idx + 1}</td>,
               );
               for (const c of visibleCols) {
-                rowCells.push(<td key={c.key} style={{ ...cellStyle, width: widthOf(c.key), background: c.key === 'status' ? STATUS_META[t.status]?.bg || 'transparent' : 'transparent' }}>{renderCell(t, c)}</td>);
+                rowCells.push(<td key={c.key} style={{ ...cellStyle, width: widthOf(c.key), background: c.key === 'status' ? STATUS_META[t.status]?.bg || 'transparent' : 'transparent', ...(c.key === 'name' ? stickyCell(STICKY_LEFT.name, grid.selectedIds.has(t.id)) : {}) }}>{renderCell(t, c)}</td>);
               }
               return (
                 <tr
@@ -235,16 +254,16 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
             {/* Quick Add Row — hidden when search is active */}
             {!isSearching && (
               <tr style={{ background: 'transparent' }}>{[
-                <td key="qa-sel" style={{ ...cellStyle, textAlign: 'center', width: 34 }} />,
-                <td key="qa-done" style={{ ...cellStyle, textAlign: 'center', width: 34 }} />,
-                <td key="qa-grip" style={{ ...cellStyle, textAlign: 'center', width: 32 }}><span style={{ opacity: 0.2, display: 'inline-flex', alignItems: 'center' }}><GripVertical size={14} color={COLORS.gray} /></span></td>,
-                <td key="qa-num" style={{ ...cellStyle, fontSize: 11.5, color: COLORS.gray, textAlign: 'center', fontWeight: 600 }}>+</td>,
+                <td key="qa-sel" style={{ ...cellStyle, textAlign: 'center', width: 34, position: 'sticky', left: 0, zIndex: 1, background: '#FFFFFF' }} />,
+                <td key="qa-done" style={{ ...cellStyle, textAlign: 'center', width: 34, position: 'sticky', left: STICKY_LEFT.done, zIndex: 1, background: '#FFFFFF' }} />,
+                <td key="qa-grip" style={{ ...cellStyle, textAlign: 'center', width: 32, position: 'sticky', left: STICKY_LEFT.grip, zIndex: 1, background: '#FFFFFF' }}><span style={{ opacity: 0.2, display: 'inline-flex', alignItems: 'center' }}><GripVertical size={14} color={COLORS.gray} /></span></td>,
+                <td key="qa-num" style={{ ...cellStyle, fontSize: 11.5, color: COLORS.gray, textAlign: 'center', fontWeight: 600, position: 'sticky', left: STICKY_LEFT.num, zIndex: 1, background: '#FFFFFF' }}>+</td>,
                 ...visibleCols.map(c => (
-                  <td key={c.key} style={{ ...cellStyle, width: widthOf(c.key), padding: 0, border: `1px solid ${COLORS.line}` }}>
+                  <td key={c.key} style={{ ...cellStyle, width: widthOf(c.key), padding: 0, border: `1px solid ${COLORS.line}`, ...(c.key === 'name' ? { position: 'sticky' as const, left: STICKY_LEFT.name, zIndex: 1, background: '#FFFFFF' } : {}) }}>
                     {c.type === 'text' ? (
                       <input
                         ref={quickAddRef}
-                        style={{ ...inputCell, padding: cellPad, fontFamily: FF, fontSize: 12.5 }}
+                        style={{ ...inputCell, padding: cellPad, fontFamily: FF, fontSize: isMobile ? 14 : 12.5 }}
                         placeholder="Type task name and press Enter..."
                         value={quickAddValue}
                         onChange={e => setQuickAddValue(e.target.value)}
