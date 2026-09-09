@@ -28,7 +28,7 @@ function formatDate(iso: string): string {
 
 export function LegalDocument({ doc }: { doc: LegalDocumentData }) {
   return (
-    <div style={{ minHeight: '100vh', fontFamily: FF, color: COLORS.ink, background: COLORS.card }}>
+    <div style={{ minHeight: '100dvh', fontFamily: FF, color: COLORS.ink, background: COLORS.card }}>
       {/* Branding header — same dark chrome as the auth layouts */}
       <header
         style={{

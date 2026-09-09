@@ -16,7 +16,12 @@ export function MoreMenu({ activeView, project, onNavigate, onClose }: {
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 55, backdropFilter: 'blur(4px)' }} />
       <div style={{
-        position: 'fixed', bottom: BOTTOM_NAV_HEIGHT, right: 12,
+        position: 'fixed',
+        /* Sit flush on top of the bottom nav, which grows by the home-indicator
+           inset via env(safe-area-inset-bottom) — without this the menu overlaps
+           the nav on notched phones (audit Table 6.1, shell height row). */
+        bottom: `calc(${BOTTOM_NAV_HEIGHT}px + env(safe-area-inset-bottom, 0px))`,
+        right: 12,
         background: layout.card.bg, border: `1px solid ${layout.card.border}`, borderRadius: 16,
         boxShadow: '0 10px 25px rgba(0,0,0,0.12)', zIndex: 56, padding: 8, width: 200, marginBottom: 4,
       }}>

@@ -11,7 +11,7 @@ export default function GlobalError({
   return (
     <html>
       <body>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'sans-serif', textAlign: 'center', backgroundColor: '#F7F7F7', color: '#1F2124' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100dvh', fontFamily: 'sans-serif', textAlign: 'center', backgroundColor: '#F7F7F7', color: '#1F2124' }}>
           <h1 style={{ fontSize: '48px', margin: '0 0 16px 0' }}>Error</h1>
           <h2 style={{ fontSize: '24px', margin: '0 0 24px 0', fontWeight: 500 }}>Something went wrong!</h2>
           <p style={{ fontSize: '16px', margin: '0 0 32px 0', color: '#6B7280' }}>{error?.message || 'An unexpected error occurred.'}</p>

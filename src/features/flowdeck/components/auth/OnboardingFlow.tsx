@@ -162,7 +162,7 @@ export function OnboardingFlow({ user, onComplete, onUpdateUser, onSkip }: Onboa
   // ---- MOBILE LAYOUT ----
   if (isMobile) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100%', fontFamily: FF, color: COLORS.ink, background: COLORS.paper, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', width: '100%', fontFamily: FF, color: COLORS.ink, background: COLORS.paper, overflow: 'hidden' }}>
         {/* Mobile top bar */}
         <div style={{ flexShrink: 0, padding: '14px 16px', borderBottom: `1px solid ${COLORS.line}`, background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -237,7 +237,7 @@ export function OnboardingFlow({ user, onComplete, onUpdateUser, onSkip }: Onboa
 
   // ---- DESKTOP LAYOUT ----
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100%', fontFamily: FF, color: COLORS.ink, background: COLORS.paper, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100dvh', width: '100%', fontFamily: FF, color: COLORS.ink, background: COLORS.paper, overflow: 'hidden' }}>
       {/* Left: Progress sidebar */}
       <div style={{ width: 280, background: 'linear-gradient(180deg, #1F2124 0%, #2D2F33 100%)', display: 'flex', flexDirection: 'column', padding: '40px 28px', position: 'relative', flexShrink: 0, overflow: 'hidden' }}>
         {/* Logo */}

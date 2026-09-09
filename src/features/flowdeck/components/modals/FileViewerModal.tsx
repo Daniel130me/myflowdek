@@ -314,7 +314,7 @@ export function FileViewerModal({ file, allFiles, allTasks, onClose, onNavigateF
         style={{ position: 'absolute', inset: 0, background: 'rgba(31,33,36,0.5)', backdropFilter: 'blur(4px)' }}
       />
       <div style={{
-        position: 'relative', width: 680, maxWidth: 'calc(100vw - 48px)', maxHeight: 'calc(100vh - 64px)',
+        position: 'relative', width: 680, maxWidth: 'calc(100vw - 48px)', maxHeight: 'calc(100dvh - 64px)',
         background: '#FFFFFF', borderRadius: 16,
         boxShadow: '0 20px 40px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.06)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',

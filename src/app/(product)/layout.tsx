@@ -154,7 +154,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100%', background: theme.layout.content.bg, fontFamily: FF, color: theme.colors.ink, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100dvh', width: '100%', background: theme.layout.content.bg, fontFamily: FF, color: theme.colors.ink, overflow: 'hidden' }}>
       {/* Skip link: first focusable element, lets keyboard users bypass the
           whole nav chrome on every page (audit H-29). */}
       <a
@@ -209,7 +209,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
         />
       )}
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100dvh', overflow: 'hidden' }}>
         <TopBar
           ref={topBarRef}
           isMobile={isMobile}

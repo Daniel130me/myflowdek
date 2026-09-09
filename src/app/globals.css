@@ -126,8 +126,11 @@ body {
   background: #F7F7F7;
   color: #1F2124;
   /* Standalone routes scroll at the document level. The authenticated
-     product shell keeps its intentional internal scroll container. */
-  overflow-x: hidden;
+     product shell keeps its intentional internal scroll container.
+     Horizontal overflow is intentionally NOT clipped here: a body-level
+     clip silently masked real layout bugs (audit Table 6.1) — pages must
+     fit the viewport and fix their own overflow. */
+  overflow-x: visible;
   overflow-y: auto;
 }
 

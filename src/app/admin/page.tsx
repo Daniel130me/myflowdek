@@ -100,7 +100,7 @@ export default function AdminDashboardPage() {
 
   if (error) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: FF }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100dvh', fontFamily: FF }}>
         <div style={{ textAlign: 'center' }}>
           <Shield size={48} color="#DC2626" style={{ marginBottom: 16 }} />
           <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1F2124', marginBottom: 8 }}>Access Denied</h2>
@@ -114,7 +114,7 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F7F7F7', fontFamily: FF, color: '#1F2124', padding: '32px' }}>
+    <div style={{ minHeight: '100dvh', background: '#F7F7F7', fontFamily: FF, color: '#1F2124', padding: '32px' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: 32 }}>

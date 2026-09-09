@@ -168,7 +168,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
   // ---- MOBILE LAYOUT (< 768px) ----
   if (isMobile) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100%', fontFamily: FF, color: COLORS.ink, background: '#FFFFFF' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', width: '100%', fontFamily: FF, color: COLORS.ink, background: '#FFFFFF' }}>
         {hasExistingSession && onLogout && (
           <button
             onClick={onLogout}
@@ -337,7 +337,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
   // Single column: dark branding header + white form below, scrollable
   if (isTablet) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100%', fontFamily: FF, color: COLORS.ink, overflow: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', width: '100%', fontFamily: FF, color: COLORS.ink, overflow: 'auto' }}>
         {hasExistingSession && onLogout && (
           <button
             onClick={onLogout}
@@ -528,7 +528,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
 
   // ---- DESKTOP LAYOUT (≥ 1024px) ----
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', width: '100%', fontFamily: FF, color: COLORS.ink }}>
+    <div style={{ display: 'flex', minHeight: '100dvh', width: '100%', fontFamily: FF, color: COLORS.ink }}>
       {/* Left Panel: Branding */}
       <div style={{
         flex: '1 1 50%',

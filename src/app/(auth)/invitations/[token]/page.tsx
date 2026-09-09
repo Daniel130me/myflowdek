@@ -101,7 +101,7 @@ export default function InvitationPage({ params }: { params: Promise<{ token: st
 
   if (error && !invitation) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#F7F7F7', fontFamily: FF }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', background: '#F7F7F7', fontFamily: FF }}>
         <div style={{ textAlign: 'center', maxWidth: 400 }}>
           <div style={{ fontSize: 32, marginBottom: 16 }}>❌</div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: COLORS.ink, marginBottom: 8 }}>Invitation unavailable</h2>
@@ -116,7 +116,7 @@ export default function InvitationPage({ params }: { params: Promise<{ token: st
 
   if (action === 'done') {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#F7F7F7', fontFamily: FF }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', background: '#F7F7F7', fontFamily: FF }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 16 }}>✅</div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: '#16A34A', marginBottom: 8 }}>Done!</h2>
@@ -127,7 +127,7 @@ export default function InvitationPage({ params }: { params: Promise<{ token: st
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#F7F7F7', fontFamily: FF }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', background: '#F7F7F7', fontFamily: FF }}>
       <div style={{ background: '#fff', borderRadius: 16, padding: '40px 32px', maxWidth: 420, width: '100%', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', textAlign: 'center' }}>
         <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg, #FE8029 0%, #FF9F5A 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
           <div style={{ width: 18, height: 18, borderRadius: 6, background: '#fff' }} />

@@ -85,7 +85,7 @@ export function AuthPageSkeleton() {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         background: '#F7F7F7',
         display: 'flex',
         alignItems: 'center',
@@ -174,7 +174,7 @@ export function ProductShellSkeleton({
   return (
     <div
       style={{
-        height: '100vh',
+        height: '100dvh',
         display: 'flex',
         flexDirection: 'row',
         fontFamily,
@@ -271,7 +271,7 @@ export function RootPageSkeleton() {
   return (
     <div
       style={{
-        height: '100vh',
+        height: '100dvh',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
