@@ -300,3 +300,19 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/*
+ * iOS Safari auto-zooms the viewport whenever a focused form control has a
+ * font-size below 16px, which breaks the fixed app shell on phones. The app
+ * styles many inputs inline (fontSize: 12.5-14px), so this rule needs
+ * !important to win over inline styles. Scoped to phone-width screens only —
+ * desktop keeps its compact typography. The 767px cutoff matches the unified
+ * mobile breakpoint (Tailwind md = 768px) used across the app.
+ */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
