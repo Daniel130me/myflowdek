@@ -1,4 +1,13 @@
-export const TODAY = new Date("2026-07-25");
+/**
+ * The current date, evaluated once per app session.
+ *
+ * This was a frozen mock-era constant (new Date("2026-07-25")) that leaked
+ * into production: budget forms prefilled a date months in the past and
+ * goals/timeline computed overdue against a fictitious "today" (audit
+ * Table 7.1). It is a live `new Date()` now — new code that needs the
+ * current date at a specific moment should call `new Date()` directly.
+ */
+export const TODAY = new Date();
 
 export const dayMs = 86400000;
 
