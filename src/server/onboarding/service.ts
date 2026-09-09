@@ -1,6 +1,7 @@
 import { db } from '@/server/db/client';
 import type { Prisma } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
+import { z } from 'zod';
 import { AuthError } from '@/server/auth/authorization';
 import { sendInvitationEmail } from '@/server/email/service';
 import { hashToken } from '@/server/invitations/service';
@@ -58,6 +59,33 @@ async function uniqueSlug(
 function generateToken(): string {
   return randomBytes(24).toString('hex');
 }
+
+/**
+ * Onboarding payload validation. Caps every free-text field (a 100KB name
+ * used to sail straight into the DB), email-validates invitations (garbage
+ * rows used to be created, each triggering an SMTP send), bounds the
+ * invitation count (500 invites in one call), and enum-checks the
+ * preference fields that feed Prisma enums directly.
+ */
+const onboardingSchema = z.object({
+  name: z.string().trim().max(80, 'Name is too long').optional(),
+  jobTitle: z.string().trim().max(80, 'Job title is too long').optional(),
+  avatarColor: z.string().trim().max(32, 'Invalid avatar colour').optional(),
+  projectName: z.string().trim().max(120, 'Project name is too long').optional(),
+  projectColor: z.string().trim().max(32, 'Invalid project colour').optional(),
+  projectDesc: z.string().trim().max(500, 'Project description is too long').optional(),
+  invitedMembers: z
+    .array(z.string().trim().email('One of the invited emails is invalid').toLowerCase())
+    .max(20, 'At most 20 members can be invited during onboarding')
+    .optional(),
+  preferences: z
+    .object({
+      defaultView: z.enum(['dashboard', 'board', 'sheet', 'calendar', 'reports', 'timeline']).optional(),
+      enableNotifications: z.boolean().optional(),
+      theme: z.enum(['light', 'dark', 'system']).optional(),
+    })
+    .optional(),
+});
 
 /**
  * Complete onboarding for a user in a single database transaction.
@@ -197,23 +225,12 @@ export async function completeOnboarding(userId: string, input: OnboardingInput)
 
 /** Type guard for parsing the onboarding request body. Throws on invalid shape. */
 export function parseOnboardingInput(body: unknown): OnboardingInput {
-  if (typeof body !== 'object' || body === null) {
-    throw new Error('Invalid onboarding payload');
+  const parsed = onboardingSchema.safeParse(body);
+  if (!parsed.success) {
+    // 400 with the first validation message — a hand-rolled typeof chain used
+    // to throw raw Error -> 500, let garbage emails through into invitation
+    // rows, and blindly cast theme into a Prisma enum crash (audit Table 7.1).
+    throw new AuthError(parsed.error.issues[0]?.message ?? 'Invalid onboarding payload', 400);
   }
-  const b = body as Record<string, unknown>;
-  return {
-    name: typeof b.name === 'string' ? b.name : undefined,
-    jobTitle: typeof b.jobTitle === 'string' ? b.jobTitle : undefined,
-    avatarColor: typeof b.avatarColor === 'string' ? b.avatarColor : undefined,
-    projectName: typeof b.projectName === 'string' ? b.projectName : undefined,
-    projectColor: typeof b.projectColor === 'string' ? b.projectColor : undefined,
-    projectDesc: typeof b.projectDesc === 'string' ? b.projectDesc : undefined,
-    invitedMembers: Array.isArray(b.invitedMembers)
-      ? b.invitedMembers.filter((m): m is string => typeof m === 'string')
-      : undefined,
-    preferences:
-      typeof b.preferences === 'object' && b.preferences !== null
-        ? (b.preferences as OnboardingInput['preferences'])
-        : undefined,
-  };
+  return parsed.data;
 }
