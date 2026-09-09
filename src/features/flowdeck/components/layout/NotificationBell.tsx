@@ -39,6 +39,14 @@ export function NotificationBell() {
   // (audit Table 5.1). Track it so the panel can offer a retry.
   const [listError, setListError] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLButtonElement>(null);
+
+  // Close and hand keyboard focus back to the bell (audit Table 6.1 —
+  // the panel is a transient dialog; focus must not be lost on dismiss).
+  const closePanel = useCallback(() => {
+    setOpen(false);
+    bellRef.current?.focus();
+  }, []);
 
   // Poll unread count.
   useEffect(() => {
@@ -59,10 +67,10 @@ export function NotificationBell() {
   // Close on Escape (audit H-23 — the cheat sheet promises Esc dismisses).
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closePanel(); };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open]);
+  }, [open, closePanel]);
 
   // Close on outside click.
   useEffect(() => {
@@ -120,6 +128,7 @@ export function NotificationBell() {
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
+        ref={bellRef}
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -150,7 +159,10 @@ export function NotificationBell() {
           aria-label="Notifications"
           style={{
           position: 'absolute', top: '100%', right: 0, marginTop: 8,
-          width: 360, maxHeight: 480, overflowY: 'auto',
+          /* Never wider than the phone viewport minus 12px gutters on each
+             side — a fixed 360px was nearly full-bleed at 390px
+             (audit Table 6.1). */
+          width: 'min(360px, calc(100vw - 24px))', maxHeight: 480, overflowY: 'auto',
           background: '#fff', borderRadius: 12,
           border: `1px solid ${COLORS.line}`,
           boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
@@ -175,7 +187,8 @@ export function NotificationBell() {
                 </button>
               )}
               <button
-                onClick={() => setOpen(false)}
+                onClick={closePanel}
+                aria-label="Close notifications"
                 style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 4 }}
               >
                 <X size={16} color={COLORS.gray} />
@@ -204,22 +217,28 @@ export function NotificationBell() {
             </div>
           ) : (
             notifications.map(n => (
-              <div
+              <button
                 key={n.id}
-                style={{
-                  padding: '10px 16px', borderBottom: `1px solid ${COLORS.lineLight || '#F3F4F6'}`,
-                  display: 'flex', gap: 10, cursor: 'pointer',
-                  background: n.readAt ? 'transparent' : 'rgba(254,128,41,0.04)',
-                }}
+                type="button"
+                /* Screen readers must get the unread state, not just the
+                   orange dot (audit Table 6.1). */
+                aria-label={`${n.readAt ? '' : 'Unread: '}${n.message}, ${fmtTime(n.createdAt)}`}
                 onClick={() => {
-                  if (!n.readAt) handleMarkRead(n.id);
+                  if (!n.readAt) void handleMarkRead(n.id);
                   // Navigate to the related project/task if available.
                   if (n.projectId && n.taskId) {
                     router.push(routes.task(n.projectId, n.taskId));
                   } else if (n.projectId) {
                     router.push(routes.projectOverview(n.projectId));
                   }
-                  setOpen(false);
+                  closePanel();
+                }}
+                style={{
+                  width: '100%', textAlign: 'left', border: 'none',
+                  font: 'inherit', cursor: 'pointer',
+                  padding: '10px 16px', borderBottom: `1px solid ${COLORS.lineLight || '#F3F4F6'}`,
+                  display: 'flex', gap: 10,
+                  background: n.readAt ? 'transparent' : 'rgba(254,128,41,0.04)',
                 }}
               >
                 {/* Actor avatar */}
@@ -243,7 +262,7 @@ export function NotificationBell() {
                 {!n.readAt && (
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS.accent, flexShrink: 0, marginTop: 6 }} />
                 )}
-              </div>
+              </button>
             ))
           )}
         </div>
