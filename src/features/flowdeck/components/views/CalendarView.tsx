@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { COLORS, STATUS_META, TODAY, addDays, FONT_FAMILY as FF } from '@/features/flowdeck/model';
 import { SectionHeader } from '../ui';
+import { Modal } from '../ui/Modal';
 import { useViewport } from '../../hooks/useViewport';
 import type { Task } from '@/features/flowdeck/model';
 
@@ -36,6 +37,8 @@ export function CalendarView({ tasks, onOpenTask, onQuickAdd, onUpdateTaskDueDat
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   const [cursor, setCursor] = useState(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1));
   const [addingOnDate, setAddingOnDate] = useState<string | null>(null);
+  // Month-view day detail (set by tapping a "+N" overflow badge).
+  const [detailDate, setDetailDate] = useState<string | null>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
 
   // Drag state
@@ -243,6 +246,40 @@ export function CalendarView({ tasks, onOpenTask, onQuickAdd, onUpdateTaskDueDat
   }
 
   // ---- MONTH VIEW (original) ----
+  /**
+   * Month-view task chip (audit Table 6.1: on phones this used to render
+   * EMPTY text — an anonymous colour sliver whose only name came from a
+   * `title` tooltip that does not exist on touch). The label is now always
+   * rendered and ellipsized, and the chip is a real button so it is
+   * reachable by keyboard and announced with its task name.
+   */
+  function MonthTaskChip({ task }: { task: Task }) {
+    return (
+      <button
+        type="button"
+        title={task.name}
+        onClick={() => onOpenTask(task.id)}
+        style={{
+          fontSize: isMobile ? 11 : 10.5,
+          lineHeight: 1.2,
+          padding: isMobile ? '2px 5px' : '2px 5px',
+          borderRadius: 9999,
+          cursor: 'pointer',
+          background: STATUS_META[task.status]?.bg || '#F3F4F6',
+          color: STATUS_META[task.status]?.color || COLORS.ink,
+          fontWeight: 600,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          textAlign: 'left',
+          border: 'none',
+          display: 'block',
+          width: '100%',
+          fontFamily: FF,
+        }}
+      >{task.name}</button>
+    );
+  }
   const monthStart = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
   const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
   const startWeekday = monthStart.getDay();
@@ -318,9 +355,20 @@ export function CalendarView({ tasks, onOpenTask, onQuickAdd, onUpdateTaskDueDat
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       {dayTasks.slice(0, maxChips).map(t => (
-                        <div key={t.id} onClick={() => onOpenTask(t.id)} title={t.name} style={{ fontSize: isMobile ? 9 : 10.5, padding: isMobile ? '1px 4px' : '2px 5px', borderRadius: 9999, cursor: 'pointer', background: STATUS_META[t.status]?.bg || '#F3F4F6', color: STATUS_META[t.status]?.color || COLORS.ink, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isMobile ? '' : t.name}</div>
+                        <MonthTaskChip key={t.id} task={t} />
                       ))}
-                      {dayTasks.length > maxChips && <div style={{ fontSize: isMobile ? 8.5 : 10, color: COLORS.gray, fontFamily: FF }}>+{dayTasks.length - maxChips}</div>}
+                      {dayTasks.length > maxChips && (
+                        // Audit Table 6.1: the overflow count was a dead end —
+                        // a plain div with no way to see the rest of the day's
+                        // tasks. It is now a button that opens a day-detail
+                        // sheet listing every task on this date.
+                        <button
+                          type="button"
+                          aria-label={`${dayTasks.length - maxChips} more tasks on ${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                          onClick={() => setDetailDate(dateStr)}
+                          style={{ fontSize: isMobile ? 11 : 10, color: COLORS.accent, fontWeight: 700, fontFamily: FF, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}
+                        >+{dayTasks.length - maxChips}</button>
+                      )}
                     </div>
                   )}
                 </>}
@@ -510,6 +558,53 @@ export function CalendarView({ tasks, onOpenTask, onQuickAdd, onUpdateTaskDueDat
           boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
         }}>{dragTask.name}</div>
       )}
+      {/* Day-detail sheet (audit Table 6.1): lists every task scheduled on a
+          month-view date. Opened from the "+N" overflow badge; bottom sheet
+          on phones, centered dialog on larger screens. */}
+      <Modal
+        open={detailDate !== null}
+        onClose={() => setDetailDate(null)}
+        label={detailDate
+          ? `Tasks on ${new Date(`${detailDate}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`
+          : 'Tasks'}
+        variant={isMobile ? 'bottom-sheet' : 'center'}
+      >
+        {detailDate && (() => {
+          // Reconstruct local midnight for the stored YYYY-MM-DD string so
+          // the day-range comparison in tasksOnDay stays consistent with
+          // how the month grid computes it.
+          const detailDay = new Date(`${detailDate}T00:00:00`);
+          const detailTasks = tasksOnDay(detailDay);
+          return (
+            <div style={{ fontFamily: FF, color: COLORS.ink }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, margin: '4px 0 2px' }}>
+                {detailDay.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              </h2>
+              <p style={{ fontSize: 12, color: COLORS.gray, margin: '0 0 14px' }}>
+                {detailTasks.length} {detailTasks.length === 1 ? 'task' : 'tasks'} scheduled
+              </p>
+              {detailTasks.length === 0 ? (
+                <p style={{ fontSize: 13, color: COLORS.gray }}>No tasks on this day.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                  {detailTasks.map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => { setDetailDate(null); onOpenTask(t.id); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '10px 12px', border: `1px solid ${COLORS.line}`, borderRadius: 10, background: '#FFFFFF', cursor: 'pointer', fontFamily: FF }}
+                    >
+                      <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: STATUS_META[t.status]?.color || COLORS.gray }} />
+                      <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
+                      <span style={{ fontSize: 11.5, color: COLORS.gray, flexShrink: 0 }}>{STATUS_META[t.status]?.label || t.status}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </Modal>
     </div>
   );
 }
