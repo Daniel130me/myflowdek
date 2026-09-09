@@ -102,12 +102,14 @@ export function RaidView({ items, onAdd, onUpdate, onRemove, projectId }: { item
       )}
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: 12, overflowX: 'auto' }}>
         <div style={{ minWidth: 700 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '110px 2.2fr 1fr 100px 1fr 36px', padding: '10px 16px', fontSize: 11.5, fontWeight: 700, color: COLORS.gray, borderBottom: `1px solid ${COLORS.line}`, letterSpacing: 0.8 }}><div>TYPE</div><div>DESCRIPTION</div><div>OWNER</div><div>IMPACT</div><div>STATUS</div><div /></div>
+          {/* Sticky TYPE column keeps the row's category pinned while the
+              700px grid is panned (audit Table 6.1). */}
+          <div style={{ display: 'grid', gridTemplateColumns: '110px 2.2fr 1fr 100px 1fr 36px', padding: '10px 16px', fontSize: 11.5, fontWeight: 700, color: COLORS.gray, borderBottom: `1px solid ${COLORS.line}`, letterSpacing: 0.8 }}><div style={{ position: 'sticky', left: 0, background: COLORS.card, zIndex: 1, boxShadow: `inset -1px 0 0 ${COLORS.line}` }}>TYPE</div><div>DESCRIPTION</div><div>OWNER</div><div>IMPACT</div><div>STATUS</div><div /></div>
           {shown.map(item => {
             const meta = RAID_META[item.type];
             return (
               <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '110px 2.2fr 1fr 100px 1fr 36px', alignItems: 'center', padding: '11px 16px', borderBottom: `1px solid ${COLORS.line}`, fontSize: 13 }}>
-                <span style={{ background: meta.bg, color: meta.color, fontSize: 11.5, fontWeight: 700, padding: '4px 8px', borderRadius: 9999, width: 'fit-content' }}>{meta.label}</span>
+                <div style={{ position: 'sticky', left: 0, background: COLORS.card, zIndex: 1, boxShadow: `inset -1px 0 0 ${COLORS.line}`, paddingRight: 8 }}><span style={{ background: meta.bg, color: meta.color, fontSize: 11.5, fontWeight: 700, padding: '4px 8px', borderRadius: 9999, width: 'fit-content' }}>{meta.label}</span></div>
                 <div style={{ paddingRight: 10 }}>{item.description}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Avatar id={item.owner} size={20} /> <span style={{ fontSize: 12.5 }}>{lookupMember(item.owner)?.name.split(' ')[0]}</span></div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: IMPACT_META[item.impact]?.color || COLORS.ink }}>{IMPACT_META[item.impact]?.label || item.impact}</span>

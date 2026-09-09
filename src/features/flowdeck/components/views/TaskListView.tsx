@@ -423,7 +423,7 @@ export function TaskListView({ tasks, tags = [], projects, currentProjectId, all
             <GripVertical size={14} color={COLORS.gray} />
           </div>
           <div><TaskCheckbox done={isDone} onToggle={e => { e.stopPropagation(); onToggleComplete(t.id); }} size={18} /></div>
-          <div>
+          <div className="fd-sticky-name" style={{ position: 'sticky', left: 64, background: COLORS.card, zIndex: 1, boxShadow: `inset -1px 0 0 ${COLORS.line}` }}>
             <InlineTaskName name={t.name} isDone={isDone} style={{ textDecoration: isDone ? 'line-through' : 'none', color: isDone ? COLORS.gray : COLORS.ink }} onSave={(newName) => onUpdateTask?.(t.id, { name: newName })} onOpenTask={() => onOpenTask(t.id)} />
             {t.tags && t.tags.length > 0 && <div style={{ marginTop: 4 }}><TagPills tags={t.tags} tagMap={tagMap} /></div>}
           </div>
@@ -540,7 +540,7 @@ export function TaskListView({ tasks, tags = [], projects, currentProjectId, all
       <SectionHeader title="Tasks" subtitle={`${filteredByTag.length}${filteredByTag.length !== tasks.length ? ` of ${tasks.length}` : ''} tasks`} right={headerRight} />
       <div style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: 12, overflowX: 'auto' }}>
         <div style={{ minWidth: 720 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '28px 36px 2.4fr 1fr 1fr 1fr 1.3fr 40px', padding: '10px 16px', fontSize: 11.5, fontWeight: 700, color: COLORS.gray, borderBottom: `1px solid ${COLORS.line}`, letterSpacing: 0.8 }}><div /><div /><div>TASK</div><div>ASSIGNEE</div><div>DUE DATE</div><div>PRIORITY</div><div>STATUS</div><div /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '28px 36px 2.4fr 1fr 1fr 1fr 1.3fr 40px', padding: '10px 16px', fontSize: 11.5, fontWeight: 700, color: COLORS.gray, borderBottom: `1px solid ${COLORS.line}`, letterSpacing: 0.8 }}><div /><div /><div style={{ position: 'sticky', left: 64, background: COLORS.card, zIndex: 1, boxShadow: `inset -1px 0 0 ${COLORS.line}` }}>TASK</div><div>ASSIGNEE</div><div>DUE DATE</div><div>PRIORITY</div><div>STATUS</div><div /></div>
           {desktopSectionsContent || sorted.map((t, idx) => renderDesktopRow(t, idx))}
           {sorted.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: COLORS.gray, fontSize: 13, fontFamily: FF }}>No tasks match your search.</div>}
           <QuickAddRow onQuickAdd={onQuickAdd} placeholder="Type a task name and press Enter..." isDesktop />
@@ -548,6 +548,8 @@ export function TaskListView({ tasks, tags = [], projects, currentProjectId, all
             .fd-task-row:hover .fd-grip-handle { opacity: 1 !important; }
             .fd-task-row .fd-grip-handle { opacity: 0.25; transition: opacity 0.15s; }
             .fd-task-row:hover { background: ${'#F9FAFB'}; }
+            /* Pinned name cell follows the row hover tint (sticky bg is solid). */
+            .fd-task-row:hover .fd-sticky-name { background: #F9FAFB; }
             .fd-section-row:hover { background: #F3F4F6 !important; }
           `}</style>
         </div>

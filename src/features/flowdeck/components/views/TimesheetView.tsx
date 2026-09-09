@@ -429,6 +429,18 @@ export function TimesheetView({
     transition: 'border-color 0.15s, background 0.15s',
   });
 
+  /* Sticky first column: while the 680px grid is panned on a phone, the task
+     name must stay pinned (audit Table 6.1). Solid bg + inset shadow replace
+     the cell border, which border-collapse does not paint on sticky cells. */
+  const stickyFirstHeader: React.CSSProperties = {
+    position: 'sticky', left: 0, zIndex: 2, background: COLORS.graySoft,
+    boxShadow: `inset -1px 0 0 ${COLORS.line}`,
+  };
+  const stickyFirstCell: React.CSSProperties = {
+    position: 'sticky', left: 0, zIndex: 1, background: COLORS.card,
+    boxShadow: `inset -1px 0 0 ${COLORS.line}`,
+  };
+
   const desktopTable = (
     <div style={{
       background: COLORS.card, borderRadius: 14, border: `1px solid ${COLORS.line}`,
@@ -439,7 +451,7 @@ export function TimesheetView({
         <table style={{ borderCollapse: 'collapse', width: '100%', fontFamily: FF, minWidth: 680 }}>
           <thead>
             <tr style={{ background: COLORS.graySoft }}>
-              <th style={{ ...headerCellStyle, textAlign: 'left', paddingLeft: isMobile ? 12 : 16, width: isMobile ? 120 : 220 }}>Task</th>
+              <th style={{ ...headerCellStyle, ...stickyFirstHeader, textAlign: 'left', paddingLeft: isMobile ? 12 : 16, width: isMobile ? 120 : 220 }}>Task</th>
               {weekDays.map((d, i) => (
                 <th key={i} style={{
                   ...headerCellStyle,
@@ -466,6 +478,7 @@ export function TimesheetView({
                   borderBottom: rowIdx < userTasks.length - 1 ? `1px solid ${COLORS.lineLight}` : 'none',
                 }}>
                   <td style={{
+                    ...stickyFirstCell,
                     padding: isMobile ? '6px 12px' : '8px 16px', fontSize: isMobile ? 12 : 13,
                     fontWeight: 500, color: COLORS.ink, fontFamily: FF, maxWidth: isMobile ? 120 : 220,
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

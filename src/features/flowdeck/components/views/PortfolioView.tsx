@@ -115,6 +115,16 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
     cursor: 'pointer', padding: '10px 14px', whiteSpace: 'nowrap', userSelect: 'none', color: COLORS.gray,
     textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: FF,
   };
+  /* Sticky first column: solid bg + inset shadow replace the cell border,
+     which border-collapse does not paint on sticky cells (audit Table 6.1). */
+  const stickyFirstHeader: React.CSSProperties = {
+    position: 'sticky', left: 0, zIndex: 2, textAlign: 'left' as const,
+    boxShadow: `inset -1px 0 0 ${COLORS.line}`,
+  };
+  const stickyFirstCell: React.CSSProperties = {
+    position: 'sticky', left: 0, zIndex: 1, background: COLORS.card,
+    boxShadow: `inset -1px 0 0 ${COLORS.line}`,
+  };
   const tdStyle: React.CSSProperties = {
     borderBottom: `1px solid ${COLORS.lineLight}`, padding: '10px 14px', fontSize: 13, fontFamily: FF, color: COLORS.ink, verticalAlign: 'middle',
   };
@@ -141,12 +151,13 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
     return (
       <tr
         key={p.id}
+        className="fd-portfolio-row"
         onClick={() => onOpen(p.id)}
         style={{ cursor: 'pointer', opacity: archived ? 0.6 : 1, transition: 'background 0.1s' }}
         onMouseEnter={e => { e.currentTarget.style.background = COLORS.lineLight; }}
         onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
       >
-        <td style={{ ...tdStyle, minWidth: 180 }}>
+        <td style={{ ...tdStyle, ...stickyFirstCell, minWidth: 180 }} className="fd-portfolio-sticky">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: p.color, flexShrink: 0 }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
@@ -222,10 +233,14 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
     if (list.length === 0) return null;
     return (
       <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${COLORS.line}`, background: COLORS.card }}>
+        {/* Keep the pinned first cell in sync with the row's JS hover tint. */}
+        <style>{`.fd-portfolio-row:hover .fd-portfolio-sticky { background: ${COLORS.lineLight} !important; }`}</style>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
           <thead>
             <tr>
-              <th style={{ ...thStyle, textAlign: 'left' }} onClick={() => handleSort('name')}>Project {renderSortIcon('name')}</th>
+              {/* Sticky first column keeps the project name pinned while the
+                  680px table is panned on a phone (audit Table 6.1). */}
+              <th style={{ ...thStyle, ...stickyFirstHeader }} onClick={() => handleSort('name')}>Project {renderSortIcon('name')}</th>
               <th style={{ ...thStyle, textAlign: 'left' }} onClick={() => handleSort('progress')}>Status {renderSortIcon('progress')}</th>
               <th style={{ ...thStyle, textAlign: 'left' }} onClick={() => handleSort('members')}>Members {renderSortIcon('members')}</th>
               <th style={{ ...thStyle, textAlign: 'left' }} onClick={() => handleSort('due')}>Due Date {renderSortIcon('due')}</th>
