@@ -59,7 +59,10 @@ export const routes = {
   projectCustomFields: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/settings/custom-fields`,
 
   // Resource overlays / detail routes
-  newTask: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/tasks/new`,
+  // `taskId` threads the parent for "Add subtask" (audit Table 5.1): the
+  // new-task modal reads the `parent` query param and pre-selects it.
+  newTask: (projectId: string, taskId?: string) =>
+    `/projects/${encodeURIComponent(projectId)}/tasks/new${taskId ? `?parent=${encodeURIComponent(taskId)}` : ''}`,
   task: (projectId: string, taskId: string) => `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`,
   taskDuplicate: (projectId: string, taskId: string) => `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}/duplicate`,
   file: (projectId: string, fileId: string) => `/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}`,

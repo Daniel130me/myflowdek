@@ -8,7 +8,7 @@ import { Field } from '../ui/Field';
 import { Modal } from '../ui/Modal';
 import { selectStyle, FF } from '../ui/styles';
 
-export function NewTaskModal({ projectStart, tasks = [], tags = [], members = [], onClose, onCreate }: { projectStart: string; tasks?: Task[]; tags?: Tag[]; members?: MemberInfo[]; onClose: () => void; onCreate: (input: CreateTaskInput) => void }) {
+export function NewTaskModal({ projectStart, tasks = [], tags = [], members = [], defaultParentId, onClose, onCreate }: { projectStart: string; tasks?: Task[]; tags?: Tag[]; members?: MemberInfo[]; /** Pre-selected parent (from /tasks/new?parent=<id>, e.g. "Add subtask"). */ defaultParentId?: string | null; onClose: () => void; onCreate: (input: CreateTaskInput) => void }) {
   const [name, setName] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [assignee, setAssignee] = React.useState(members[0]?.id ?? '');
@@ -16,7 +16,9 @@ export function NewTaskModal({ projectStart, tasks = [], tags = [], members = []
   const [duration, setDuration] = React.useState(5);
   const [start, setStart] = React.useState(TODAY.toISOString().slice(0, 10));
   const [dueDate, setDueDate] = React.useState('');
-  const [parentId, setParentId] = React.useState<string | null>(null);
+  // Pre-fill from the route so "Add subtask" lands with the right parent
+  // selected instead of silently creating an unrelated top-level task.
+  const [parentId, setParentId] = React.useState<string | null>(defaultParentId ?? null);
   const [selectedTags, setSelectedTags] = React.useState<Set<string>>(new Set());
 
   function submit() {

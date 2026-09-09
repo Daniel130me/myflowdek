@@ -82,7 +82,7 @@ export default function TaskDetailRoutePage() {
         parentTask={parentTask}
         onClose={() => router.push(routes.projectTasks(projectId))}
         onUpdate={patch => state.updateTask(projectId, task.id, patch)}
-        onAddSubtask={() => router.push(routes.newTask(projectId))}
+        onAddSubtask={parentTaskId => router.push(routes.newTask(projectId, parentTaskId))}
         onNavigateToTask={tid => router.push(routes.task(projectId, tid))}
         onToggleTaskTag={(taskId, tagId) => state.toggleTaskTag(projectId, taskId, tagId)}
         onAddTag={(tag) => state.addTag(projectId, tag)}
