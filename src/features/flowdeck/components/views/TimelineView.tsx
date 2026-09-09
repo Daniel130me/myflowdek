@@ -15,7 +15,7 @@ import {
 import { Avatar, StatusPill, PriorityFlag, SectionHeader, ToolbarBtn, TaskCheckbox, useMemberDirectory, useProjectMembers } from '../ui';
 import { FF } from '../ui/styles';
 import { GridToolbar, type GridActions } from '../toolbar';
-import { useViewport } from '../../hooks/useViewport';
+import { useViewport, MOBILE_MAX_WIDTH } from '../../hooks/useViewport';
 
 /* ------------------------------------------------------------------ critical path ------------------------------------------------------------------ */
 
@@ -129,8 +129,8 @@ export function TimelineView({ projectId, project, tasks, onOpenTask, onToggleCo
   // Avatar + the assignee-grouping logic below resolve real users.
   const { members: projectMembers } = useProjectMembers(projectId);
   const { lookup } = useMemberDirectory();
-  const [dayWidth, setDayWidth] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 720) ? 20 : 28);
-  const [labelWidth, setLabelWidth] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 720) ? 140 : 280);
+  const [dayWidth, setDayWidth] = useState(() => (typeof window !== 'undefined' && window.innerWidth < MOBILE_MAX_WIDTH) ? 20 : 28);
+  const [labelWidth, setLabelWidth] = useState(() => (typeof window !== 'undefined' && window.innerWidth < MOBILE_MAX_WIDTH) ? 140 : 280);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set());
   const [groupMode, setGroupMode] = useState<GroupMode>('parent');

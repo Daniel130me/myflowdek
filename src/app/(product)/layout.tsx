@@ -63,7 +63,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
   const params = useParams();
 
   const theme = useTheme();
-  const { isMobile } = useViewport();
+  const { isMobile, ready: viewportReady } = useViewport();
   const wsHook = useWorkspaces();
 
   const topBarRef = useRef<TopBarHandle>(null);
@@ -142,6 +142,15 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
     const targetRoute = getRouteForView(id, routeProjectId || undefined);
     router.push(targetRoute);
     state.setMoreMenuOpen(false);
+  }
+
+  // Wrong-shell flash guard (audit Table 4.1): the shell forks desktop
+  // (Sidebar) vs mobile (BottomNav) chrome. Until the viewport has been
+  // measured on the client, `isMobile` comes from the hard-coded server
+  // guess — committing that fork painted phones the desktop shell for a
+  // frame. Hold the neutral skeleton for that one frame instead.
+  if (!viewportReady) {
+    return <ProductShellSkeleton fontFamily={FF} />;
   }
 
   return (

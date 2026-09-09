@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, ArrowRight, Layers, BarChart3, Users, Zap, ChevronRight, Sparkles, LogOut } from 'lucide-react';
 import { COLORS, FF } from '@/features/flowdeck/model';
 import { routes } from '@/shared/navigation/routes';
+import { AuthPageSkeleton } from '@/components/ui/skeleton';
 import type { UserProfile } from './useAuth';
 
 interface LoginPageProps {
@@ -154,6 +155,15 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
       setLoading(false);
     }
   }, [onDemoLogin]);
+
+  // Wrong-layout flash guard (audit Table 4.1 — same finding as the product
+  // shell): `useWindowSize` starts at 0, so the server and the hydration
+  // commit render the MOBILE layout, which wide-screen visitors saw flip to
+  // the desktop layout right after hydration. Hold the shared auth skeleton
+  // until the real width is measured; `0` can never be a real innerWidth.
+  if (viewportWidth === 0) {
+    return <AuthPageSkeleton />;
+  }
 
   // ---- MOBILE LAYOUT (< 768px) ----
   if (isMobile) {
