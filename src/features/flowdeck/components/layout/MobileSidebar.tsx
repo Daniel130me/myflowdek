@@ -18,6 +18,7 @@ export function MobileSidebar({
   activeView,
   open,
   onClose,
+  pendingMyTasks = 0,
   onNavigate,
   goToPortfolio,
   bottomNavHeight,
@@ -30,6 +31,8 @@ export function MobileSidebar({
   activeView: string;
   open: boolean;
   onClose: () => void;
+  /** Open tasks assigned to the current user — drives the My Tasks badge. */
+  pendingMyTasks?: number;
   onNavigate: (id: string) => void;
   goToPortfolio: () => void;
   bottomNavHeight: number | string;
@@ -114,6 +117,7 @@ export function MobileSidebar({
                 fontSize: 14, fontWeight: active ? 600 : 500, opacity: disabled ? 0.5 : 1, minHeight: 44,
               }}>
                 <Icon size={18} strokeWidth={1.8} /> {n.label}
+                {n.id === 'mytasks' && pendingMyTasks > 0 && !active && <span style={{ marginLeft: 'auto', minWidth: 18, height: 18, borderRadius: 9999, background: '#FE8029', color: '#FFFFFF', fontSize: 10, fontWeight: 700, fontFamily: FF, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>{pendingMyTasks}</span>}
               </button>
             );
           })}

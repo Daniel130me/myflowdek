@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import type { Task, TaskStatus, TaskPriority } from '@/features/flowdeck/model';
 import { apiUpdateTask } from '@/lib/api-client';
+import { invalidateMyTasksBadge } from './useMyTasksBadge';
 
 /**
  * Shape returned by GET /api/tasks/my.
@@ -151,6 +152,9 @@ export function useMyTasks(status?: string, limit?: number) {
       toast.error('Failed to update task', { description: res.error });
       // Refetch to restore the server's view of this task.
       void refetch();
+    } else {
+      // The open-task set changed, so the sidebar badge must refetch too.
+      invalidateMyTasksBadge();
     }
     return !reverted;
   }, [tasks, refetch]);

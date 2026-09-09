@@ -11,6 +11,7 @@ import { FlowdekDataProvider } from '@/providers/FlowdekDataProvider';
 import { WorkspaceProvider } from '@/providers/WorkspaceProvider';
 import { MemberDirectoryProvider, useProjectMembers, ConfirmProvider } from '@/features/flowdeck/components/ui';
 import { useAuth } from '@/features/flowdeck/components/auth';
+import { useMyTasksBadge } from '@/features/flowdeck/hooks/useMyTasksBadge';
 import {
   Sidebar, MobileSidebar, TopBar, MobileSearchRow, BottomNav, MoreMenu,
 } from '@/features/flowdeck/components/layout';
@@ -71,6 +72,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
   const topBarRef = useRef<TopBarHandle>(null);
 
   const state = useFlowDeck();
+  const myTasksBadge = useMyTasksBadge();
   const {
     project, tasks, gridActions,
     searchQuery, projectMenuOpen, sidebarOpen, moreMenuOpen,
@@ -179,7 +181,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
           activeView={activeView}
           onNavigate={handleNavigate}
           goToPortfolio={() => router.push(routes.projects())}
-          pendingMyTasks={tasks.filter(t => t.assignee === state.currentUserId && t.status !== 'done').length}
+          pendingMyTasks={myTasksBadge}
           onToggleFavorite={state.toggleProjectFavorite}
           onArchive={state.archiveProject}
           onLogout={onLogout}
@@ -203,6 +205,7 @@ function ProductShellInner({ children, modal, onLogout }: { children: React.Reac
             state.setSidebarOpen(false);
             router.push(routes.projects());
           }}
+          pendingMyTasks={myTasksBadge}
           bottomNavHeight={bottomNavHeight}
           workspaces={wsHook.workspaces}
           selectedWorkspace={wsHook.selectedWorkspace}
