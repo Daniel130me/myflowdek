@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { getPlatformFeePercentage } from './payment.service';
 
 export const milestoneSelect = {
   id: true,
@@ -329,6 +330,8 @@ export function toEngagementDetailDto(
     scopeDescription: engagement.scopeDescription,
     agreedPrice: Number(engagement.agreedPrice),
     currency: engagement.currency,
+    /** Server-configured fee rate so clients never invent their own math. */
+    platformFeeRate: getPlatformFeePercentage(),
     startDate: engagement.startDate ? engagement.startDate.toISOString() : null,
     deadline: engagement.deadline ? engagement.deadline.toISOString() : null,
     completedAt: engagement.completedAt ? engagement.completedAt.toISOString() : null,

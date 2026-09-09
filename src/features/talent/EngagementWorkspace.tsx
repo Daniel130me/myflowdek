@@ -1425,12 +1425,14 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                     <strong>{data.currency} {fundAmount.toLocaleString()}</strong>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Platform Service Fee (10%):</span>
-                    <span>{data.currency} {(fundAmount * 0.1).toLocaleString()}</span>
+                    {/* Rate comes from the server (PLATFORM_FEE_PERCENTAGE) —
+                        never hard-code it here (audit Table 7.1). */}
+                    <span>Platform Service Fee ({data.platformFeeRate ?? 10}%):</span>
+                    <span>{data.currency} {(fundAmount * (data.platformFeeRate ?? 10) / 100).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between font-bold border-t border-border pt-1">
                     <span>Net Contractor Protection Payout:</span>
-                    <span className="text-emerald-600">{data.currency} {(fundAmount * 0.9).toLocaleString()}</span>
+                    <span className="text-emerald-600">{data.currency} {(fundAmount - fundAmount * (data.platformFeeRate ?? 10) / 100).toLocaleString()}</span>
                   </div>
                 </div>
 

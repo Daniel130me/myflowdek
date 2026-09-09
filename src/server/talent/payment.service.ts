@@ -4,12 +4,21 @@ import { ServiceError } from '@/server/http/errors';
 import { defaultPaymentProvider, isPaymentSandboxEnabled, MarketplacePaymentProvider } from './payment.provider';
 import { ConnectPaymentAccountInput, InitializePaymentInput, RequestRefundInput } from './payment.schemas';
 
-const getPlatformFeePercentage = (): number => {
+/**
+ * Platform fee configuration — single source of truth (audit Table 7.1:
+ * the UI used to print a literal "Platform Service Fee (10%)" while the
+ * server fee was env-configurable).
+ */
+export const DEFAULT_PLATFORM_FEE_PERCENTAGE = 10.0;
+
+export function getPlatformFeePercentage(): number {
   const envVal = process.env.PLATFORM_FEE_PERCENTAGE;
-  if (!envVal) return 10.0;
+  if (!envVal) return DEFAULT_PLATFORM_FEE_PERCENTAGE;
   const parsed = parseFloat(envVal);
-  return Number.isFinite(parsed) && parsed >= 0 && parsed < 100 ? parsed : 10.0;
-};
+  return Number.isFinite(parsed) && parsed >= 0 && parsed < 100
+    ? parsed
+    : DEFAULT_PLATFORM_FEE_PERCENTAGE;
+}
 
 type PaymentWebhookPayload = {
   id?: string | number;

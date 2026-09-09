@@ -243,6 +243,8 @@ export interface EngagementListItemDto {
 }
 
 export interface EngagementDetailDto {
+  /** Server-configured fee rate (PLATFORM_FEE_PERCENTAGE, default 10). */
+  platformFeeRate?: number;
   id: string;
   taskId: string;
   opportunityId: string | null;
