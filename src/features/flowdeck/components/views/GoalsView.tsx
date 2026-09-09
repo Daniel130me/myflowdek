@@ -5,6 +5,7 @@ import { Goal, KeyResult, COLORS, FF, TODAY } from '@/features/flowdeck/model';
 import { SectionHeader } from '../ui';
 import { Target, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { useViewport } from '../../hooks/useViewport';
+import { formatDateWithYear } from '@/shared/utils/format';
 
 const STATUS_STYLES: Record<string, { label: string; bg: string; color: string }> = {
   on_track:    { label: 'On Track',    bg: COLORS.greenSoft,  color: COLORS.green  },
@@ -124,7 +125,7 @@ export function GoalsView({ goals, keyResults, onAddGoal, onUpdateGoal, onDelete
   }
 
   function fmtDate(d: string) {
-    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatDateWithYear(d);
   }
 
   return (

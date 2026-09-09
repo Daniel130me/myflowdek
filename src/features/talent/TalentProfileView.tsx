@@ -21,6 +21,7 @@ import { getProfileReadiness, humanizeEnum } from './profile-readiness';
 import styles from './talent.module.css';
 import type { ProfessionalProfile } from './types';
 import { readApiMessage } from './types';
+import { formatDate } from '@/shared/utils/format';
 
 export function TalentProfileView() {
   const [profile, setProfile] = useState<ProfessionalProfile | null>(null);
@@ -240,7 +241,7 @@ export function TalentProfileView() {
             </div>
             <div className={styles.privacyNote}>
               <Clock3 size={16} aria-hidden="true" />
-              <span>Last updated {new Date(profile.updatedAt).toLocaleDateString()}</span>
+              <span>Last updated {formatDate(new Date(profile.updatedAt))}</span>
             </div>
           </aside>
         </div>

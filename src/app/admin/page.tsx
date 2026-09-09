@@ -5,6 +5,7 @@ import { Users, Building2, Activity, Heart, AlertTriangle, HardDrive, TrendingUp
 import { useRouter } from 'next/navigation';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import { formatDateTime } from '@/shared/utils/format';
 
 /**
  * Internal Flowdeck Admin Dashboard.
@@ -204,7 +205,7 @@ export default function AdminDashboardPage() {
                 </span>
                 <span style={{ fontSize: 13, color: '#6B7280' }}>{e.user?.email ?? 'system'}</span>
                 {e.ip && <span style={{ fontSize: 11, color: '#9CA3AF' }}>{e.ip}</span>}
-                <span style={{ fontSize: 11, color: '#9CA3AF', marginLeft: 'auto' }}>{new Date(e.createdAt).toLocaleString()}</span>
+                <span style={{ fontSize: 11, color: '#9CA3AF', marginLeft: 'auto' }}>{formatDateTime(new Date(e.createdAt))}</span>
               </div>
             ))}
           </div>

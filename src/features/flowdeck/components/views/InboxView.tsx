@@ -6,6 +6,7 @@ import { COLORS, type Project } from '@/features/flowdeck/model';
 import { Avatar, SectionHeader, FF, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 import type { InboxNotification } from '../../hooks/useNotifications';
+import { formatDateTime } from '@/shared/utils/format';
 
 interface InboxViewProps {
   /** Fetched notifications from `useNotifications`. */
@@ -84,7 +85,7 @@ export function InboxView({
     if (diff < 60_000) return 'just now';
     if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
     if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    return formatDateTime(d);
   }
 
   return (

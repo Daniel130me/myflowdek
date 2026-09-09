@@ -33,6 +33,7 @@ import type {
   MilestoneStatus,
 } from './types';
 import { readApiMessage } from './types';
+import { formatDate, formatDateTime, formatNumber } from '@/shared/utils/format';
 
 interface EngagementWorkspaceProps {
   engagementId: string;
@@ -512,12 +513,12 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
 
           <div className="flex flex-col items-end gap-2 text-right">
             <span className="text-2xl font-bold text-foreground">
-              {data.currency} {data.agreedPrice.toLocaleString()}
+              {data.currency} {formatDateTime(data.agreedPrice)}
             </span>
             {data.deadline && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
-                Target Due: {new Date(data.deadline).toLocaleDateString()}
+                Target Due: {formatDate(new Date(data.deadline))}
               </span>
             )}
           </div>
@@ -757,11 +758,11 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                     <div className="flex items-center gap-4">
                       <div className="text-right">
                         <strong className="block text-sm font-bold">
-                          {data.currency} {m.amount.toLocaleString()}
+                          {data.currency} {formatDateTime(m.amount)}
                         </strong>
                         {m.dueDate && (
                           <span className="text-xs text-muted-foreground">
-                            Due {new Date(m.dueDate).toLocaleDateString()}
+                            Due {formatDate(new Date(m.dueDate))}
                           </span>
                         )}
                       </div>
@@ -810,7 +811,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                   Total Contract Value
                 </span>
                 <strong className="text-xl text-foreground font-bold">
-                  {data.currency} {data.agreedPrice.toLocaleString()}
+                  {data.currency} {formatDateTime(data.agreedPrice)}
                 </strong>
               </div>
               <div className={styles.panel}>
@@ -818,7 +819,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                   Total Funded in Protection
                 </span>
                 <strong className="text-xl text-emerald-600 font-bold">
-                  {data.currency} {(paymentsData?.summary?.totalFunded || 0).toLocaleString()}
+                  {data.currency} {formatNumber(paymentsData?.summary?.totalFunded ?? 0)}
                 </strong>
               </div>
               <div className={styles.panel}>
@@ -826,7 +827,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                   Released Payouts
                 </span>
                 <strong className="text-xl text-primary font-bold">
-                  {data.currency} {(paymentsData?.summary?.totalReleased || 0).toLocaleString()}
+                  {data.currency} {formatNumber(paymentsData?.summary?.totalReleased ?? 0)}
                 </strong>
               </div>
             </div>
@@ -910,9 +911,9 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                           </span>
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Gross Amount: <strong>{p.currency} {Number(p.amount).toLocaleString()}</strong> |
-                          Platform Fee (10%): {p.currency} {Number(p.platformFee).toLocaleString()} |
-                          Net Contractor Payout: <strong>{p.currency} {Number(p.netAmount).toLocaleString()}</strong>
+                          Gross Amount: <strong>{p.currency} {formatNumber(Number(p.amount))}</strong> |
+                          Platform Fee (10%): {p.currency} {formatNumber(Number(p.platformFee))} |
+                          Net Contractor Payout: <strong>{p.currency} {formatNumber(Number(p.netAmount))}</strong>
                         </div>
                       </div>
 
@@ -977,7 +978,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                         <strong className="text-base">{d.title}</strong>
                         <span className="block text-xs text-muted-foreground mt-0.5">
                           Submitted by {d.submittedBy.name ?? 'User'} on{' '}
-                          {new Date(d.submittedAt).toLocaleString()}
+                          {formatDateTime(new Date(d.submittedAt))}
                         </span>
                       </div>
                       {d.milestoneId && (
@@ -1051,7 +1052,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                         </div>
                         <p className="text-muted-foreground m-0 italic">"{reviewsData.professionalReview.writtenFeedback || 'No written comments provided.'}"</p>
                         <div className="text-xs text-muted-foreground pt-2 border-t border-border">
-                          Submitted by {reviewsData.professionalReview.clientUser?.name ?? 'Client'} • {new Date(reviewsData.professionalReview.createdAt).toLocaleDateString()}
+                          Submitted by {reviewsData.professionalReview.clientUser?.name ?? 'Client'} • {formatDate(new Date(reviewsData.professionalReview.createdAt))}
                         </div>
                       </div>
                     ) : (
@@ -1118,7 +1119,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                         </div>
                         <p className="text-muted-foreground m-0 italic">"{reviewsData.clientReview.writtenFeedback || 'No written comments provided.'}"</p>
                         <div className="text-xs text-muted-foreground pt-2 border-t border-border">
-                          Submitted by Contractor • {new Date(reviewsData.clientReview.createdAt).toLocaleDateString()}
+                          Submitted by Contractor • {formatDate(new Date(reviewsData.clientReview.createdAt))}
                         </div>
                       </div>
                     ) : (
@@ -1168,7 +1169,7 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                   <div className={styles.activityDot} />
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <strong>{a.author?.name ?? 'System'}</strong>
-                    <span>{new Date(a.createdAt).toLocaleString()}</span>
+                    <span>{formatDateTime(new Date(a.createdAt))}</span>
                   </div>
                   <p className="text-sm m-0 text-foreground">{a.description}</p>
                 </div>
@@ -1422,17 +1423,17 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
                 <div className="p-3 rounded bg-secondary/50 text-xs space-y-1">
                   <div className="flex justify-between">
                     <span>Gross Payment Amount:</span>
-                    <strong>{data.currency} {fundAmount.toLocaleString()}</strong>
+                    <strong>{data.currency} {formatDateTime(fundAmount)}</strong>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     {/* Rate comes from the server (PLATFORM_FEE_PERCENTAGE) —
                         never hard-code it here (audit Table 7.1). */}
                     <span>Platform Service Fee ({data.platformFeeRate ?? 10}%):</span>
-                    <span>{data.currency} {(fundAmount * (data.platformFeeRate ?? 10) / 100).toLocaleString()}</span>
+                    <span>{data.currency} {formatNumber(fundAmount * (data.platformFeeRate ?? 10) / 100)}</span>
                   </div>
                   <div className="flex justify-between font-bold border-t border-border pt-1">
                     <span>Net Contractor Protection Payout:</span>
-                    <span className="text-emerald-600">{data.currency} {(fundAmount - fundAmount * (data.platformFeeRate ?? 10) / 100).toLocaleString()}</span>
+                    <span className="text-emerald-600">{data.currency} {formatNumber(fundAmount - fundAmount * (data.platformFeeRate ?? 10) / 100)}</span>
                   </div>
                 </div>
 

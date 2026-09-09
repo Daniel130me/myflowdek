@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Bell, X, Check, CheckCheck } from 'lucide-react';
 import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { routes } from '@/shared/navigation/routes';
+import { formatDate } from '@/shared/utils/format';
 
 interface NotificationItem {
   id: string;
@@ -122,7 +123,7 @@ export function NotificationBell() {
     if (diff < 60_000) return 'just now';
     if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
     if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-    return d.toLocaleDateString();
+    return formatDate(d);
   };
 
   return (

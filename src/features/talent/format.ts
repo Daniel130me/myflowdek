@@ -1,3 +1,4 @@
+import { formatNumber } from '@/shared/utils/format';
 import type { PublicProfessionalProfile } from './types';
 
 export function humanizeTalentEnum(value: string | null | undefined): string {
@@ -14,8 +15,8 @@ export function formatRate(profile: Pick<PublicProfessionalProfile, 'rateType' |
   if (profile.rateType === 'NEGOTIABLE') return 'Negotiable';
 
   const currency = profile.currency ?? '';
-  const minimum = profile.minimumRate ? Number(profile.minimumRate).toLocaleString() : null;
-  const maximum = profile.maximumRate ? Number(profile.maximumRate).toLocaleString() : null;
+  const minimum = profile.minimumRate ? formatNumber(Number(profile.minimumRate)) : null;
+  const maximum = profile.maximumRate ? formatNumber(Number(profile.maximumRate)) : null;
   const suffix = profile.rateType === 'HOURLY' ? '/hr' : ' fixed';
 
   if (minimum && maximum) return `${currency} ${minimum}–${maximum}${suffix}`.trim();

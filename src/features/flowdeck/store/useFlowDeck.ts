@@ -40,6 +40,7 @@ import {
   apiCreateRaidItem, apiUpdateRaidItem, apiDeleteRaidItem,
   taskToApiPayload,
 } from '@/lib/api-client';
+import { formatDate } from '@/shared/utils/format';
 
 /* ---- LocalStorage persistence ---- */
 const SAVE_DEBOUNCE = 500;
@@ -3138,7 +3139,7 @@ export function useFlowDeckStore(): FlowDeckState {
     // Auto-create task from submission
     const form = forms.find(f => f.id === submission.formId);
     if (form && form.isActive) {
-      const taskName = submission.data['name'] || submission.data['title'] || `Request from ${new Date(submission.submittedAt).toLocaleDateString()}`;
+      const taskName = submission.data['name'] || submission.data['title'] || `Request from ${formatDate(new Date(submission.submittedAt))}`;
       const desc = Object.entries(submission.data).filter(([k]) => !['name', 'title', 'email'].includes(k)).map(([k, v]) => `**${k}:** ${v}`).join('\n');
       const pid = form.projectId;
       if (pid && tasksByProject[pid]) {

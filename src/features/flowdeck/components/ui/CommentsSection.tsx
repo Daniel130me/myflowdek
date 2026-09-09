@@ -8,6 +8,7 @@ import { Field } from './Field';
 import { useMemberDirectory } from './MemberDirectory';
 import { MarkdownPreview } from './MarkdownDescription';
 import { applyMarkdownFormat, MarkdownToolbar, type MarkdownFormat } from './MarkdownToolbar';
+import { formatDate, formatTime } from '@/shared/utils/format';
 
 /* ---- Quick-reaction emojis ---- */
 const QUICK_REACTIONS = ['❤️', '👍', '🎉', '🎊', '👏', '😮', '😎', '👀'];
@@ -95,10 +96,10 @@ export function CommentsSection({
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
     const diffDays = Math.floor(diffMs / 86400000);
-    if (diffDays === 0) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    if (diffDays === 0) return formatTime(d);
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays}d ago`;
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return formatDate(d);
   }
 
   /* ---- @mention autocomplete (main input) ---- */

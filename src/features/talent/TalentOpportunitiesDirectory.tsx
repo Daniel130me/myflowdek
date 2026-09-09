@@ -27,6 +27,7 @@ import type {
   SkillOption,
 } from './types';
 import { readApiMessage } from './types';
+import { formatDate } from '@/shared/utils/format';
 
 export function TalentOpportunitiesDirectory() {
   const router = useRouter();
@@ -337,7 +338,7 @@ function OpportunityCard({ opportunity }: { opportunity: PublicOpportunity }) {
         {opportunity.applicationDeadline && (
           <span className="flex items-center gap-1">
             <Calendar className="w-3.5 h-3.5" />
-            Deadline: {new Date(opportunity.applicationDeadline).toLocaleDateString()}
+            Deadline: {formatDate(new Date(opportunity.applicationDeadline))}
           </span>
         )}
       </div>

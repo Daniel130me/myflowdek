@@ -10,6 +10,7 @@ import { useViewport } from '@/features/flowdeck/hooks/useViewport';
 import { toast } from 'sonner';
 import { fetchJson } from '@/lib/fetch-json';
 import { useConfirmDialog } from '@/features/flowdeck/components/ui';
+import { formatDate } from '@/shared/utils/format';
 
 interface WorkspaceMember {
   userId: string;
@@ -377,7 +378,7 @@ export default function WorkspaceSettingsPage() {
               <div style={{ ...avatarStyle('#E5E7EB') }}><Mail size={14} color="#6B7280" /></div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{inv.email}</div>
-                <div style={{ fontSize: 11, color: COLORS.gray }}>Role: {inv.role} · Expires: {new Date(inv.expiresAt).toLocaleDateString()}</div>
+                <div style={{ fontSize: 11, color: COLORS.gray }}>Role: {inv.role} · Expires: {formatDate(new Date(inv.expiresAt))}</div>
               </div>
               {canManageInvitations && (
                 <button

@@ -10,6 +10,7 @@ import { getSingleParam } from '@/shared/utils/routeParams';
 import { DocumentWorkspace } from './DocumentWorkspace';
 import type { ProjectDocument } from './document-client.types';
 import styles from './documents.module.css';
+import { formatDate } from '@/shared/utils/format';
 
 const PHASES = [
   { value: '', label: 'All phases' }, { value: 'INITIATION', label: 'Initiation' },
@@ -150,7 +151,7 @@ export default function ProjectDocumentsPage() {
       {documents.map((document) => <article className={styles.row} key={document.id}>
         <div className={styles.fileIcon}><DocumentIcon type={document.template?.documentType ?? document.mimeType ?? ''} /></div>
         <button className={styles.documentMain} onClick={() => setViewer(document)}>
-          <h2>{document.name}</h2><div className={styles.metadata}><span><UserRound size={13} /> {document.createdBy.name ?? document.createdBy.email}</span><span><CalendarDays size={13} /> {new Date(document.createdAt).toLocaleDateString()}</span>{document.template && <><span>{document.template.name}</span><span>{phaseLabel(document.template.phase)}</span><span>{typeLabel(document.template.documentType)}</span></>}<span><Cloud size={13} /> Google Drive · {drive ? 'Connected' : 'Reconnect required'}</span></div>
+          <h2>{document.name}</h2><div className={styles.metadata}><span><UserRound size={13} /> {document.createdBy.name ?? document.createdBy.email}</span><span><CalendarDays size={13} /> {formatDate(new Date(document.createdAt))}</span>{document.template && <><span>{document.template.name}</span><span>{phaseLabel(document.template.phase)}</span><span>{typeLabel(document.template.documentType)}</span></>}<span><Cloud size={13} /> Google Drive · {drive ? 'Connected' : 'Reconnect required'}</span></div>
         </button>
         <div className={styles.actions}><button title="Preview in Flowdek" onClick={() => setViewer(document)}><Eye size={17} /></button><button title="Open in Google Drive" onClick={() => window.open(document.providerWebUrl, '_blank', 'noopener,noreferrer')}><ExternalLink size={17} /></button><button title="Share" onClick={() => setSharing(document)}><Share2 size={17} /></button><button title="Rename Flowdek reference" onClick={() => void renameDocument(document)}><Pencil size={17} /></button><button className={styles.danger} title="Remove from Flowdek" onClick={() => void removeDocument(document)}><Trash2 size={17} /></button></div>
       </article>)}

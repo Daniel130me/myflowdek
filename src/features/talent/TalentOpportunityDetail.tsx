@@ -23,6 +23,7 @@ import { useConfirmDialog } from '@/features/flowdeck/components/ui';
 import styles from './talent.module.css';
 import type { PublicOpportunity, TalentProposalDto } from './types';
 import { readApiMessage } from './types';
+import { formatDate } from '@/shared/utils/format';
 
 interface TalentOpportunityDetailProps {
   opportunityId: string;
@@ -251,7 +252,7 @@ export function TalentOpportunityDetail({ opportunityId }: TalentOpportunityDeta
             </span>
             <span className="text-xs text-muted-foreground">
               Posted by {opportunity.createdBy.displayName} on{' '}
-              {new Date(opportunity.publishedAt || opportunity.createdAt).toLocaleDateString()}
+              {formatDate(new Date(opportunity.publishedAt || opportunity.createdAt))}
             </span>
           </div>
 
@@ -274,7 +275,7 @@ export function TalentOpportunityDetail({ opportunityId }: TalentOpportunityDeta
               <span className="text-xs text-muted-foreground uppercase font-semibold">Deadline</span>
               <p className="font-bold text-foreground mt-0.5">
                 {opportunity.applicationDeadline
-                  ? new Date(opportunity.applicationDeadline).toLocaleDateString()
+                  ? formatDate(new Date(opportunity.applicationDeadline))
                   : 'Open until filled'}
               </p>
             </div>
@@ -402,7 +403,7 @@ export function TalentOpportunityDetail({ opportunityId }: TalentOpportunityDeta
                             {proposal.status}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            Submitted {new Date(proposal.submittedAt).toLocaleDateString()}
+                            Submitted {formatDate(new Date(proposal.submittedAt))}
                           </span>
                         </div>
 

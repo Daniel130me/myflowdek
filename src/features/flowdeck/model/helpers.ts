@@ -1,3 +1,4 @@
+import { formatDate } from '@/shared/utils/format';
 /**
  * The current date, evaluated once per app session.
  *
@@ -24,7 +25,7 @@ export function addDays(dateStr: string, n: number): Date {
 export function fmtDate(d: string | Date): string {
   const date = new Date(d);
   if (Number.isNaN(date.getTime())) return "Date not set";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return formatDate(date);
 }
 
 export function fmtRange(startStr: string, duration: number): string {

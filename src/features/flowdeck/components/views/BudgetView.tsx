@@ -28,6 +28,7 @@ import { SectionHeader, Avatar, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 import { useAuth } from '../auth';
 import { toast } from 'sonner';
+import { formatNumber } from '@/shared/utils/format';
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -88,7 +89,7 @@ const selectStyle: React.CSSProperties = {
 
 function fmtCurrency(amount: number, currency: string): string {
   const symbol = CURRENCY_SYMBOLS[currency] || '$';
-  return `${symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  return `${symbol}${formatNumber(amount)}`;
 }
 
 function getBarColor(pct: number): string {

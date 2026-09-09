@@ -6,6 +6,7 @@ import { COLORS, type TimeLog } from '@/features/flowdeck/model';
 import { FF } from './styles';
 import { Avatar } from './Avatar';
 import { useMemberDirectory } from './MemberDirectory';
+import { formatDateTime } from '@/shared/utils/format';
 
 interface TimeTrackingSectionProps {
   timeLogs: TimeLog[];
@@ -22,7 +23,7 @@ function fmtDuration(minutes: number): string {
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  return formatDateTime(d);
 }
 
 const sectionStyle: React.CSSProperties = { marginBottom: 16 };

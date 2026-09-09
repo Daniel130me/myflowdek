@@ -27,6 +27,7 @@ import type {
   EngagementStatus,
 } from './types';
 import { readApiMessage } from './types';
+import { formatDate, formatDateTime } from '@/shared/utils/format';
 
 export function EngagementsDirectory() {
   const searchParams = useSearchParams();
@@ -255,13 +256,13 @@ export function EngagementsDirectory() {
                     <div className={styles.engagementMetaRow}>
                       <span className="flex items-center gap-1.5 font-bold text-foreground">
                         <DollarSign className="w-4 h-4 text-primary" />
-                        {engagement.currency} {engagement.agreedPrice.toLocaleString()}
+                        {engagement.currency} {formatDateTime(engagement.agreedPrice)}
                       </span>
 
                       {engagement.deadline && (
                         <span className="flex items-center gap-1.5">
                           <Calendar className="w-4 h-4" />
-                          Due {new Date(engagement.deadline).toLocaleDateString()}
+                          Due {formatDate(new Date(engagement.deadline))}
                         </span>
                       )}
 

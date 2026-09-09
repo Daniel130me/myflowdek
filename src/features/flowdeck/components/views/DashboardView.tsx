@@ -6,6 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
 import { Users, AlertTriangle, CheckCircle2, TrendingUp, Star, Archive, Save, Plus, X, UserPlus, Trash2, Pencil } from 'lucide-react';
 import { Avatar, StatusPill, PriorityFlag, Card, SectionHeader, StatCard, FileThumbnailGrid, FF, useMemberDirectory, useProjectMembers } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
+import { formatDateTime } from '@/shared/utils/format';
 
 const STATUS_COLORS: Record<string, string> = { green: '#16A34A', yellow: '#D97706', red: '#DC2626' };
 const STATUS_LABELS: Record<string, string> = { green: 'On Track', yellow: 'At Risk', red: 'Off Track' };
@@ -276,7 +277,7 @@ export function DashboardView({ project, tasks, files = [], statusUpdates = [], 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                         <Avatar id={su.authorId} size={22} />
                         <span style={{ fontSize: 13, fontWeight: 600, fontFamily: FF }}>{author?.name || 'Unknown'}</span>
-                        <span style={{ fontSize: 11, color: COLORS.gray }}>{new Date(su.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        <span style={{ fontSize: 11, color: COLORS.gray }}>{formatDateTime(su.createdAt)}</span>
                         <span style={{ fontSize: 10.5, fontWeight: 700, color: STATUS_COLORS[su.color], background: `${STATUS_COLORS[su.color]}18`, padding: '2px 8px', borderRadius: 9999, fontFamily: FF }}>{STATUS_LABELS[su.color]}</span>
                         {onDeleteStatusUpdate && (
                           <button onClick={() => onDeleteStatusUpdate(su.id)} style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: COLORS.gray, padding: 2, display: 'flex' }}><Trash2 size={14} /></button>
