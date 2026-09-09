@@ -27,6 +27,11 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
+  // Search failures used to be swallowed, leaving results=null — the panel
+  // then showed a confident "No results found" for what was actually a
+  // failed request (audit Table 5.1). Track it so the UI can differentiate.
+  const [failed, setFailed] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Focus input when opened.
@@ -42,18 +47,26 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
   useEffect(() => {
     if (!open || query.trim().length < 2) {
       setResults(null);
+      setFailed(false);
       return;
     }
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`);
-        if (res.ok) setResults(await res.json());
-      } catch { /* network error */ }
+        if (!res.ok) throw new Error('search failed');
+        setResults(await res.json());
+        setFailed(false);
+      } catch {
+        // Keep the previous results hidden and surface the failure instead
+        // of rendering a meaningless-looking empty state.
+        setResults(null);
+        setFailed(true);
+      }
       finally { setLoading(false); }
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, open]);
+  }, [query, open, retryTick]);
 
   // Escape-to-close is handled by the Radix Dialog inside Modal; the old
   // document-level listener fought other overlays for the key.
@@ -92,7 +105,18 @@ export function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => 
           {loading && (
             <div style={{ padding: 24, textAlign: 'center', color: COLORS.gray, fontSize: 13 }}>Searching…</div>
           )}
-          {!loading && !hasResults && query.trim().length >= 2 && (
+          {!loading && failed && query.trim().length >= 2 && (
+            <div style={{ padding: 24, textAlign: 'center', color: COLORS.gray, fontSize: 13 }}>
+              <div style={{ marginBottom: 8 }}>Search failed. Check your connection and try again.</div>
+              <button
+                onClick={() => setRetryTick(t => t + 1)}
+                style={{ border: `1px solid ${COLORS.line}`, background: '#F3F4F6', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: FF, color: COLORS.ink }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {!loading && !failed && !hasResults && query.trim().length >= 2 && (
             <div style={{ padding: 24, textAlign: 'center', color: COLORS.gray, fontSize: 13 }}>
               No results found for "{query}"
             </div>

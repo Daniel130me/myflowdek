@@ -34,6 +34,10 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loadingList, setLoadingList] = useState(false);
+  // A failed list fetch used to be swallowed (.catch(() => {})) and rendered
+  // as "No notifications" — indistinguishable from a genuinely empty inbox
+  // (audit Table 5.1). Track it so the panel can offer a retry.
+  const [listError, setListError] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   // Poll unread count.
@@ -71,15 +75,25 @@ export function NotificationBell() {
   }, [open]);
 
   // Fetch full list when opened.
+  const loadList = useCallback(async () => {
+    setLoadingList(true);
+    try {
+      const res = await fetch('/api/notifications?limit=20');
+      if (!res.ok) throw new Error('Failed to load notifications');
+      const data = await res.json();
+      setNotifications(data.notifications ?? []);
+      setListError(false);
+    } catch {
+      setListError(true);
+    } finally {
+      setLoadingList(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!open) return;
-    setLoadingList(true);
-    fetch('/api/notifications?limit=20')
-      .then(res => res.json())
-      .then(data => setNotifications(data.notifications ?? []))
-      .catch(() => {})
-      .finally(() => setLoadingList(false));
-  }, [open]);
+    void loadList();
+  }, [open, loadList]);
 
   const handleMarkRead = useCallback(async (id: string) => {
     await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
@@ -173,6 +187,16 @@ export function NotificationBell() {
           {loadingList ? (
             <div style={{ padding: 24, textAlign: 'center', color: COLORS.gray, fontSize: 13 }}>
               Loading…
+            </div>
+          ) : listError ? (
+            <div style={{ padding: 24, textAlign: 'center', color: COLORS.gray, fontSize: 13 }}>
+              <div style={{ marginBottom: 8 }}>Couldn't load notifications.</div>
+              <button
+                onClick={() => void loadList()}
+                style={{ border: `1px solid ${COLORS.line}`, background: '#F3F4F6', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, fontFamily: FF, color: COLORS.ink }}
+              >
+                Retry
+              </button>
             </div>
           ) : notifications.length === 0 ? (
             <div style={{ padding: 32, textAlign: 'center', color: COLORS.gray, fontSize: 13 }}>

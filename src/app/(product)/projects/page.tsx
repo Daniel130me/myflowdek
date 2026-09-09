@@ -25,6 +25,8 @@ export default function ProjectsPortfolioPage() {
   const wsHook = useWorkspaces();
   const {
     loading,
+    error: loadError,
+    refetch: refetchProjects,
     deleteProject,
     setFavorite,
     archiveProject,
@@ -60,6 +62,25 @@ export default function ProjectsPortfolioPage() {
 
   if (loading) {
     return <ProjectListSkeleton />;
+  }
+
+  // A failed list fetch used to render the portfolio with zero projects and
+  // the misleading "No projects match your search." copy (audit Table 5.1).
+  // Show a retryable error instead when there is nothing to display.
+  if (loadError && Object.keys(workspaceProjects).length === 0) {
+    return (
+      <div style={{ padding: 48, textAlign: 'center', fontFamily: 'inherit' }}>
+        <AlertTriangle size={28} color={COLORS.amber} style={{ display: 'inline-block', marginBottom: 12 }} />
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Couldn't load your projects</div>
+        <div style={{ fontSize: 13, color: COLORS.gray, marginBottom: 16 }}>{loadError}</div>
+        <button
+          onClick={() => void refetchProjects()}
+          style={{ border: `1px solid ${COLORS.line}`, background: '#F3F4F6', borderRadius: 10, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   return (

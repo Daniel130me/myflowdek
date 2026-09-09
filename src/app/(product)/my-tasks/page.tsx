@@ -7,6 +7,7 @@ import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useMyTasks } from '@/features/flowdeck/hooks/useMyTasks';
 import { routes } from '@/shared/navigation/routes';
 import { TableSkeleton } from '@/components/ui/skeleton';
+import { TaskLoadError } from '@/components/ui/task-load-error';
 
 /**
  * My Tasks page.
@@ -24,10 +25,17 @@ import { TableSkeleton } from '@/components/ui/skeleton';
 export default function MyTasksRoutePage() {
   const router = useRouter();
   const state = useFlowDeck();
-  const { tasks, loading, toggleComplete } = useMyTasks();
+  const { tasks, loading, error, refetch, toggleComplete } = useMyTasks();
 
   if (loading && tasks.length === 0) {
     return <TableSkeleton />;
+  }
+
+  // A failed fetch used to fall through to the view's "No tasks assigned to
+  // you" empty state — indistinguishable from genuinely having no work
+  // (audit Table 5.1). Show a retryable error instead.
+  if (error && tasks.length === 0) {
+    return <TaskLoadError onRetry={() => void refetch()} />;
   }
 
   return (

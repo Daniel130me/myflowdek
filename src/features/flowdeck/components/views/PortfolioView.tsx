@@ -8,6 +8,43 @@ import { useViewport } from '../../hooks/useViewport';
 
 type SortDir = 'asc' | 'desc';
 
+/**
+ * Empty state for the portfolio, split by cause (audit Table 5.1):
+ *   - zero projects in the workspace -> onboarding CTA ("create your first
+ *     project"), never a search-miss sentence;
+ *   - projects exist but the active search/filter matches none -> search
+ *     miss copy;
+ *   - everything archived -> neutral archive hint.
+ */
+function EmptyProjectsMessage({ hasSearch, workspaceHasNoProjects, onNew }: { hasSearch: boolean; workspaceHasNoProjects: boolean; onNew: () => void }) {
+  if (workspaceHasNoProjects && !hasSearch) {
+    return (
+      <div style={{ textAlign: 'center', padding: '36px 16px', color: COLORS.gray, fontFamily: FF }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: COLORS.ink, marginBottom: 4 }}>No projects yet</div>
+        <div style={{ fontSize: 13, marginBottom: 16 }}>Create your first project to start planning work.</div>
+        <button
+          onClick={onNew}
+          style={{ border: `1px solid ${COLORS.line}`, background: COLORS.accentSoft, color: COLORS.accentDark, borderRadius: 10, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: FF }}
+        >
+          + Create your first project
+        </button>
+      </div>
+    );
+  }
+  if (hasSearch) {
+    return (
+      <div style={{ textAlign: 'center', color: COLORS.gray, fontSize: 13, marginTop: 12 }}>
+        No projects match your search.
+      </div>
+    );
+  }
+  return (
+    <div style={{ textAlign: 'center', color: COLORS.gray, fontSize: 13, marginTop: 12 }}>
+      No active projects. Archived projects can be restored from the archive view.
+    </div>
+  );
+}
+
 export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, onToggleFavorite, onArchive, onRestore }: {
   projects: Record<string, Project>; searchQuery: string;
   onOpen: (id: string) => void; onDelete: (id: string) => void; onNew: () => void;
@@ -22,6 +59,11 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
   const activeProjects = Object.values(projects).filter(p => !p.isArchived && p.name.toLowerCase().includes((searchQuery || '').toLowerCase()));
+  // Differentiate the two "nothing here" cases (audit Table 5.1): a workspace
+  // with zero projects is an onboarding moment ("create your first project"),
+  // not a search miss — and a search miss must not claim zero projects exist.
+  const hasSearch = Boolean((searchQuery || '').trim());
+  const workspaceHasNoProjects = Object.keys(projects).length === 0;
   const archivedProjects = Object.values(projects).filter(p => p.isArchived && p.name.toLowerCase().includes((searchQuery || '').toLowerCase()));
 
   function statsFor(id: string) {
@@ -328,7 +370,7 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
               New project
             </button>
           </div>
-          {activeProjects.length === 0 && !showArchived && <div style={{ textAlign: 'center', color: COLORS.gray, fontSize: 13, marginTop: 12 }}>No projects match your search.</div>}
+          {activeProjects.length === 0 && !showArchived && <EmptyProjectsMessage hasSearch={hasSearch} workspaceHasNoProjects={workspaceHasNoProjects} onNew={onNew} />}
         </>
       ) : (
         <>
@@ -337,7 +379,7 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
             <Plus size={18} />
             New project
           </button>
-          {activeProjects.length === 0 && !showArchived && <div style={{ textAlign: 'center', color: COLORS.gray, fontSize: 13, marginTop: 12 }}>No projects match your search.</div>}
+          {activeProjects.length === 0 && !showArchived && <EmptyProjectsMessage hasSearch={hasSearch} workspaceHasNoProjects={workspaceHasNoProjects} onNew={onNew} />}
         </>
       )}
 
