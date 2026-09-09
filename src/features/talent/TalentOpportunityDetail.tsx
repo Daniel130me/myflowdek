@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 
 import { routes } from '@/shared/navigation/routes';
+import { useConfirmDialog } from '@/features/flowdeck/components/ui';
 import styles from './talent.module.css';
 import type { PublicOpportunity, TalentProposalDto } from './types';
 import { readApiMessage } from './types';
@@ -29,6 +30,7 @@ interface TalentOpportunityDetailProps {
 
 export function TalentOpportunityDetail({ opportunityId }: TalentOpportunityDetailProps) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [opportunity, setOpportunity] = useState<PublicOpportunity | null>(null);
@@ -130,7 +132,11 @@ export function TalentOpportunityDetail({ opportunityId }: TalentOpportunityDeta
   };
 
   const handleWithdrawProposal = async (proposalId: string) => {
-    if (!confirm('Are you sure you want to withdraw your proposal?')) return;
+    if (!(await confirmDialog({
+      title: 'Withdraw your proposal?',
+      description: 'The client will no longer see your proposal for this opportunity.',
+      confirmLabel: 'Withdraw proposal',
+    }))) return;
     try {
       const res = await fetch(`/api/talent/proposals/${proposalId}/withdraw`, { method: 'POST' });
       if (!res.ok) throw new Error(await readApiMessage(res));
@@ -149,7 +155,10 @@ export function TalentOpportunityDetail({ opportunityId }: TalentOpportunityDeta
       action === 'accept'
         ? 'accept this proposal and award the task'
         : `${action} this proposal`;
-    if (!confirm(`Are you sure you want to ${actionLabel}?`)) return;
+    if (!(await confirmDialog({
+      title: `Are you sure you want to ${actionLabel}?`,
+      confirmLabel: 'Confirm',
+    }))) return;
 
     try {
       const res = await fetch(`/api/talent/proposals/${proposalId}/${action}`, { method: 'POST' });

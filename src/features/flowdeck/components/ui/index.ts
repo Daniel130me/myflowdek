@@ -23,4 +23,6 @@ export { TaskContextMenu } from './TaskContextMenu';
 export { InlineTaskName } from './InlineTaskName';
 export { DuplicateTaskDialog } from './DuplicateTaskDialog';
 export { MarkdownDescription } from './MarkdownDescription';
+export { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
+export { ConfirmProvider, useConfirmDialog } from './ConfirmProvider';
 export { MemberDirectoryProvider, useMemberDirectory, useProjectMembers } from './MemberDirectory';

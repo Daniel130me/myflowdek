@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useConfirmDialog } from '@/features/flowdeck/components/ui';
 import type { ProjectDocument, ProviderDocumentSnapshot, SpreadsheetSnapshot } from './document-client.types';
 import styles from './documents.module.css';
 
@@ -106,10 +107,15 @@ export function DocumentWorkspace({ projectId, document, onClose, contentEndpoin
   const sheetEditingAvailable = content?.kind !== 'spreadsheet'
     || !content.sheets.some((sheet) => sheet.truncated);
 
+  const confirmDialog = useConfirmDialog();
+
   const closeWorkspace = useCallback(() => {
-    if (dirty && !window.confirm('Discard your unsaved document changes?')) return;
-    onClose();
-  }, [dirty, onClose]);
+    if (!dirty) { onClose(); return; }
+    void confirmDialog({
+      title: 'Discard your unsaved document changes?',
+      confirmLabel: 'Discard changes',
+    }).then(ok => { if (ok) onClose(); });
+  }, [dirty, onClose, confirmDialog]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -120,15 +126,24 @@ export function DocumentWorkspace({ projectId, document, onClose, contentEndpoin
   }, [closeWorkspace, saving]);
 
   function cancelEditing() {
-    if (dirty && !window.confirm('Discard your unsaved document changes?')) return;
-    if (content) setDraft(cloneSnapshot(content));
-    setEditing(false);
-    setError(null);
+    if (!dirty) { setEditing(false); return; }
+    void confirmDialog({
+      title: 'Discard your unsaved document changes?',
+      confirmLabel: 'Discard changes',
+    }).then(ok => {
+      if (!ok) return;
+      if (content) setDraft(cloneSnapshot(content));
+      setEditing(false);
+      setError(null);
+    });
   }
 
   function reloadFromGoogle() {
-    if (dirty && !window.confirm('Discard your unsaved changes and reload from Google?')) return;
-    void load();
+    if (!dirty) { void load(); return; }
+    void confirmDialog({
+      title: 'Discard your unsaved changes and reload from Google?',
+      confirmLabel: 'Discard & reload',
+    }).then(ok => { if (ok) void load(); });
   }
 
   async function save() {

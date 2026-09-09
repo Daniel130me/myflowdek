@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { MoreHorizontal, GripVertical, Plus, Repeat, ChevronRight, ChevronDown, Trash2, X } from 'lucide-react';
 import { COLORS, STATUS_META, STATUS_ORDER, fmtRange, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task, type Tag, type Project, type Section } from '@/features/flowdeck/model';
-import { Avatar, StatusPill, PriorityFlag, SectionHeader, TaskCheckbox, TagPills, TagFilterBar, FF, TaskContextMenu, InlineTaskName, useMemberDirectory } from '../ui';
+import { Avatar, StatusPill, PriorityFlag, SectionHeader, TaskCheckbox, TagPills, TagFilterBar, FF, TaskContextMenu, InlineTaskName, useMemberDirectory, useConfirmDialog } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 
 function computeNextDateStr(dateStr: string, recurrence: string): string {
@@ -219,6 +219,7 @@ interface TaskListViewProps {
 
 export function TaskListView({ tasks, tags = [], projects, currentProjectId, allTasks = [], sections = [], onOpenTask, onMove, onToggleComplete, onReorder, onQuickAdd, onUpdateTask, onRemoveTask, onDuplicateTask, onToggleTaskTag, onMoveToProject, onPromoteSubtask, onDemoteToSubtask, onAddSection, onRenameSection, onDeleteSection, onToggleSectionCollapsed, onSetRecurrence, onSetTaskSection }: TaskListViewProps) {
   const { isMobile } = useViewport();
+  const confirmDialog = useConfirmDialog();
   const { lookup: lookupMember } = useMemberDirectory();
   const [sortKey, setSortKey] = useState('start');
   const [tagFilter, setTagFilter] = useState<Set<string>>(new Set());
@@ -473,7 +474,7 @@ export function TaskListView({ tasks, tags = [], projects, currentProjectId, all
               collapsed={!!sec.collapsed}
               onToggle={() => onToggleSectionCollapsed?.(sec.id)}
               onRename={(name) => onRenameSection?.(sec.id, name)}
-              onDelete={() => { if (confirm(`Delete section "${sec.name}"? Tasks will be moved to unsectioned.`)) onDeleteSection?.(sec.id); }}
+              onDelete={() => { void confirmDialog({ title: `Delete section "${sec.name}"?`, description: 'Its tasks will be moved to unsectioned.', confirmLabel: 'Delete section' }).then(ok => { if (ok) onDeleteSection?.(sec.id); }); }}
             />
             {!sec.collapsed && secTasks.map(t => renderMobileCard(t))}
           </React.Fragment>
@@ -499,7 +500,7 @@ export function TaskListView({ tasks, tags = [], projects, currentProjectId, all
               collapsed={!!sec.collapsed}
               onToggle={() => onToggleSectionCollapsed?.(sec.id)}
               onRename={(name) => onRenameSection?.(sec.id, name)}
-              onDelete={() => { if (confirm(`Delete section "${sec.name}"? Tasks will be moved to unsectioned.`)) onDeleteSection?.(sec.id); }}
+              onDelete={() => { void confirmDialog({ title: `Delete section "${sec.name}"?`, description: 'Its tasks will be moved to unsectioned.', confirmLabel: 'Delete section' }).then(ok => { if (ok) onDeleteSection?.(sec.id); }); }}
             />
             {!sec.collapsed && secTasks.map((t, idx) => renderDesktopRow(t, idx))}
           </React.Fragment>

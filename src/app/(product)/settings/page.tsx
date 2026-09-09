@@ -9,6 +9,7 @@ import { FONT_FAMILY as FF, COLORS } from '@/features/flowdeck/model';
 import { useViewport } from '@/features/flowdeck/hooks/useViewport';
 import { toast } from 'sonner';
 import { fetchJson } from '@/lib/fetch-json';
+import { useConfirmDialog } from '@/features/flowdeck/components/ui';
 
 interface WorkspaceMember {
   userId: string;
@@ -55,6 +56,7 @@ export default function WorkspaceSettingsPage() {
   const { isMobile } = useViewport();
   const workspaceId = ws.selectedWorkspaceId;
   const selectedWs = ws.selectedWorkspace;
+  const confirmDialog = useConfirmDialog();
 
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -199,7 +201,16 @@ export default function WorkspaceSettingsPage() {
 
   const handleDelete = async () => {
     if (!workspaceId) return;
-    if (!confirm('Are you sure? This will permanently delete the workspace and all its projects.')) return;
+    // Cascading, permanent — the shared dialog demands the workspace name
+    // instead of a native confirm() click (audit Table 7.1).
+    const wsName = selectedWs?.name ?? '';
+    const ok = await confirmDialog({
+      title: 'Delete workspace?',
+      description: 'This permanently deletes the workspace and all of its projects, tasks, files and logs for every member.',
+      requireTyped: wsName,
+      confirmLabel: 'Delete workspace forever',
+    });
+    if (!ok) return;
     const res = await fetchJson(`/api/workspaces/${workspaceId}`, { method: 'DELETE' });
     if (!res.ok) {
       toast.error('Failed to delete workspace', { description: res.error });
@@ -210,6 +221,15 @@ export default function WorkspaceSettingsPage() {
   };
 
   const handleDisconnectStorage = async (slug: string) => {
+    // Disconnect deletes the stored OAuth tokens — files stop opening and
+    // uploads stop working until reconnected, so it must not be one-click
+    // (audit Table 7.1).
+    const ok = await confirmDialog({
+      title: 'Disconnect cloud storage?',
+      description: 'The saved connection and its OAuth tokens are deleted. Existing file references stop opening and new uploads fail until you reconnect an account.',
+      confirmLabel: 'Disconnect',
+    });
+    if (!ok) return;
     try {
       const response = await fetch('/api/storage/connections/' + slug, { method: 'DELETE' });
       const data = await response.json().catch(() => ({}));

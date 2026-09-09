@@ -9,7 +9,7 @@ import { useKeyboardShortcuts } from '@/features/flowdeck/hooks/useKeyboardShort
 import { ThemeProvider, useTheme } from '@/features/flowdeck/hooks/useTheme';
 import { FlowdekDataProvider } from '@/providers/FlowdekDataProvider';
 import { WorkspaceProvider } from '@/providers/WorkspaceProvider';
-import { MemberDirectoryProvider, useProjectMembers } from '@/features/flowdeck/components/ui';
+import { MemberDirectoryProvider, useProjectMembers, ConfirmProvider } from '@/features/flowdeck/components/ui';
 import { useAuth } from '@/features/flowdeck/components/auth';
 import {
   Sidebar, MobileSidebar, TopBar, MobileSearchRow, BottomNav, MoreMenu,
@@ -46,10 +46,12 @@ export default function ProductLayout({ children, modal }: { children: React.Rea
       <FlowdekDataProvider>
         <MemberDirectoryProvider>
           <WorkspaceProvider>
-            <ProductShellInner onLogout={auth.logout} modal={modal}>
-              {children}
-            </ProductShellInner>
-            <Toaster />
+            <ConfirmProvider>
+              <ProductShellInner onLogout={auth.logout} modal={modal}>
+                {children}
+              </ProductShellInner>
+              <Toaster />
+            </ConfirmProvider>
           </WorkspaceProvider>
         </MemberDirectoryProvider>
       </FlowdekDataProvider>

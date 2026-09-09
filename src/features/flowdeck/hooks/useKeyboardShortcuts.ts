@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useCallback, useRef } from 'react';
+import { useConfirmDialog } from '../components/ui';
 
 export interface KeyboardShortcutsOptions {
   activeView: string;
@@ -32,9 +33,13 @@ function isMeta(e: KeyboardEvent): boolean {
 }
 
 export function useKeyboardShortcuts(opts: KeyboardShortcutsOptions): void {
+  // Shared styled confirm dialog (audit Table 7.1) — one idiom app-wide.
+  const confirmDialog = useConfirmDialog();
   // Keep a ref so the effect always reads the latest values without re-subscribing
   const ref = useRef(opts);
   useEffect(() => { ref.current = opts; });
+  const confirmRef = useRef(confirmDialog);
+  useEffect(() => { confirmRef.current = confirmDialog; });
 
   const handler = useCallback((e: KeyboardEvent) => {
     const o = ref.current;
@@ -121,9 +126,11 @@ export function useKeyboardShortcuts(opts: KeyboardShortcutsOptions): void {
         e.preventDefault();
         const count = o.selectedIds.size;
         // No false promises: deletion is permanent (undo was removed — H-01).
-        if (confirm(`Delete ${count} task${count > 1 ? 's' : ''}? This cannot be undone.`)) {
-          o.onDelete();
-        }
+        void confirmRef.current({
+          title: `Delete ${count} task${count > 1 ? 's' : ''}?`,
+          description: 'This permanently deletes the selected tasks. This cannot be undone.',
+          count,
+        }).then((ok) => { if (ok) o.onDelete(); });
         return;
       }
     }

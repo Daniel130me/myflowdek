@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 
 import { routes } from '@/shared/navigation/routes';
+import { useConfirmDialog } from '@/features/flowdeck/components/ui';
 import styles from './talent.module.css';
 import type {
   EngagementDetailDto,
@@ -39,6 +40,7 @@ interface EngagementWorkspaceProps {
 
 export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) {
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -207,7 +209,11 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
   };
 
   const handleReleasePayment = async (paymentId: string) => {
-    if (!confirm('Release funded payout to contractor? This will transfer net funds to the contractor account.')) return;
+    if (!(await confirmDialog({
+      title: 'Release funded payout to contractor?',
+      description: 'This transfers the net funds to the contractor account and cannot be reversed.',
+      confirmLabel: 'Release payment',
+    }))) return;
     setActionLoading(true);
     setActionError(null);
     try {
@@ -251,7 +257,11 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
 
 
   const handleAcceptTerms = async () => {
-    if (!confirm('Accept these contract terms and start this engagement? You will receive scoped task access.')) return;
+    if (!(await confirmDialog({
+      title: 'Accept these contract terms and start this engagement?',
+      description: 'You will receive scoped task access for the work.',
+      confirmLabel: 'Accept terms',
+    }))) return;
     setActionLoading(true);
     setActionError(null);
     try {
@@ -397,7 +407,11 @@ export function EngagementWorkspace({ engagementId }: EngagementWorkspaceProps) 
   };
 
   const handleCompleteEngagement = async () => {
-    if (!confirm('Approve and complete this engagement? This will mark all milestones approved and complete the task.')) return;
+    if (!(await confirmDialog({
+      title: 'Approve and complete this engagement?',
+      description: 'All milestones are marked approved and the task is completed.',
+      confirmLabel: 'Approve & complete',
+    }))) return;
     setActionLoading(true);
     setActionError(null);
     try {

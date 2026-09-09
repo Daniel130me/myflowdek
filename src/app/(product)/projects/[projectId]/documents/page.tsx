@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { BookOpen, CalendarDays, Cloud, ExternalLink, Eye, FileSpreadsheet, FileText, Loader2, Pencil, Search, Share2, Trash2, UserRound, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useConfirmDialog } from '@/features/flowdeck/components/ui';
 import { ShareFileModal } from '@/features/flowdeck/components/modals';
 import { getSingleParam } from '@/shared/utils/routeParams';
 import { DocumentWorkspace } from './DocumentWorkspace';
@@ -43,6 +44,7 @@ function contents(template: DocumentTemplate) {
 export default function ProjectDocumentsPage() {
   const projectId = getSingleParam(useParams().projectId);
   const router = useRouter();
+  const confirmDialog = useConfirmDialog();
   const [tab, setTab] = useState<'documents' | 'templates'>('templates');
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
@@ -108,7 +110,13 @@ export default function ProjectDocumentsPage() {
   }
 
   async function removeDocument(document: ProjectDocument) {
-    if (!projectId || !window.confirm(`Remove “${document.name}” from Flowdek? The Google Drive file will not be deleted.`)) return;
+    if (!projectId) return;
+    const ok = await confirmDialog({
+      title: `Remove “${document.name}” from Flowdek?`,
+      description: 'The Google Drive file itself is not deleted.',
+      confirmLabel: 'Remove from Flowdek',
+    });
+    if (!ok) return;
     try {
       await fetch(`/api/projects/${projectId}/documents/${document.id}`, { method: 'DELETE' }).then((r) => readResponse<Record<string, never>>(r));
       setDocuments((current) => current.filter((item) => item.id !== document.id));
