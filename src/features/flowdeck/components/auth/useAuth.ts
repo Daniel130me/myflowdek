@@ -119,6 +119,14 @@ export function useAuth() {
         if (result.error === 'EMAIL_NOT_VERIFIED') {
           return { ok: false, error: 'EMAIL_NOT_VERIFIED' };
         }
+        // Registration path: the account WAS created, but the immediate
+        // sign-in failed (e.g. the register attempt already consumed part of
+        // the rate-limit budget). "Invalid email or password" would be a
+        // lie, and a retry would then hit "already exists" — stranding the
+        // user between contradictions (audit Table 7.1). Tell the truth.
+        if (name) {
+          return { ok: false, error: 'Account created - please sign in' };
+        }
         return { ok: false, error: 'Invalid email or password' };
       }
       return { ok: true };
