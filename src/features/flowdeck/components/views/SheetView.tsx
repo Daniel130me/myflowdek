@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Search, Diamond, GripVertical } from 'lucide-react';
+import { Search, Diamond, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
 import { COLORS, STATUS_META, PRIORITY_META, SHEET_COLUMNS, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task, type TaskStatus, type TaskPriority } from '@/features/flowdeck/model';
 import { SectionHeader, TaskCheckbox, FF, useProjectMembers } from '../ui';
 import { GridToolbar, type GridActions } from '../toolbar';
@@ -39,6 +39,11 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
 
   const cellPad = isMobile ? '8px 8px' : '8px 10px';
   const cellStyle: React.CSSProperties = { border: `1px solid ${COLORS.line}`, padding: 0 };
+  const moveBtnStyle: React.CSSProperties = {
+    border: 'none', background: 'none', cursor: 'pointer', padding: 0,
+    color: COLORS.gray, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    width: 16, height: 13, touchAction: 'manipulation',
+  };
   // Audit H-30: 12.5px inputs trigger iOS focus zoom; >= 14px keeps the
   // software keyboard from blowing the layout up.
   const inputCell: React.CSSProperties = { width: '100%', border: 'none', outline: 'none', padding: cellPad, fontSize: isMobile ? 14 : 12.5, background: 'transparent', fontFamily: 'inherit', minHeight: 36, boxSizing: 'border-box' };
@@ -70,6 +75,20 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   }
+  // Touch path for the same handle: tablets take the desktop sheet, where
+  // the mouse-only handle made columns unresizable (audit Table 6.1).
+  function startResizeTouch(key: string, e: React.TouchEvent) {
+    const t0 = e.touches[0];
+    dragState.current = { key, startX: t0.clientX, startWidth: widthOf(key) };
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+  }
+  function onTouchMove(e: TouchEvent) {
+    if (!dragState.current) return;
+    e.preventDefault(); // resize, don't scroll — touch-action:none on the handle
+    const { key, startX, startWidth } = dragState.current;
+    setWidths(prev => ({ ...prev, [key]: Math.max(70, startWidth + (e.touches[0].clientX - startX)) }));
+  }
   function onMove(e: MouseEvent) {
     if (!dragState.current) return;
     const { key, startX, startWidth } = dragState.current;
@@ -78,8 +97,16 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
   function onUp() {
     dragState.current = null;
     window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('touchmove', onTouchMove);
     window.removeEventListener('mouseup', onUp);
+    window.removeEventListener('touchend', onUp);
   }
+  const resizeWithKeyboard = useCallback((key: string, e: React.KeyboardEvent) => {
+    const delta = e.key === 'ArrowLeft' ? -24 : e.key === 'ArrowRight' ? 24 : 0;
+    if (!delta) return;
+    e.preventDefault();
+    setWidths(prev => ({ ...prev, [key]: Math.max(70, (prev[key] || 140) + delta) }));
+  }, []);
   function toggleSelect(id: string) { grid.setSelectedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; }); }
   function toggleAll() { grid.setSelectedIds(prev => prev.size === filtered.length ? new Set() : new Set(filtered.map(t => t.id))); }
 
@@ -118,6 +145,16 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
     setDragIdx(null);
     setDragOverIdx(null);
   }, []);
+
+  /* Keyboard + touch reorder: anchor on the neighbour in the move direction
+     (same contract as the drag path — ids travel, not filtered indices). */
+  const moveRow = useCallback((idx: number, dir: -1 | 1) => {
+    const targetIdx = idx + dir;
+    if (targetIdx < 0 || targetIdx >= filtered.length) return;
+    const taskId = filtered[idx].id;
+    const neighbour = filtered[targetIdx];
+    onReorder(taskId, dir === -1 ? { beforeTaskId: neighbour.id } : { afterTaskId: neighbour.id });
+  }, [filtered, onReorder]);
 
   // ── Quick add handler ──
   const handleQuickAddKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -187,6 +224,12 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
         .fd-grip-handle { opacity: 0.25; transition: opacity 0.2s; cursor: grab; }
         .fd-row:hover .fd-grip-handle { opacity: 1; }
         .fd-row:hover .fd-grip-handle:active { cursor: grabbing; }
+        /* Move buttons: visible-but-subtle so touch can tap them without a
+           hover state; full strength on hover/keyboard focus. */
+        .fd-move-btns button { opacity: 0.4; transition: opacity 0.2s; }
+        .fd-row:hover .fd-move-btns button { opacity: 1; }
+        .fd-move-btns button:focus-visible { opacity: 1; }
+        .fd-move-btns button:disabled { opacity: 0.1 !important; cursor: default; }
       `}</style>
       <GridToolbar projectId={projectId} tasks={tasks} grid={grid} members={members} />
       <SectionHeader title="Sheet" subtitle="Every cell is editable — drag column edges to resize, just like a spreadsheet" />
@@ -209,7 +252,18 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
               ...visibleCols.map(c => (
                 <th key={c.key} style={{ ...cellStyle, width: widthOf(c.key), position: 'sticky', top: 0, zIndex: 2, background: '#F9FAFB', textAlign: 'left', padding: '9px 10px', fontSize: 11, fontWeight: 700, color: COLORS.gray, ...(c.key === 'name' ? { left: STICKY_LEFT.name, zIndex: 3 } : {}) }}>
                   {c.key === 'duration' ? `Duration (${grid.durationUnit === 'hours' ? 'h' : 'd'})` : c.label}
-                  {!isMobile && <div onMouseDown={e => startResize(c.key, e)} style={{ position: 'absolute', top: 0, right: -2, width: 5, height: '100%', cursor: 'col-resize' }} />}
+                  {!isMobile && (
+                    <div
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label={`Resize ${c.key === 'duration' ? 'duration' : c.label} column. Arrow keys adjust width.`}
+                      tabIndex={0}
+                      onMouseDown={e => startResize(c.key, e)}
+                      onTouchStart={e => startResizeTouch(c.key, e)}
+                      onKeyDown={e => resizeWithKeyboard(c.key, e)}
+                      style={{ position: 'absolute', top: 0, right: -2, width: 5, height: '100%', cursor: 'col-resize', touchAction: 'none', outlineOffset: -2 }}
+                    />
+                  )}
                 </th>
               )),
             ]}</tr>
@@ -223,7 +277,16 @@ export function SheetView({ projectId, tasks, onUpdate, onAdd, onRemove, grid, o
               rowCells.push(
                 <td key="sel" style={{ ...cellStyle, textAlign: 'center', ...stickyCell(0, grid.selectedIds.has(t.id)) }}><input type="checkbox" style={isMobile ? { width: 18, height: 18 } : undefined} checked={grid.selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} /></td>,
                 <td key="done" style={{ ...cellStyle, textAlign: 'center', width: 34, ...stickyCell(STICKY_LEFT.done, grid.selectedIds.has(t.id)) }}><TaskCheckbox done={t.status === 'done'} onToggle={e => { e.stopPropagation(); onToggleComplete(t.id); }} size={isMobile ? 20 : 16} /></td>,
-                <td key="grip" style={{ ...cellStyle, textAlign: 'center', width: 32, ...stickyCell(STICKY_LEFT.grip, grid.selectedIds.has(t.id)) }}><span className="fd-grip-handle" style={{ display: 'inline-flex', alignItems: 'center' }}><GripVertical size={14} color={COLORS.gray} /></span></td>,
+                <td key="grip" style={{ ...cellStyle, textAlign: 'center', width: 32, ...stickyCell(STICKY_LEFT.grip, grid.selectedIds.has(t.id)) }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', flexDirection: 'column' }}>
+                    <span className="fd-grip-handle" style={{ display: 'inline-flex', alignItems: 'center' }}><GripVertical size={14} color={COLORS.gray} /></span>
+                    {/* Tap/keyboard reorder — HTML5 drag never fires on touch. */}
+                    <span className="fd-move-btns" style={{ display: 'inline-flex', flexDirection: 'column' }}>
+                      <button type="button" aria-label={`Move ${t.name} up`} disabled={idx === 0} onClick={() => moveRow(idx, -1)} style={moveBtnStyle}><ChevronUp size={11} /></button>
+                      <button type="button" aria-label={`Move ${t.name} down`} disabled={idx === filtered.length - 1} onClick={() => moveRow(idx, 1)} style={moveBtnStyle}><ChevronDown size={11} /></button>
+                    </span>
+                  </span>
+                </td>,
                 <td key="num" style={{ ...cellStyle, fontSize: 11.5, color: COLORS.gray, textAlign: 'center', ...stickyCell(STICKY_LEFT.num, grid.selectedIds.has(t.id)) }}>{idx + 1}</td>,
               );
               for (const c of visibleCols) {
