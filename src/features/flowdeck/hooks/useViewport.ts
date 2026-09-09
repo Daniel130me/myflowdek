@@ -71,3 +71,27 @@ export function useViewport() {
     isTablet: width >= MOBILE_MAX_WIDTH && width < TABLET_MAX_WIDTH,
   };
 }
+
+/**
+ * True when the primary input device can hover (mouse/trackpad).
+ *
+ * Touch-first devices — tablets in particular: an iPad portrait is exactly
+ * 768px wide, so it takes the desktop layout where hover-revealed controls
+ * would be invisible yet tappable (audit Table 6.1, Files view). Consumers
+ * must show such controls permanently when this returns false.
+ */
+function subscribeHover(callback: () => void) {
+  const query = window.matchMedia('(hover: hover)');
+  query.addEventListener('change', callback);
+  return () => query.removeEventListener('change', callback);
+}
+function getHoverSnapshot() {
+  return window.matchMedia('(hover: hover)').matches;
+}
+/** Desktop-first default; touch devices re-render to the visible fork after hydration. */
+function getHoverServerSnapshot() {
+  return true;
+}
+export function useHasHover() {
+  return useSyncExternalStore(subscribeHover, getHoverSnapshot, getHoverServerSnapshot);
+}

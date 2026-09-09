@@ -4,7 +4,7 @@ import React, { useRef, useState, useCallback } from 'react';
 import { Cloud, Trash2, Paperclip, ExternalLink, Share2, Eye } from 'lucide-react';
 import { COLORS, fmtSize, fmtDate, extOf, type Task, type FileItem } from '@/features/flowdeck/model';
 import { Avatar, SectionHeader, FileThumbnail, FF, useMemberDirectory } from '../ui';
-import { useViewport } from '../../hooks/useViewport';
+import { useViewport, useHasHover } from '../../hooks/useViewport';
 
 export function FilesView({
   files,
@@ -25,6 +25,8 @@ export function FilesView({
 }) {
   const { isMobile } = useViewport();
   const { lookup: lookupMember } = useMemberDirectory();
+  /* Touch devices never hover — hover-revealed card actions must be always visible there. */
+  const canHover = useHasHover();
 
   /* Track hover state for desktop cards */
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -138,6 +140,9 @@ export function FilesView({
           const linkedTasks = tasks.filter(task => linkedTaskIds.includes(task.id));
           const availableTasks = tasks.filter(task => !linkedTaskIds.includes(task.id));
           const isHovered = hoveredId === f.id;
+          /* On touch hardware the hover state can never activate, so the card
+             actions render permanently: same visual, no mouse required. */
+          const actionsVisible = isHovered || !canHover;
           return (
             <div
               key={f.id}
@@ -155,7 +160,7 @@ export function FilesView({
                   width: 28, height: 28, borderRadius: 8,
                   background: 'rgba(0,0,0,0.45)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#FFFFFF', opacity: isHovered ? 1 : 0, transition: 'opacity 0.15s',
+                  color: '#FFFFFF', opacity: actionsVisible ? 1 : 0, transition: 'opacity 0.15s',
                   pointerEvents: 'none',
                 }}>
                   <Eye size={14} />
@@ -163,7 +168,7 @@ export function FilesView({
                 {/* Delete button overlay (top-right, visible on hover) */}
                 <button
                   onClick={(e) => { e.stopPropagation(); onRemove(f.id); }}
-                  style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, background: 'rgba(0,0,0,0.45)', border: 'none', cursor: 'pointer', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isHovered ? 1 : 0, transition: 'opacity 0.15s' } as React.CSSProperties}
+                  style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 8, background: 'rgba(0,0,0,0.45)', border: 'none', cursor: 'pointer', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: actionsVisible ? 1 : 0, transition: 'opacity 0.15s' } as React.CSSProperties}
                   title="Remove file reference"
                 >
                   <Trash2 size={14} />
@@ -171,7 +176,7 @@ export function FilesView({
                 {/* Open in cloud provider button overlay (top-left, visible on hover) */}
                 <button
                   onClick={(e) => { e.stopPropagation(); handleOpenFile(f, e); }}
-                  style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, background: 'rgba(0,0,0,0.45)', border: 'none', cursor: 'pointer', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isHovered ? 1 : 0, transition: 'opacity 0.15s' } as React.CSSProperties}
+                  style={{ position: 'absolute', top: 8, left: 8, width: 28, height: 28, borderRadius: 8, background: 'rgba(0,0,0,0.45)', border: 'none', cursor: 'pointer', color: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: actionsVisible ? 1 : 0, transition: 'opacity 0.15s' } as React.CSSProperties}
                   title="Open original file in Cloud Drive"
                 >
                   <ExternalLink size={14} />
