@@ -11,7 +11,7 @@ export const INVITATION_TTL_HOURS = 24;
 export const INVITATION_ISSUER_ROLES = ['OWNER', 'ADMIN'] as const;
 
 /** Roles an invitation can offer to a new member. */
-export const INVITATION_ROLES = ['ADMIN', 'MEMBER', 'GUEST'] as const;
+export const INVITATION_ROLES = ['ADMIN', 'MEMBER', 'VIEWER'] as const;
 
 /** Length of the generated invitation token (URL-safe hex). */
 export const INVITATION_TOKEN_LENGTH = 48;

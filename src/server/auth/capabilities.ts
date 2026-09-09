@@ -63,7 +63,7 @@ export type ProjectCapability = keyof typeof PROJECT_PERMISSIONS;
 
 export const WORKSPACE_PERMISSIONS = {
   /** View workspace details and projects. */
-  VIEW_WORKSPACE: ['OWNER', 'ADMIN', 'MEMBER', 'GUEST'] as WorkspaceRole[],
+  VIEW_WORKSPACE: ['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'] as WorkspaceRole[],
   /** Create projects within the workspace. */
   CREATE_PROJECT: ['OWNER', 'ADMIN', 'MEMBER'] as WorkspaceRole[],
   /** Manage workspace settings (rename, delete). */

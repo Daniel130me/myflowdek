@@ -336,7 +336,7 @@ export default function WorkspaceSettingsPage() {
                     >
                       <option value="ADMIN">Admin</option>
                       <option value="MEMBER">Member</option>
-                      <option value="GUEST">Guest</option>
+                      <option value="VIEWER">Viewer</option>
                     </select>
                     {isOwner && (
                       <button onClick={() => handleRemoveMember(m.userId)} style={iconBtnStyle} title="Remove member">
@@ -365,7 +365,7 @@ export default function WorkspaceSettingsPage() {
               <select value={inviteRole} onChange={e => setInviteRole(e.target.value)} style={selectStyle}>
                 <option value="ADMIN">Admin</option>
                 <option value="MEMBER">Member</option>
-                <option value="GUEST">Guest</option>
+                <option value="VIEWER">Viewer</option>
               </select>
               <button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()} style={btnPrimary}>
                 {inviting ? 'Sending…' : <><Send size={14} style={{ display: 'inline', marginRight: 4 }} />Invite</>}

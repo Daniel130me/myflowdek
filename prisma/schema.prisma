@@ -29,7 +29,7 @@ enum WorkspaceRole {
   OWNER
   ADMIN
   MEMBER
-  GUEST
+  VIEWER
 }
 
 /**

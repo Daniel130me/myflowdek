@@ -32,18 +32,18 @@ const ALL_PROJECT_CAPABILITIES = Object.keys(PROJECT_PERMISSIONS) as ProjectCapa
 const ALL_WORKSPACE_CAPABILITIES = Object.keys(WORKSPACE_PERMISSIONS) as WorkspaceCapability[];
 
 const PROJECT_ROLES: ProjectRole[] = ['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'];
-const WORKSPACE_ROLES: WorkspaceRole[] = ['OWNER', 'ADMIN', 'MEMBER', 'GUEST'];
+const WORKSPACE_ROLES: WorkspaceRole[] = ['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'];
 
 /**
  * Role strength rank — used by the hierarchy invariant. Higher = more
  * powerful. VIEWER < MEMBER < ADMIN < OWNER (project) and
- * GUEST < MEMBER < ADMIN < OWNER (workspace).
+ * VIEWER < MEMBER < ADMIN < OWNER (workspace).
  */
 function projectRank(role: ProjectRole): number {
   return { VIEWER: 0, MEMBER: 1, ADMIN: 2, OWNER: 3 }[role];
 }
 function workspaceRank(role: WorkspaceRole): number {
-  return { GUEST: 0, MEMBER: 1, ADMIN: 2, OWNER: 3 }[role];
+  return { VIEWER: 0, MEMBER: 1, ADMIN: 2, OWNER: 3 }[role];
 }
 
 /* --------------------------- VIEWER --------------------------- */
@@ -154,7 +154,7 @@ describe('OWNER role', () => {
     assert.equal(hasWorkspaceCapability('OWNER', 'DELETE_WORKSPACE'), true);
     assert.equal(hasWorkspaceCapability('OWNER', 'TRANSFER_OWNERSHIP'), true);
     // No other role has these.
-    for (const r of ['ADMIN', 'MEMBER', 'GUEST'] as WorkspaceRole[]) {
+    for (const r of ['ADMIN', 'MEMBER', 'VIEWER'] as WorkspaceRole[]) {
       assert.equal(hasWorkspaceCapability(r, 'DELETE_WORKSPACE'), false);
       assert.equal(hasWorkspaceCapability(r, 'TRANSFER_OWNERSHIP'), false);
     }
@@ -180,13 +180,13 @@ describe('role hierarchy invariant', () => {
     }
   });
 
-  test('workspace capabilities are monotonic: GUEST ⊆ MEMBER ⊆ ADMIN ⊆ OWNER', () => {
+  test('workspace capabilities are monotonic: VIEWER ⊆ MEMBER ⊆ ADMIN ⊆ OWNER', () => {
     for (const cap of ALL_WORKSPACE_CAPABILITIES) {
-      const guest = hasWorkspaceCapability('GUEST', cap);
+      const viewer = hasWorkspaceCapability('VIEWER', cap);
       const member = hasWorkspaceCapability('MEMBER', cap);
       const admin = hasWorkspaceCapability('ADMIN', cap);
       const owner = hasWorkspaceCapability('OWNER', cap);
-      if (guest) assert.ok(member, `GUEST has ${cap} but MEMBER does not`);
+      if (viewer) assert.ok(member, `VIEWER has ${cap} but MEMBER does not`);
       if (member) assert.ok(admin, `MEMBER has ${cap} but ADMIN does not`);
       if (admin) assert.ok(owner, `ADMIN has ${cap} but OWNER does not`);
     }
@@ -198,7 +198,7 @@ describe('role hierarchy invariant', () => {
     assert.ok(projectRank('MEMBER') > projectRank('VIEWER'));
     assert.ok(workspaceRank('OWNER') > workspaceRank('ADMIN'));
     assert.ok(workspaceRank('ADMIN') > workspaceRank('MEMBER'));
-    assert.ok(workspaceRank('MEMBER') > workspaceRank('GUEST'));
+    assert.ok(workspaceRank('MEMBER') > workspaceRank('VIEWER'));
   });
 });
 

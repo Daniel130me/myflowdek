@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { WORKSPACE_NAME_MAX_LENGTH } from '../workspaces/constants';
 
 /** Roles a member can be changed to (OWNER is excluded — use transfer endpoint). */
-export const VALID_MEMBER_ROLES = ['ADMIN', 'MEMBER', 'GUEST'] as const;
+export const VALID_MEMBER_ROLES = ['ADMIN', 'MEMBER', 'VIEWER'] as const;
 
 /** Validation for updating a member's role. */
 export const updateMemberRoleSchema = z.object({

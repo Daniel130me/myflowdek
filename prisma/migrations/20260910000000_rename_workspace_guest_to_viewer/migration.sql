@@ -1,0 +1,12 @@
+-- Unify the lowest read-only role across both role systems.
+--
+-- Workspace-level roles used GUEST while project-level roles used VIEWER
+-- for the same concept (read-only membership). Two names for one concept
+-- meant two code paths, two UI labels and a guaranteed question in every
+-- permission review. VIEWER wins because projects already used it and it
+-- describes the capability, not a social arrangement.
+--
+-- ALTER TYPE ... RENAME VALUE updates the enum in place; existing rows
+-- keep their position in the type, so no column rewrite or data migration
+-- is needed.
+ALTER TYPE "WorkspaceRole" RENAME VALUE 'GUEST' TO 'VIEWER';
