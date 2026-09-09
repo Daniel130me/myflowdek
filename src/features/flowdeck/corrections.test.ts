@@ -25,10 +25,15 @@ test('routes.task generates correct path with pId and taskId', () => {
   assert.strictEqual(routes.task('p-alpha', 't-omega'), '/projects/p-alpha/tasks/t-omega');
 });
 
-test('project switching preserves the current project subroute', () => {
+test('project switching keeps safe subroutes and collapses foreign resource ids', () => {
+  // Safe section tails survive the switch…
   assert.strictEqual(replaceProjectInPath('/projects/old-project/board', 'new-project'), '/projects/new-project/board');
-  assert.strictEqual(replaceProjectInPath('/projects/old-project/tasks/task-1', 'new-project'), '/projects/new-project/tasks/task-1');
-  assert.strictEqual(replaceProjectInPath('/projects/old-project', 'new-project'), '/projects/new-project');
+  // …but a resource-id tail points at the OLD project's task under the NEW
+  // project's route — a guaranteed 404 (audit Table 5.1) — so it collapses
+  // to the section root.
+  assert.strictEqual(replaceProjectInPath('/projects/old-project/tasks/task-1', 'new-project'), '/projects/new-project/tasks');
+  // The bare project root resolves explicitly to the overview.
+  assert.strictEqual(replaceProjectInPath('/projects/old-project', 'new-project'), '/projects/new-project/overview');
 });
 
 test('new task opens inline without navigating away from the current project page', () => {

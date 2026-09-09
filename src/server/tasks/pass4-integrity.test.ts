@@ -146,13 +146,15 @@ describe('VIEWER capability restrictions', () => {
 });
 
 /**
- * Bulk mutation rollback (item 3):
- *   - bulk delete failure rolls back
+ * Bulk mutation rollback (item 3, revised by audit Table 5.1):
+ *   - bulk delete failure re-syncs from the server
  *
- * The store's removeTasksBulk must capture a snapshot and restore on failure.
+ * Restoring a whole-list snapshot taken before the mutation silently erases
+ * concurrent changes that landed while the request was in flight, so the
+ * failure path must re-sync the canonical list from GET instead.
  */
 describe('Bulk mutation rollback (item 3)', () => {
-  test('removeTasksBulk captures snapshot and restores on failure', async () => {
+  test('removeTasksBulk re-syncs from the server on failure', async () => {
     const fs = await import('fs');
     const path = await import('path');
     const storePath = path.join(process.cwd(), 'src/features/flowdeck/store/useFlowDeck.ts');
@@ -163,11 +165,14 @@ describe('Bulk mutation rollback (item 3)', () => {
     assert.ok(fnStart > 0, 'removeTasksBulk must exist');
     const fnBody = source.slice(fnStart, fnStart + 1000);
 
-    assert.ok(fnBody.includes('snapshot'), 'removeTasksBulk must capture a snapshot');
     assert.ok(fnBody.includes('apiBulkAction'), 'removeTasksBulk must call the bulk API');
     assert.ok(
-      fnBody.includes('setTasksByProject') && fnBody.includes('snapshot'),
-      'removeTasksBulk must restore snapshot on failure',
+      fnBody.includes('resyncTasksFromServer'),
+      'removeTasksBulk must re-sync from the server on failure',
+    );
+    assert.ok(
+      !fnBody.includes('[projectId]: snapshot'),
+      'removeTasksBulk must not roll back to a stale whole-list snapshot',
     );
   });
 });

@@ -18,6 +18,7 @@ import {
 import type { GridActions } from '../components/toolbar/types';
 import type { ProjectStatusUpdate } from '@/features/flowdeck/model';
 import { useOptionalFlowdekData } from '@/providers/FlowdekDataProvider';
+import { mapApiTask } from '@/features/flowdeck/hooks/useTasks';
 import { loadPersistedState, savePersistedState, clearPersistedState, loadCustomTemplates, saveCustomTemplates, STORAGE_KEY } from '@/data/local-storage/storageAdapter';
 import { defaultIdGenerator } from '@/shared/utils/id';
 import {
@@ -769,6 +770,31 @@ export function useFlowDeckStore(): FlowDeckState {
     if (projectId) setTasksByProject(prev => ({ ...prev, [projectId]: nextTasksForProject }));
   }, []);
 
+  /**
+   * Replace the store's task list for a project with the server's canonical
+   * list (GET /api/projects/:id/tasks).
+   *
+   * Failed optimistic mutations used to roll back to a whole-list snapshot
+   * taken BEFORE the mutation — a second concurrent change that landed while
+   * the request was in flight was silently erased (audit Table 5.1). The
+   * server response is the source of truth, so re-sync from it instead;
+   * per-field pending edits (H-06) are intentionally left alone and will
+   * flush on top of the refreshed baseline.
+   */
+  const resyncTasksFromServer = useCallback(async (projectId: string) => {
+    if (!projectId) return;
+    try {
+      const res = await fetch(`/api/projects/${projectId}/tasks`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const tasks = (data.tasks ?? []).map(mapApiTask);
+      setTasksByProject(prev => ({ ...prev, [projectId]: tasks }));
+    } catch {
+      // Network-level failure: keep the optimistic state visible rather
+      // than blanking the view; the next successful action re-syncs.
+    }
+  }, []);
+
   /* ---- debounced cell persistence (audit H-06) ---- */
   // Per-task accumulation of not-yet-persisted cell edits.
   const pendingTaskUpdatesRef = useRef<Map<string, PendingTaskUpdate>>(new Map());
@@ -925,8 +951,6 @@ export function useFlowDeckStore(): FlowDeckState {
     const task = projectTasks.find(t => t.id === id);
     if (!task) return;
     const actorName = resolveMemberName(userIdRef.current);
-    // Snapshot for rollback.
-    const snapshot = projectTasks;
     if (task.status === 'done') {
       // Reopen the task.
       const patch: Partial<Task> = { status: 'in_progress', progress: 0 };
@@ -935,7 +959,7 @@ export function useFlowDeckStore(): FlowDeckState {
       toast.info('Task reopened', { description: task.name });
       apiUpdateTask(id, taskToApiPayload(patch)).then((res) => {
         if (res.ok) return;
-        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        void resyncTasksFromServer(projectId);
         toast.error('Failed to reopen task', { description: res.error });
       });
     } else {
@@ -948,7 +972,7 @@ export function useFlowDeckStore(): FlowDeckState {
       toast.success('Task completed', { description: task.name });
       apiUpdateTask(id, taskToApiPayload(patch)).then((res) => {
         if (res.ok) return;
-        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        void resyncTasksFromServer(projectId);
         toast.error('Failed to complete task', { description: res.error });
       });
     }
@@ -989,7 +1013,6 @@ export function useFlowDeckStore(): FlowDeckState {
     };
     // Snapshot for rollback — captures the project task list before the
     // optimistic insert so we can restore it on API failure.
-    const snapshot = projectTasks;
     // Optimistic local update.
     commit(projectId, [...projectTasks, newTask]);
     logActivity(projectId, tempId, 'created', `Task "${newTask.name}" was created`);
@@ -1010,7 +1033,7 @@ export function useFlowDeckStore(): FlowDeckState {
       duration: input.duration,
     })).then((res) => {
       if (!res.ok) {
-        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        void resyncTasksFromServer(projectId);
         toast.error('Failed to create task on server', { description: res.error });
         return;
       }
@@ -1094,7 +1117,7 @@ export function useFlowDeckStore(): FlowDeckState {
     // descendant tree.
     apiDeleteTask(id).then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       setSelectedIds(snapshotSelection);
       toast.error('Failed to delete task on server', { description: res.error });
     });
@@ -1117,7 +1140,7 @@ export function useFlowDeckStore(): FlowDeckState {
     // canonical state.
     apiBulkAction(projectId, 'delete', [...ids]).then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       setSelectedIds(snapshotSelection);
       toast.error('Failed to delete tasks on server', { description: res.error });
     });
@@ -1126,8 +1149,6 @@ export function useFlowDeckStore(): FlowDeckState {
   const bulkSetDueDate = useCallback((projectId: string, ids: Set<string>, date: string | null) => {
     if (!projectId || ids.size === 0) return;
     const projectTasks = tasksByProject[projectId] || [];
-    // Snapshot for rollback.
-    const snapshot = projectTasks;
     // Optimistic local update.
     updateTasksBulk(projectId, ids, { dueDate: date || undefined });
     toast.success(date ? `Due date set for ${ids.size} task${ids.size > 1 ? 's' : ''}` : `Due date cleared for ${ids.size} task${ids.size > 1 ? 's' : ''}`);
@@ -1137,7 +1158,7 @@ export function useFlowDeckStore(): FlowDeckState {
     const dueDatePayload = date ? new Date(date).toISOString() : null;
     apiBulkAction(projectId, 'dueDate', [...ids], { dueDate: dueDatePayload }).then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to save due date', { description: res.error });
     });
   }, [tasksByProject, updateTasksBulk]);
@@ -1145,8 +1166,6 @@ export function useFlowDeckStore(): FlowDeckState {
   const bulkAddTag = useCallback((projectId: string, ids: Set<string>, tagId: string) => {
     if (!projectId || ids.size === 0) return;
     const projectTasks = tasksByProject[projectId] || [];
-    // Snapshot for rollback.
-    const snapshot = projectTasks;
     // Optimistic local update.
     updateTasksBulk(projectId, ids, (t) => {
       const current = t.tags || [];
@@ -1156,7 +1175,7 @@ export function useFlowDeckStore(): FlowDeckState {
     // Persist to PostgreSQL via the bulk addTag action.
     apiBulkAction(projectId, 'addTag', [...ids], { tagId }).then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to add tag', { description: res.error });
     });
   }, [tasksByProject, updateTasksBulk]);
@@ -1164,8 +1183,6 @@ export function useFlowDeckStore(): FlowDeckState {
   const bulkRemoveTag = useCallback((projectId: string, ids: Set<string>, tagId: string) => {
     if (!projectId || ids.size === 0) return;
     const projectTasks = tasksByProject[projectId] || [];
-    // Snapshot for rollback.
-    const snapshot = projectTasks;
     // Optimistic local update.
     updateTasksBulk(projectId, ids, (t) => ({
       tags: (t.tags || []).filter(tid => tid !== tagId),
@@ -1174,7 +1191,7 @@ export function useFlowDeckStore(): FlowDeckState {
     // Persist to PostgreSQL via the bulk removeTag action.
     apiBulkAction(projectId, 'removeTag', [...ids], { tagId }).then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to remove tag', { description: res.error });
     });
   }, [tasksByProject, updateTasksBulk]);
@@ -1184,14 +1201,12 @@ export function useFlowDeckStore(): FlowDeckState {
     const s = status as TaskStatus;
     const progress = s === 'done' ? 100 : s === 'backlog' ? 0 : undefined;
     const projectTasks = tasksByProject[projectId] || [];
-    // Snapshot for rollback.
-    const snapshot = projectTasks;
     // Optimistic local update.
     updateTasksBulk(projectId, ids, progress !== undefined ? { status: s, progress } : { status: s });
     toast.success(`${ids.size} task${ids.size > 1 ? 's' : ''} set to ${STATUS_META[s]?.label || s}`);
     apiBulkAction(projectId, 'status', [...ids], { status }).then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to save status change', { description: res.error });
     });
   }, [tasksByProject, updateTasksBulk]);
@@ -1199,15 +1214,13 @@ export function useFlowDeckStore(): FlowDeckState {
   const bulkAssign = useCallback((projectId: string, ids: Set<string>, memberId: string) => {
     if (!projectId || ids.size === 0) return;
     const projectTasks = tasksByProject[projectId] || [];
-    // Snapshot for rollback.
-    const snapshot = projectTasks;
     // Optimistic local update.
     updateTasksBulk(projectId, ids, { assignee: memberId });
     const memberName = resolveMemberName(memberId);
     toast.success(`Assigned ${ids.size} task${ids.size > 1 ? 's' : ''} to ${memberName}`);
     apiBulkAction(projectId, 'assignee', [...ids], { assigneeId: memberId }).then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to save assignment', { description: res.error });
     });
   }, [tasksByProject, updateTasksBulk, resolveMemberName]);
@@ -1215,14 +1228,12 @@ export function useFlowDeckStore(): FlowDeckState {
   const bulkSetPriority = useCallback((projectId: string, ids: Set<string>, priority: TaskPriority) => {
     if (!projectId || ids.size === 0) return;
     const projectTasks = tasksByProject[projectId] || [];
-    // Snapshot for rollback.
-    const snapshot = projectTasks;
     // Optimistic local update.
     updateTasksBulk(projectId, ids, { priority });
     toast.success(`Priority set to ${PRIORITY_META[priority].label} for ${ids.size} task${ids.size > 1 ? 's' : ''}`);
     apiBulkAction(projectId, 'priority', [...ids], { priority }).then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to save priority change', { description: res.error });
     });
   }, [tasksByProject, updateTasksBulk]);
@@ -1230,14 +1241,12 @@ export function useFlowDeckStore(): FlowDeckState {
   const bulkComplete = useCallback((projectId: string, ids: Set<string>) => {
     if (!projectId || ids.size === 0) return;
     const projectTasks = tasksByProject[projectId] || [];
-    // Snapshot for rollback.
-    const snapshot = projectTasks;
     // Optimistic local update.
     updateTasksBulk(projectId, ids, { status: 'done', progress: 100 });
     toast.success(`Completed ${ids.size} task${ids.size > 1 ? 's' : ''}`);
     apiBulkAction(projectId, 'complete', [...ids]).then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to save completion', { description: res.error });
     });
   }, [tasksByProject, updateTasksBulk]);
@@ -1249,7 +1258,6 @@ export function useFlowDeckStore(): FlowDeckState {
    */
   const indentSelected = useCallback((projectId: string) => {
     if (!projectId || selectedIds.size === 0) return;
-    const snapshot = tasksByProject[projectId] || [];
     // Optimistic local update; collect each task's computed level as we go.
     const patches: Array<{ id: string; level: number }> = [];
     updateTasksBulk(projectId, selectedIds, (t: Task) => {
@@ -1261,13 +1269,12 @@ export function useFlowDeckStore(): FlowDeckState {
     Promise.all(patches.map(p => apiUpdateTask(p.id, taskToApiPayload({ level: p.level })))).then(results => {
       const firstFailure = results.find(r => !r.ok);
       if (!firstFailure) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to save indent', { description: firstFailure.error });
     });
   }, [selectedIds, tasksByProject, updateTasksBulk]);
   const outdentSelected = useCallback((projectId: string) => {
     if (!projectId || selectedIds.size === 0) return;
-    const snapshot = tasksByProject[projectId] || [];
     // Optimistic local update; collect each task's computed level as we go.
     const patches: Array<{ id: string; level: number }> = [];
     updateTasksBulk(projectId, selectedIds, (t: Task) => {
@@ -1279,7 +1286,7 @@ export function useFlowDeckStore(): FlowDeckState {
     Promise.all(patches.map(p => apiUpdateTask(p.id, taskToApiPayload({ level: p.level })))).then(results => {
       const firstFailure = results.find(r => !r.ok);
       if (!firstFailure) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to save outdent', { description: firstFailure.error });
     });
   }, [selectedIds, tasksByProject, updateTasksBulk]);
@@ -1308,7 +1315,7 @@ export function useFlowDeckStore(): FlowDeckState {
     Promise.all(pairs.map(p => apiAddDependency(p.successorId, p.dependsOnId))).then(results => {
       const firstFailure = results.find(r => !r.ok);
       if (!firstFailure) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to link tasks', { description: firstFailure.error });
     });
   }, [selectedIds, tasksByProject, commit]);
@@ -1331,7 +1338,7 @@ export function useFlowDeckStore(): FlowDeckState {
     Promise.all(removedPairs.map(p => apiRemoveDependency(p.successorId, p.dependsOnId))).then(results => {
       const firstFailure = results.find(r => !r.ok);
       if (!firstFailure) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to unlink tasks', { description: firstFailure.error });
     });
   }, [selectedIds, tasksByProject, commit]);
@@ -1347,7 +1354,6 @@ export function useFlowDeckStore(): FlowDeckState {
   const setRecurrenceSelected = useCallback((projectId: string, freq: string | null) => {
     if (!projectId || selectedIds.size === 0) return;
     const projectTasks = tasksByProject[projectId] || [];
-    const snapshot = projectTasks;
     // Optimistic local update.
     updateTasksBulk(projectId, selectedIds, { recurrence: freq });
     // Persist each task's recurrence via individual PATCHes. The recurrence
@@ -1356,7 +1362,7 @@ export function useFlowDeckStore(): FlowDeckState {
     Promise.all(ids.map(id => apiUpdateTask(id, taskToApiPayload({ recurrence: freq })))).then(results => {
       const firstFailure = results.find(r => !r.ok);
       if (!firstFailure) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to save recurrence', { description: firstFailure.error });
     });
   }, [selectedIds, tasksByProject, updateTasksBulk]);
@@ -1371,21 +1377,20 @@ export function useFlowDeckStore(): FlowDeckState {
     Promise.all([...selectedIds].map(id => apiUpdateTask(id, taskToApiPayload({ bold: !anyBold })))).then(results => {
       const firstFailure = results.find(r => !r.ok);
       if (!firstFailure) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to save bold formatting', { description: firstFailure.error });
     });
   }, [selectedIds, tasksByProject, updateTasksBulk]);
   /** Set / clear the colour tag on selected tasks; persists per-task (H-04). */
   const setColorSelected = useCallback((projectId: string, color: string | null) => {
     if (!projectId || selectedIds.size === 0) return;
-    const snapshot = tasksByProject[projectId] || [];
     // Optimistic local update.
     updateTasksBulk(projectId, selectedIds, { color });
     toast.success(color ? `Colour tagged ${selectedIds.size} task${selectedIds.size > 1 ? 's' : ''}` : `Colour cleared for ${selectedIds.size} task${selectedIds.size > 1 ? 's' : ''}`);
     Promise.all([...selectedIds].map(id => apiUpdateTask(id, taskToApiPayload({ color })))).then(results => {
       const firstFailure = results.find(r => !r.ok);
       if (!firstFailure) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to save colour tag', { description: firstFailure.error });
     });
   }, [selectedIds, tasksByProject, updateTasksBulk]);
@@ -1400,7 +1405,7 @@ export function useFlowDeckStore(): FlowDeckState {
     Promise.all([...selectedIds].map(id => apiUpdateTask(id, taskToApiPayload({ milestone: !anyMilestone })))).then(results => {
       const firstFailure = results.find(r => !r.ok);
       if (!firstFailure) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to save milestone flag', { description: firstFailure.error });
     });
   }, [selectedIds, tasksByProject, updateTasksBulk]);
@@ -1499,7 +1504,7 @@ export function useFlowDeckStore(): FlowDeckState {
           if (failed > 0) {
             toast.error(`Failed to import ${failed} task${failed > 1 ? 's' : ''} on server`);
             // If every row failed, restore the snapshot.
-            if (failed === results.length) setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+            if (failed === results.length) void resyncTasksFromServer(projectId);
           } else {
             toast.success(`Imported ${rows.length} task${rows.length > 1 ? 's' : ''}`);
           }
@@ -1809,8 +1814,6 @@ export function useFlowDeckStore(): FlowDeckState {
     const projectTasks = tasksByProject[projectId] || [];
     const task = projectTasks.find(t => t.id === taskId);
     if (!task) return;
-    // Snapshot for rollback — captured BEFORE the optimistic mutation.
-    const snapshot = projectTasks;
     const currentTags = task.tags || [];
     const isAdding = !currentTags.includes(tagId);
     const newTags = isAdding
@@ -1825,13 +1828,13 @@ export function useFlowDeckStore(): FlowDeckState {
     if (isAdding) {
       apiAddTaskTag(taskId, tagId).then((res) => {
         if (res.ok) return;
-        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        void resyncTasksFromServer(projectId);
         toast.error('Failed to add tag', { description: res.error });
       });
     } else {
       apiRemoveTaskTag(taskId, tagId).then((res) => {
         if (res.ok) return;
-        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        void resyncTasksFromServer(projectId);
         toast.error('Failed to remove tag', { description: res.error });
       });
     }
@@ -1845,8 +1848,6 @@ export function useFlowDeckStore(): FlowDeckState {
     // list did not survive the translation, audit H-07).
     const arr = applyReorderAnchor(projectTasks, taskId, anchor);
     if (!arr) return;
-    // Snapshot for rollback.
-    const snapshot = projectTasks;
     // Optimistic local update — reassign sortOrder based on new positions.
     const reordered = arr.map((t, i) => ({ ...t, sortOrder: i }));
     commit(projectId, reordered);
@@ -1860,7 +1861,7 @@ export function useFlowDeckStore(): FlowDeckState {
     apiReorderTasks(projectId, serverPayload).then((res) => {
       if (res.ok) return;
       // Roll back on failure.
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to save task order', { description: res.error });
     });
   }, [tasksByProject, commit]);
@@ -1885,8 +1886,6 @@ export function useFlowDeckStore(): FlowDeckState {
       createdAt: new Date().toISOString(),
     };
     const projectTasks = tasksByProject[projectId] || [];
-    // Snapshot for rollback.
-    const snapshot = projectTasks;
     // Optimistic local update.
     commit(projectId, [...projectTasks, newTask]);
     logActivity(projectId, tempId, 'created', `Task "${newTask.name}" was created`);
@@ -1899,7 +1898,7 @@ export function useFlowDeckStore(): FlowDeckState {
       start: opts?.startOverride,
     })).then((res) => {
       if (!res.ok) {
-        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        void resyncTasksFromServer(projectId);
         toast.error('Failed to create task on server', { description: res.error });
         return;
       }
@@ -2087,7 +2086,6 @@ export function useFlowDeckStore(): FlowDeckState {
       : [...current, userId];
     // Snapshot for rollback — restore the pre-toggle followers if the API
     // rejects the change.
-    const snapshot = projectTasks;
     // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, followers: newFollowers } : t));
     const memberName = resolveMemberName(userId);
@@ -2096,7 +2094,7 @@ export function useFlowDeckStore(): FlowDeckState {
     const persist = isFollowing ? apiUnfollowTask(taskId) : apiFollowTask(taskId);
     persist.then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error(isFollowing ? 'Failed to unfollow task' : 'Failed to follow task', { description: res.error });
     });
   }, [tasksByProject, commit, logActivity, resolveMemberName]);
@@ -2243,7 +2241,6 @@ export function useFlowDeckStore(): FlowDeckState {
     if (!task) return;
     // Snapshot for rollback — restore the pre-duplicate task list if the
     // server rejects the new task creation.
-    const snapshot = projectTasks;
     const newId = defaultIdGenerator.generate('t');
     const idMap = new Map<string, string>();
     idMap.set(id, newId);
@@ -2362,7 +2359,7 @@ export function useFlowDeckStore(): FlowDeckState {
 
     persistClone(task, null, newId).then((serverParentId) => {
       if (!serverParentId) {
-        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        void resyncTasksFromServer(projectId);
         toast.error('Failed to duplicate task on server');
         return;
       }
@@ -2471,7 +2468,7 @@ export function useFlowDeckStore(): FlowDeckState {
       const succeeded = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
       const failed = results.length - succeeded;
       if (succeeded === 0 && failed > 0) {
-        setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        void resyncTasksFromServer(projectId);
       }
     });
   }, [tasksByProject, commit]);
@@ -2736,7 +2733,7 @@ export function useFlowDeckStore(): FlowDeckState {
         toast.error('Failed to paste some tasks on server');
         // If every paste failed, restore the snapshot.
         const allFailed = results.every(r => !r.res.ok);
-        if (allFailed) setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+        if (allFailed) void resyncTasksFromServer(projectId);
       }
     });
   }, [clipboard, tasksByProject, commit, moveTasksToProjectBulk]);
@@ -2772,7 +2769,6 @@ export function useFlowDeckStore(): FlowDeckState {
     const task = projectTasks.find(t => t.id === taskId);
     if (!task || !task.parentId) return;
     const newLevel = Math.max(0, (task.level || 1) - 1);
-    const snapshot = projectTasks;
     // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, parentId: null, level: newLevel } : t));
     const actorName = resolveMemberName(userIdRef.current);
@@ -2781,7 +2777,7 @@ export function useFlowDeckStore(): FlowDeckState {
     // Persist to PostgreSQL — clearing parentId promotes the task.
     apiUpdateTask(taskId, taskToApiPayload({ parentId: null })).then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to promote subtask', { description: res.error });
     });
   }, [tasksByProject, commit, logActivity, resolveMemberName]);
@@ -2793,7 +2789,6 @@ export function useFlowDeckStore(): FlowDeckState {
     const task = projectTasks.find(t => t.id === taskId);
     if (!task) return;
     const newLevel = Math.min(4, (task.level || 0) + 1);
-    const snapshot = projectTasks;
     // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, parentId: newParentId, level: newLevel } : t));
     const parentTask = projectTasks.find(t => t.id === newParentId);
@@ -2805,7 +2800,7 @@ export function useFlowDeckStore(): FlowDeckState {
     // hierarchy, so on a 400 we roll back the optimistic change.
     apiUpdateTask(taskId, taskToApiPayload({ parentId: newParentId })).then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to convert task to subtask', { description: res.error });
     });
   }, [tasksByProject, commit, logActivity]);
@@ -2920,14 +2915,13 @@ export function useFlowDeckStore(): FlowDeckState {
 
   const setTaskSection = useCallback((projectId: string, taskId: string, sectionId: string | null) => {
     const projectTasks = tasksByProject[projectId] || [];
-    const snapshot = projectTasks;
     // Optimistic local update.
     commit(projectId, projectTasks.map(t => t.id === taskId ? { ...t, sectionId } : t));
     // Persist to PostgreSQL via the task PATCH endpoint (the sectionId field
     // on Task). Roll back on failure.
     apiUpdateTask(taskId, taskToApiPayload({ sectionId })).then((res) => {
       if (res.ok) return;
-      setTasksByProject(prev => ({ ...prev, [projectId]: snapshot }));
+      void resyncTasksFromServer(projectId);
       toast.error('Failed to move task to section', { description: res.error });
     });
   }, [tasksByProject, commit]);

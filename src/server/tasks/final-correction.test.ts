@@ -335,18 +335,21 @@ describe('Custom field value persistence (item 4)', () => {
 });
 
 describe('Task tag rollback (item 5)', () => {
-  test('toggleTaskTag restores snapshot on add failure', () => {
+  test('toggleTaskTag re-syncs from the server on add failure', () => {
     const source = readSrc('src/features/flowdeck/store/useFlowDeck.ts');
     const fnStart = source.indexOf('const toggleTaskTag');
     assert.ok(fnStart > 0, 'toggleTaskTag must exist');
-    const fnBody = source.slice(fnStart, fnStart + 2000);
+    const fnBody = source.slice(fnStart, fnStart + 2400);
+    // A stale whole-list snapshot would silently erase concurrent changes
+    // that landed while the request was in flight (audit Table 5.1), so the
+    // failure path must re-sync the canonical list from GET instead.
     assert.ok(
-      fnBody.includes('snapshot'),
-      'toggleTaskTag must capture a snapshot before mutation',
+      fnBody.includes('resyncTasksFromServer'),
+      'toggleTaskTag must re-sync from the server on API failure',
     );
     assert.ok(
-      fnBody.includes('setTasksByProject') && fnBody.includes('snapshot'),
-      'toggleTaskTag must restore snapshot on API failure',
+      !fnBody.includes('[projectId]: snapshot'),
+      'toggleTaskTag must not roll back to a stale whole-list snapshot',
     );
   });
 });

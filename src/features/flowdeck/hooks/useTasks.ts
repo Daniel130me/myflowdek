@@ -40,14 +40,17 @@ interface ApiTask {
 }
 
 /**
- * Map the API task shape to the frontend Task type.
+ * Map the API task shape to the frontend Task type. Exported so the store
+ * can re-sync canonical task lists straight from GET responses when a
+ * failed optimistic mutation needs server truth instead of a stale
+ * client-side snapshot.
  *
  * Custom-field values are joined onto the task as `customFields: Record<key,
  * value>` so the existing UI (SheetView, TaskDetailPanel) can read/write them
  * without changes. Empty/null values are skipped so the record only contains
  * actually-populated fields.
  */
-function mapTask(api: ApiTask): Task {
+export function mapApiTask(api: ApiTask): Task {
   const customFields: Record<string, string> | undefined =
     api.customFieldValues && api.customFieldValues.length > 0
       ? api.customFieldValues.reduce<Record<string, string>>((acc, v) => {
@@ -104,7 +107,7 @@ export function useTasks(projectId: string | null) {
       const res = await fetch(`/api/projects/${projectId}/tasks`);
       if (!res.ok) throw new Error('Failed to load tasks');
       const data = await res.json();
-      setTasks((data.tasks ?? []).map(mapTask));
+      setTasks((data.tasks ?? []).map(mapApiTask));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -126,7 +129,7 @@ export function useTasks(projectId: string | null) {
       });
       if (!res.ok) throw new Error('Failed to create task');
       const data = await res.json();
-      const mapped = mapTask(data.task as ApiTask);
+      const mapped = mapApiTask(data.task as ApiTask);
       setTasks((prev) => [...prev, mapped]);
       return mapped;
     },
