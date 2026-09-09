@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { routes, getRouteForView, getViewFromPathname } from './routes';
+import { routes, getRouteForView, getViewFromPathname, replaceProjectInPath } from './routes';
 
 test('routes generator functions produce correct paths', () => {
   assert.strictEqual(routes.projects(), '/projects');
@@ -36,4 +36,21 @@ test('getViewFromPathname extracts active view correctly', () => {
   assert.strictEqual(getViewFromPathname('/projects/p1/board'), 'board');
   assert.strictEqual(getViewFromPathname('/projects/p1/documents'), 'documents');
   assert.strictEqual(getViewFromPathname('/projects/p1/timeline'), 'timeline');
+});
+
+test('replaceProjectInPath collapses resource-id tails that would 404 (audit Table 5.1)', () => {
+  // A task id belongs to the OLD project — keeping it under the new
+  // project's route is a guaranteed 404, so it collapses to the section root.
+  assert.strictEqual(replaceProjectInPath('/projects/p1/tasks/t1', 'p2'), '/projects/p2/tasks');
+  assert.strictEqual(replaceProjectInPath('/projects/p1/tasks/t1/duplicate', 'p2'), '/projects/p2/tasks');
+  assert.strictEqual(replaceProjectInPath('/projects/p1/files/f1', 'p2'), '/projects/p2/files');
+  // The new-task overlay is not a stored resource — safe to keep.
+  assert.strictEqual(replaceProjectInPath('/projects/p1/tasks/new', 'p2'), '/projects/p2/tasks/new');
+});
+
+test('replaceProjectInPath keeps context where it is safe', () => {
+  assert.strictEqual(replaceProjectInPath('/projects/p1/board', 'p2'), '/projects/p2/board');
+  assert.strictEqual(replaceProjectInPath('/projects/p1/settings/custom-fields', 'p2'), '/projects/p2/settings/custom-fields');
+  assert.strictEqual(replaceProjectInPath('/projects/p1', 'p2'), '/projects/p2/overview');
+  assert.strictEqual(replaceProjectInPath('/my-tasks', 'p2'), '/projects/p2/overview');
 });

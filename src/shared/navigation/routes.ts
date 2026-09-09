@@ -65,14 +65,41 @@ export const routes = {
   file: (projectId: string, fileId: string) => `/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}`,
 };
 
+/**
+ * Sections whose path can carry a resource-id tail that belongs to a
+ * specific project: /projects/:id/tasks/:taskId and /projects/:id/files/:fileId
+ * (plus /duplicate). Switching projects while such a tail is present would
+ * address the OLD project's resource under the NEW project's route — a
+ * guaranteed 404 (audit Table 5.1) — so those tails collapse to the
+ * section root. `new` is a form overlay, not a stored resource, and is
+ * safe to keep.
+ */
+const RESOURCE_ID_SECTIONS = new Set(['tasks', 'files']);
+
 export function replaceProjectInPath(pathname: string, projectId: string): string {
-  const parts = pathname.split('/');
-  if (parts[1] !== 'projects' || parts.length < 3 || !parts[2]) {
+  const parts = pathname.split('/').filter(Boolean);
+  // Not inside a project workspace (or malformed): land on the new
+  // project's overview.
+  if (parts[0] !== 'projects' || parts.length < 2 || !parts[1]) {
     return routes.projectOverview(projectId);
   }
 
-  parts[2] = encodeURIComponent(projectId);
-  return parts.join('/');
+  const section = parts[2];
+  if (!section) {
+    return routes.projectOverview(projectId);
+  }
+
+  // Collapse a resource-id tail (/tasks/<id>, /tasks/<id>/duplicate,
+  // /files/<id>) to the section root; keep safe tails (section roots,
+  // overlays like /tasks/new, /settings/custom-fields) so switching stays
+  // context-preserving wherever it cannot 404.
+  const hasResourceIdTail = parts.length > 3 && RESOURCE_ID_SECTIONS.has(section) && parts[3] !== 'new';
+  if (hasResourceIdTail) {
+    return `/${['projects', encodeURIComponent(projectId), section].join('/')}`;
+  }
+
+  parts[1] = encodeURIComponent(projectId);
+  return `/${parts.join('/')}`;
 }
 
 export function getRouteForView(viewId: string, projectId?: string): string {
