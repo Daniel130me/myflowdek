@@ -8,7 +8,7 @@ import {
   DEFAULT_JOB_TITLE_FALLBACK,
   DEFAULT_AVATAR_COLOR,
 } from '@/lib/auth.constants';
-import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit';
+import { rateLimit, recordAuthFailure, clearAuthFailures, authBackoffWindowMs, RATE_LIMITS } from '@/lib/rate-limit';
 import { audit } from '@/server/audit/log';
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -19,8 +19,12 @@ const isProduction = process.env.NODE_ENV === 'production';
  * Uses the JWT session strategy with a credentials provider that validates
  * email + password against the User table in PostgreSQL (Neon).
  *
- * Login is rate-limited per email (10 attempts/minute) to slow credential
- * brute-force. Every login attempt (success and failure) is audit-logged.
+ * Login is rate-limited on two axes (audit Table 7.1): per-IP for all
+ * attempts and per-email for FAILED attempts with a widening backoff
+ * window. Counting only failures per email means an attacker burning a
+ * victim's bucket simultaneously burns their own IP budget, and a
+ * successful sign-in clears the streak entirely. Every login attempt
+ * (success and failure) is audit-logged.
  */
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -67,24 +71,41 @@ export const authOptions: NextAuthOptions = {
         const password = credentials?.password;
         if (!email || !password) return null;
 
-        // --- Rate limit (per email, 10/min) ---
-        const rl = rateLimit(`login:${email}`, RATE_LIMITS.login);
-        if (!rl.allowed) {
-          return null;
-        }
-
-        // Extract IP/user-agent defensively — the req object shape varies
-        // between NextAuth versions and runtime environments.
+        // --- Rate limits (audit Table 7.1) ---
+        // Per-IP: every attempt counts, so credential-stuffing sweeps burn
+        // the attacker's own budget before they can fill a victim's email
+        // bucket. Behind the platform proxy TRUST_PROXY=true makes this the
+        // real client IP; otherwise every caller shares one 'unknown' bucket
+        // (spoofed XFF must not buy a fresh bucket).
         let ip: string | null = null;
         let userAgent: string | null = null;
         try {
           const headers = (req as { headers?: Headers })?.headers;
-          ip = headers?.get('x-forwarded-for')?.split(',')[0]?.trim()
-            ?? headers?.get('x-real-ip')
-            ?? null;
+          ip = process.env.TRUST_PROXY === 'true'
+            ? headers?.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
+            : null;
+          ip = ip ?? headers?.get('x-real-ip') ?? 'unknown';
           userAgent = headers?.get('user-agent') ?? null;
         } catch {
           // Headers not available in this runtime — proceed without them.
+        }
+        const ipRl = rateLimit(`login-ip:${ip}`, RATE_LIMITS.loginIp);
+        if (!ipRl.allowed) {
+          await audit({ action: 'login_rate_limited', ip, userAgent, meta: { axis: 'ip', email } });
+          return null;
+        }
+
+        // Per-email: FAILED attempts only, in a window that doubles for
+        // every 5 consecutive failures (cap 16x) — intentional lockout DoS
+        // of an email now costs the attacker their full IP budget while a
+        // user who types the right password is never throttled.
+        const emailRl = rateLimit(
+          `login-email:${email}`,
+          { ...RATE_LIMITS.login, windowMs: authBackoffWindowMs(email, RATE_LIMITS.login.windowMs) },
+        );
+        if (!emailRl.allowed) {
+          await audit({ action: 'login_rate_limited', ip, userAgent, meta: { axis: 'email', email } });
+          return null;
         }
 
         try {
@@ -141,6 +162,7 @@ export const authOptions: NextAuthOptions = {
           // Single keyed lookup — no scan, no N+1.
           const user = await db.user.findUnique({ where: { email } });
           if (!user || !user.passwordHash) {
+            recordAuthFailure(email, RATE_LIMITS.login.windowMs);
             await audit({ action: 'login_failed', ip, userAgent, meta: { reason: 'unknown_email', email } });
             return null;
           }
@@ -168,10 +190,12 @@ export const authOptions: NextAuthOptions = {
 
           const valid = await bcrypt.compare(password, user.passwordHash);
           if (!valid) {
+            recordAuthFailure(email, RATE_LIMITS.login.windowMs);
             await audit({ userId: user.id, action: 'login_failed', ip, userAgent, meta: { reason: 'wrong_password' } });
             return null;
           }
 
+          clearAuthFailures(email);
           await audit({ userId: user.id, action: 'login', ip, userAgent });
           return {
             id: user.id,

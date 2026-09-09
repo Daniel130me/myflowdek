@@ -108,6 +108,38 @@ describe('rate limiter', () => {
     assert.equal(blocked.allowed, false);
     assert.ok(blocked.retryAfterMs !== undefined && blocked.retryAfterMs > 0);
   });
+
+  test('login backoff widens the window as failures accumulate and resets on success', async () => {
+    const { recordAuthFailure, authBackoffWindowMs, clearAuthFailures } = await import('@/lib/rate-limit');
+    const key = `test-backoff-${RUN_ID}@flowdeck.io`;
+    const base = 60_000;
+    assert.equal(await Promise.resolve(authBackoffWindowMs(key, base)), base, 'no failures -> base window');
+    for (let i = 1; i <= 4; i++) recordAuthFailure(key, base);
+    assert.equal(authBackoffWindowMs(key, base), base, '4 failures -> still base window');
+    recordAuthFailure(key, base); // 5th consecutive failure
+    assert.equal(authBackoffWindowMs(key, base), base * 2, '5 failures -> window doubles');
+    for (let i = 0; i < 10; i++) recordAuthFailure(key, base); // 15 total -> 8x
+    assert.equal(authBackoffWindowMs(key, base), base * 8, '15 failures -> 8x window');
+    clearAuthFailures(key);
+    assert.equal(authBackoffWindowMs(key, base), base, 'success clears the streak');
+  });
+
+  test('getClientId ignores spoofed x-forwarded-for unless TRUST_PROXY is set', async () => {
+    const { getClientId } = await import('@/lib/rate-limit');
+    const request = new Request('https://flowdeck.example/login', {
+      headers: { 'x-forwarded-for': '1.2.3.4', 'x-real-ip': '9.9.9.9' },
+    });
+    const previous = process.env.TRUST_PROXY;
+    try {
+      delete process.env.TRUST_PROXY;
+      assert.equal(getClientId(request), '9.9.9.9', 'untrusted proxy: XFF ignored');
+      process.env.TRUST_PROXY = 'true';
+      assert.equal(getClientId(request), '1.2.3.4', 'trusted proxy: XFF honoured');
+    } finally {
+      if (previous === undefined) delete process.env.TRUST_PROXY;
+      else process.env.TRUST_PROXY = previous;
+    }
+  });
 });
 
 /* ====================== DESTRUCTIVE SEED GUARD TESTS ====================== */

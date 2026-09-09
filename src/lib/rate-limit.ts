@@ -24,7 +24,8 @@ interface RateLimitConfig {
 /** Default limits for auth + mutation endpoints. */
 export const RATE_LIMITS = {
   register: { maxRequests: 5, windowMs: 60_000 }, // 5 per minute
-  login: { maxRequests: 10, windowMs: 60_000 }, // 10 per minute
+  login: { maxRequests: 10, windowMs: 60_000 }, // 10 failed attempts per email per minute (window widens with backoff)
+  loginIp: { maxRequests: 30, windowMs: 60_000 }, // 30 total attempts per IP per minute — caps credential-stuffing sweeps
   forgotPassword: { maxRequests: 3, windowMs: 60_000 }, // 3 per minute
   taskCreate: { maxRequests: 30, windowMs: 60_000 }, // 30 per minute
   commentCreate: { maxRequests: 20, windowMs: 60_000 }, // 20 per minute
@@ -62,12 +63,56 @@ export function rateLimit(key: string, config: RateLimitConfig): { allowed: bool
   return { allowed: true };
 }
 
-/** Extract a client identifier from a Request (IP address, with fallback). */
+/** Extract a client identifier from a Request (IP address, with fallback).
+ *
+ * `x-forwarded-for` is client-spoofable when the request did NOT come
+ * through the platform's own proxy (audit Table 7.1). It is only honoured
+ * when TRUST_PROXY=true is set by the deployment that terminates the
+ * connection; otherwise callers share the conservative 'unknown' bucket.
+ */
 export function getClientId(request: Request): string {
-  // Prefer the forwarded-for header (behind Caddy/load balancer).
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
+  if (process.env.TRUST_PROXY === 'true') {
+    const forwarded = request.headers.get('x-forwarded-for');
+    if (forwarded) return forwarded.split(',')[0].trim();
+  }
   return request.headers.get('x-real-ip') ?? 'unknown';
+}
+
+/**
+ * Progressive login backoff (audit Table 7.1: per-email limiter alone lets
+ * an attacker keep a victim's bucket full forever).
+ *
+ * The email bucket only counts FAILED attempts and its window doubles for
+ * every 5 consecutive failures (up to 16x). Successful sign-in clears the
+ * count, so a legitimate user who simply got their password right is never
+ * throttled by someone else's failures against their own IP budget.
+ */
+const FAILURE_TTL_MS = 15 * 60_000;
+const failureCounts = new Map<string, { count: number; last: number }>();
+
+function backoffMultiplier(count: number): number {
+  return Math.min(2 ** Math.floor(count / 5), 16);
+}
+
+/** Record a failed auth attempt for `key`; returns the widened window in ms. */
+export function recordAuthFailure(key: string, baseWindowMs: number): number {
+  const now = Date.now();
+  const prev = failureCounts.get(key);
+  const count = prev && now - prev.last < FAILURE_TTL_MS ? prev.count + 1 : 1;
+  failureCounts.set(key, { count, last: now });
+  return baseWindowMs * backoffMultiplier(count);
+}
+
+/** Clear the failure streak for `key` (call on successful sign-in). */
+export function clearAuthFailures(key: string): void {
+  failureCounts.delete(key);
+}
+
+/** Current widened window for `key`, taking recent failures into account. */
+export function authBackoffWindowMs(key: string, baseWindowMs: number): number {
+  const prev = failureCounts.get(key);
+  const active = prev && Date.now() - prev.last < FAILURE_TTL_MS;
+  return baseWindowMs * (active ? backoffMultiplier(prev.count) : 1);
 }
 
 /** Convert a retryAfterMs value to seconds for the Retry-After header. */
