@@ -6,6 +6,7 @@ import { Eye, EyeOff, ArrowRight, Layers, BarChart3, Users, Zap, ChevronRight, S
 import { COLORS, FF } from '@/features/flowdeck/model';
 import { routes } from '@/shared/navigation/routes';
 import { AuthPageSkeleton } from '@/components/ui/skeleton';
+import { IS_DEMO_ENV } from '@/lib/auth.constants';
 import type { UserProfile } from './useAuth';
 
 interface LoginPageProps {
@@ -198,7 +199,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
 
           {/* Demo button — dev-only: the credentials ship in the client
               bundle, so an ungated path is a public backdoor (audit H-18). */}
-          {process.env.NODE_ENV !== 'production' && (
+          {IS_DEMO_ENV && (
           <button
             onClick={handleDemo}
             disabled={loading}
@@ -414,7 +415,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
                 : 'Get started with FlowDeck in seconds'}
             </p>
 
-            {process.env.NODE_ENV !== 'production' && (
+            {IS_DEMO_ENV && (
             <button
               onClick={handleDemo}
               disabled={loading}
@@ -610,7 +611,7 @@ export function LoginPage({ onLogin, onDemoLogin, onLogout, hasExistingSession }
               : 'Get started with FlowDeck in seconds'}
           </p>
 
-          {process.env.NODE_ENV !== 'production' && (
+          {IS_DEMO_ENV && (
           <button
             onClick={handleDemo}
             disabled={loading}

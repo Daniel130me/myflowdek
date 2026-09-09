@@ -7,11 +7,35 @@ import {
   LOGIN_PATH,
   DEFAULT_JOB_TITLE_FALLBACK,
   DEFAULT_AVATAR_COLOR,
+  DEMO_CREDENTIALS,
+  IS_DEMO_ENV,
+  BCRYPT_ROUNDS,
 } from '@/lib/auth.constants';
 import { rateLimit, recordAuthFailure, clearAuthFailures, authBackoffWindowMs, RATE_LIMITS } from '@/lib/rate-limit';
 import { audit } from '@/server/audit/log';
 
 const isProduction = process.env.NODE_ENV === 'production';
+
+/**
+ * Resolve the NextAuth signing secret (Low: auth config hygiene).
+ *
+ * A production deploy without NEXTAUTH_SECRET must fail at boot with a
+ * clear message instead of silently running with `secret: undefined`,
+ * which surfaces later as cryptic "JWS verification failures" / "NO SECRET"
+ * errors at sign-in time (and, on some NextAuth versions, quietly rotates
+ * an ephemeral key, invalidating every session). In dev a fixed string
+ * keeps sessions stable across restarts with zero config.
+ */
+function authSecret(): string {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (secret) return secret;
+  if (isProduction) {
+    throw new Error(
+      '[auth] NEXTAUTH_SECRET must be set in production — sessions cannot be signed without it.',
+    );
+  }
+  return 'flowdeck-dev-secret-do-not-use-in-production';
+}
 
 /**
  * NextAuth configuration for FlowDeck.
@@ -27,7 +51,7 @@ const isProduction = process.env.NODE_ENV === 'production';
  * (success and failure) is audit-logged.
  */
 export const authOptions: NextAuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: authSecret(),
   cookies: {
     sessionToken: {
       name: 'next-auth.session-token',
@@ -113,19 +137,22 @@ export const authOptions: NextAuthOptions = {
           // DB. NEVER available in production — this is a convenience for
           // local/dev demos, not a public signup path (audit H-18: the
           // credentials ship in the client bundle, so an ungated path here is
-          // a permanent backdoor). The button is hidden in prod too.
+          // a permanent backdoor). The button is hidden in prod too. Gated
+          // through the shared IS_DEMO_ENV switch + DEMO_CREDENTIALS so the
+          // policy and the credentials can never drift from the seed script
+          // or the UI (Low: demo-credentials gating).
           if (
-            process.env.NODE_ENV !== 'production' &&
-            email === 'wale.johnson@flowdeck.io' &&
-            password === 'flowdeck123'
+            IS_DEMO_ENV &&
+            email === DEMO_CREDENTIALS.email &&
+            password === DEMO_CREDENTIALS.password
           ) {
             const existingDemo = await db.user.findUnique({ where: { email } });
             if (!existingDemo) {
-              const demoHash = await bcrypt.hash('flowdeck123', 10);
+              const demoHash = await bcrypt.hash(DEMO_CREDENTIALS.password, BCRYPT_ROUNDS);
               const newDemoUser = await db.user.create({
                 data: {
                   id: 'u5',
-                  email: 'wale.johnson@flowdeck.io',
+                  email: DEMO_CREDENTIALS.email,
                   name: 'Wale Johnson',
                   jobTitle: 'Project Manager',
                   avatarColor: '#FE8029',

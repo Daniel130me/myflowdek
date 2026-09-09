@@ -72,3 +72,15 @@ export const DEMO_PASSWORD = DEMO_CREDENTIALS.password;
 
 /** Domain used for seeded demo emails (e.g. `wale.johnson@flowdeck.io`). */
 export const DEMO_EMAIL_DOMAIN = 'flowdeck.io';
+
+/**
+ * Master switch for every demo-account path: the login button, the
+ * credentials-provider auto-provision and the demo fixtures.
+ *
+ * Strictly dev-only by design (audit H-18 / Low: demo-credentials gating):
+ * the credentials ship in the client bundle, so a production build must
+ * never accept them. Every call site imports THIS constant instead of
+ * re-deriving `NODE_ENV` inline, so the policy can never drift between
+ * the UI, the server and the store.
+ */
+export const IS_DEMO_ENV = process.env.NODE_ENV !== 'production';

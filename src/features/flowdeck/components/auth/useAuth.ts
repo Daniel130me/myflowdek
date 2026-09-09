@@ -7,6 +7,7 @@ import {
   DEFAULT_JOB_TITLE_FALLBACK,
   DEFAULT_AVATAR_COLOR,
   DEMO_CREDENTIALS,
+  IS_DEMO_ENV,
 } from '@/lib/auth.constants';
 
 export interface UserProfile {
@@ -134,8 +135,17 @@ export function useAuth() {
     [],
   );
 
-  /** Sign in as the seeded demo project manager (Wale Johnson). */
+  /** Sign in as the seeded demo project manager (Wale Johnson).
+   *
+   * Defense in depth: the button is hidden by the same IS_DEMO_ENV switch,
+   * but the hook also refuses to fire outside demo environments so a stray
+   * caller can never round-trip known credentials at a production server
+   * (Low: demo-credentials gating).
+   */
   const demoLogin = useCallback(async (): Promise<LoginResult> => {
+    if (!IS_DEMO_ENV) {
+      return { ok: false, error: 'Demo login is disabled in production' };
+    }
     const result = await signIn('credentials', {
       email: DEMO_CREDENTIALS.email,
       password: DEMO_CREDENTIALS.password,
