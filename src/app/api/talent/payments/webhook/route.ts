@@ -5,7 +5,9 @@ import { ServiceError } from '@/server/http/errors';
 export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
-    const signatureHeader = req.headers.get('x-paystack-signature') || req.headers.get('stripe-signature') || '';
+    // Paystack is the only wired provider (audit Table 7.1: no fake Stripe
+    // surface until a second provider actually ships).
+    const signatureHeader = req.headers.get('x-paystack-signature') || '';
 
     let payload = {};
     try {
