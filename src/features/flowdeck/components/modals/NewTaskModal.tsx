@@ -23,19 +23,26 @@ export function NewTaskModal({ projectStart, tasks = [], tags = [], members = []
 
   function submit() {
     if (!name.trim()) return;
+    // Reject a due date before the start date — the server accepts it, but
+    // the timeline math and overdue indicators then behave nonsensically
+    // (audit Table 7.1, new task modal validation gaps).
+    if (dueDate && new Date(dueDate) < new Date(start)) return;
     onCreate({
       name: name.trim(),
       description: description.trim() || undefined,
       status: 'backlog',
       assignee,
       start,
-      duration: Number(duration),
+      // A cleared number input must never send 0 or NaN as a duration.
+      duration: Math.max(1, Math.floor(Number(duration)) || 1),
       priority,
       dueDate: dueDate || undefined,
       tags: [...selectedTags],
       parentId: parentId || null,
     });
   }
+
+  const invalidDue = !!dueDate && new Date(dueDate) < new Date(start);
 
   const { isMobile } = useViewport();
 
@@ -87,9 +94,10 @@ export function NewTaskModal({ projectStart, tasks = [], tags = [], members = []
   if (isMobile) {
     return (
       <Modal open onClose={onClose} label="New task" variant="bottom-sheet" zIndex={50}>
+        <form onSubmit={e => { e.preventDefault(); submit(); }}>
         <div style={{ width: 36, height: 4, borderRadius: 2, background: COLORS.line, margin: '4px auto 16px' }} />
         <h3 style={{ fontFamily: FF, fontSize: 18, margin: '0 0 18px' }}>New task</h3>
-          <Field label="Task name"><input autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Draft launch email" style={selectStyle} /></Field>
+          <Field label="Task name"><input autoFocus maxLength={200} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Draft launch email" style={selectStyle} /></Field>
           <Field label="Description"><textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Add a more detailed description\u2026" style={descStyle} /></Field>
           {parentSelectContent}
           {tagPickerContent}
@@ -98,23 +106,26 @@ export function NewTaskModal({ projectStart, tasks = [], tags = [], members = []
             <Field label="Priority"><select value={priority} onChange={e => setPriority(e.target.value as TaskPriority)} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
             <Field label="Start date"><input type="date" value={start} onChange={e => setStart(e.target.value)} style={selectStyle} /></Field>
             <Field label="Due date"><input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={selectStyle} /></Field>
-            <Field label="Duration (days)"><input type="number" min={1} value={duration} onChange={e => setDuration(Number(e.target.value))} style={selectStyle} /></Field>
+            <Field label="Duration (days)"><input type="number" min={1} value={duration} onChange={e => setDuration(Math.max(1, Math.floor(Number(e.target.value)) || 1))} style={selectStyle} /></Field>
           </div>
+          {invalidDue && <div style={{ fontSize: 12, color: COLORS.red, marginTop: -4, fontFamily: FF }}>Due date must be on or after the start date.</div>}
           <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-            <button onClick={onClose} style={{ flex: 1, background: '#F3F4F6', color: COLORS.ink, border: 'none', borderRadius: 12, padding: '14px 0', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>Cancel</button>
-            <button onClick={submit} disabled={!name.trim()} style={{ flex: 2, background: name.trim() ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 12, padding: '14px 0', fontSize: 15, fontWeight: 700, cursor: name.trim() ? 'pointer' : 'not-allowed', fontFamily: FF, boxShadow: name.trim() ? '0 1px 3px rgba(254,128,41,0.2)' : 'none' }}>Create task</button>
+            <button type="button" onClick={onClose} style={{ flex: 1, background: '#F3F4F6', color: COLORS.ink, border: 'none', borderRadius: 12, padding: '14px 0', fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>Cancel</button>
+            <button type="submit" disabled={!name.trim() || invalidDue} style={{ flex: 2, background: name.trim() && !invalidDue ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 12, padding: '14px 0', fontSize: 15, fontWeight: 700, cursor: name.trim() && !invalidDue ? 'pointer' : 'not-allowed', fontFamily: FF, boxShadow: name.trim() && !invalidDue ? '0 1px 3px rgba(254,128,41,0.2)' : 'none' }}>Create task</button>
           </div>
+        </form>
       </Modal>
     );
   }
 
   return (
     <Modal open onClose={onClose} label="New task" variant="center" zIndex={60} style={{ padding: 24 }}>
+      <form onSubmit={e => { e.preventDefault(); submit(); }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <h3 style={{ fontFamily: FF, fontSize: 17, margin: 0 }}>New task</h3>
-        <button onClick={onClose} aria-label="Close" style={{ border: 'none', background: 'none', cursor: 'pointer' }}><X size={18} /></button>
+        <button type="button" onClick={onClose} aria-label="Close" style={{ border: 'none', background: 'none', cursor: 'pointer' }}><X size={18} /></button>
       </div>
-        <Field label="Task name"><input autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Draft launch email" style={selectStyle} /></Field>
+        <Field label="Task name"><input autoFocus maxLength={200} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Draft launch email" style={selectStyle} /></Field>
         <Field label="Description"><textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Add a more detailed description\u2026" style={descStyle} /></Field>
         {parentSelectContent}
         {tagPickerContent}
@@ -123,12 +134,14 @@ export function NewTaskModal({ projectStart, tasks = [], tags = [], members = []
           <Field label="Priority"><select value={priority} onChange={e => setPriority(e.target.value as TaskPriority)} style={selectStyle}>{Object.entries(PRIORITY_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></Field>
           <Field label="Start date"><input type="date" value={start} onChange={e => setStart(e.target.value)} style={selectStyle} /></Field>
           <Field label="Due date"><input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} style={selectStyle} /></Field>
-          <Field label="Duration (days)"><input type="number" min={1} value={duration} onChange={e => setDuration(Number(e.target.value))} style={selectStyle} /></Field>
+          <Field label="Duration (days)"><input type="number" min={1} value={duration} onChange={e => setDuration(Math.max(1, Math.floor(Number(e.target.value)) || 1))} style={selectStyle} /></Field>
         </div>
+        {invalidDue && <div style={{ fontSize: 12, color: COLORS.red, marginTop: -4, fontFamily: FF }}>Due date must be on or after the start date.</div>}
         <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-          <button onClick={onClose} style={{ flex: 1, background: '#F3F4F6', color: COLORS.ink, border: 'none', borderRadius: 10, padding: '11px 0', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>Cancel</button>
-          <button onClick={submit} disabled={!name.trim()} style={{ flex: 2, background: name.trim() ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 10, padding: '11px 0', fontSize: 13.5, fontWeight: 700, cursor: name.trim() ? 'pointer' : 'not-allowed', fontFamily: FF, boxShadow: name.trim() ? '0 1px 3px rgba(254,128,41,0.2)' : 'none' }}>Create task</button>
+          <button type="button" onClick={onClose} style={{ flex: 1, background: '#F3F4F6', color: COLORS.ink, border: 'none', borderRadius: 10, padding: '11px 0', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: FF }}>Cancel</button>
+          <button type="submit" disabled={!name.trim() || invalidDue} style={{ flex: 2, background: name.trim() && !invalidDue ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 10, padding: '11px 0', fontSize: 13.5, fontWeight: 700, cursor: name.trim() && !invalidDue ? 'pointer' : 'not-allowed', fontFamily: FF, boxShadow: name.trim() && !invalidDue ? '0 1px 3px rgba(254,128,41,0.2)' : 'none' }}>Create task</button>
         </div>
+      </form>
     </Modal>
   );
 }

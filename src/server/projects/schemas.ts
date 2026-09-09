@@ -10,9 +10,9 @@ import {
 const projectDate = z.union([z.iso.date(), z.iso.datetime()]);
 const optionalDate = projectDate.optional().nullable();
 
-/** Validation for creating a project. ownerId is NOT accepted from the
- *  browser — it always comes from the authenticated session. */
-export const createProjectSchema = z.object({
+/** Base project fields. ownerId is NOT accepted from the browser — it always
+ *  comes from the authenticated session. */
+const createProjectBase = z.object({
   name: z.string().trim().min(PROJECT_NAME_MIN_LENGTH, 'Project name is required').max(PROJECT_NAME_MAX_LENGTH),
   description: z.string().trim().max(PROJECT_DESCRIPTION_MAX_LENGTH).optional().nullable(),
   color: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
@@ -20,8 +20,21 @@ export const createProjectSchema = z.object({
   endDate: optionalDate,
 });
 
+/** Validation for creating a project.
+ *
+ *  The end>start rule was only on the template schema; a blank-created
+ *  project could still carry end <= start (audit Table 7.1). Here the rule
+ *  applies only when BOTH dates are supplied, since blank create allows
+ *  omitting the schedule entirely. Zod v4 cannot extend a refined schema,
+ *  so the template variant rebuilds from the same base with its own rules. */
+export const createProjectSchema = createProjectBase.refine(
+  ({ startDate, endDate }) =>
+    !(startDate && endDate) || new Date(endDate).getTime() > new Date(startDate).getTime(),
+  { message: 'End date must be after start date', path: ['endDate'] },
+);
+
 /** Template creation uses the same project fields plus a server-known template. */
-export const createProjectFromTemplateSchema = createProjectSchema.extend({
+export const createProjectFromTemplateSchema = createProjectBase.extend({
   templateId: z.string().trim().min(1, 'Template is required').max(100),
   startDate: projectDate,
   endDate: projectDate,

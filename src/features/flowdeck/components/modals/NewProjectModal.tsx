@@ -115,7 +115,7 @@ export function NewProjectModal({
   const formContent = (
     <>
       <Field label="Project name">
-        <input autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Q4 Marketing Campaign" style={selectStyle} />
+        <input autoFocus maxLength={120} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Q4 Marketing Campaign" style={selectStyle} />
       </Field>
       <Field label="Colour">
         <div style={{ display: 'flex', gap: isMobile ? 10 : 8, flexWrap: 'wrap' }}>
@@ -137,7 +137,7 @@ export function NewProjectModal({
   const templateContent = (
     <>
       <Field label="Project name">
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Q4 Marketing Campaign" style={selectStyle} />
+        <input maxLength={120} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Q4 Marketing Campaign" style={selectStyle} />
       </Field>
       <Field label="Start date">
         <input type="date" value={start} onChange={e => setStart(e.target.value)} style={selectStyle} />
@@ -183,7 +183,7 @@ export function NewProjectModal({
         </div>
       </Field>
       {name.trim() && !(new Date(end) > new Date(start)) && (
-        <div style={{ fontSize: 12, color: COLORS.red, marginBottom: 12, marginTop: -6, fontFamily: FF }}>Start date is required.</div>
+        <div style={{ fontSize: 12, color: COLORS.red, marginBottom: 12, marginTop: -6, fontFamily: FF }}>End date must be after the start date.</div>
       )}
     </>
   );
