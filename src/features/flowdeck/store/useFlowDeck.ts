@@ -303,7 +303,6 @@ export interface FlowDeckState {
   addAutomation: (rule: AutomationRule) => void;
   updateAutomation: (id: string, patch: Partial<AutomationRule>) => void;
   deleteAutomation: (id: string) => void;
-  executeAutomation: (taskId: string, triggerType: string, newValue: string, projectId: string) => void;
   /* Forms */
   forms: Form[];
   submissions: FormSubmission[];
@@ -3130,42 +3129,6 @@ export function useFlowDeckStore(): FlowDeckState {
     toast.success('Automation updated');
   }, []);
   const deleteAutomation = useCallback((id: string) => { setAutomations(prev => prev.filter(r => r.id !== id)); toast.success('Automation deleted'); }, []);
-  const executeAutomation = useCallback((taskId: string, triggerType: string, newValue: string, projectId: string) => {
-    setAutomations(prev => {
-      const rules = prev.filter(r => r.enabled);
-      rules.forEach(rule => {
-        let match = false;
-        if (rule.trigger.type === triggerType) {
-          if (triggerType === 'status_change' && rule.trigger.value === newValue) match = true;
-          if (triggerType === 'priority_change' && rule.trigger.value === newValue) match = true;
-          if (triggerType === 'task_completed') match = true;
-          if (triggerType === 'task_created') match = true;
-        }
-        if (match && rule.actions.length > 0) {
-          rule.actions.forEach(action => {
-            if (projectId && tasksByProject[projectId]) {
-              const taskList = tasksByProject[projectId];
-              setTasksByProject(prevTasks => {
-                const copy = { ...prevTasks, [projectId]: taskList.map(t => {
-                  if (t.id !== taskId) return t;
-                  const patch: Partial<Task> = {};
-                  if (action.type === 'set_status' && action.value) patch.status = action.value as TaskStatus;
-                  if (action.type === 'set_priority' && action.value) patch.priority = action.value as TaskPriority;
-                  if (action.type === 'set_assignee' && action.value) patch.assignee = action.value;
-                  if (action.type === 'set_due_date' && action.value) patch.dueDate = action.value;
-                  return { ...t, ...patch };
-                })};
-                return copy;
-              });
-            }
-          });
-          toast.info(`Automation "${rule.name}" triggered`);
-        }
-      });
-      return prev;
-    });
-  }, [tasksByProject]);
-
   /* ---- Forms ---- */
   const addForm = useCallback((form: Form) => { setForms(prev => [...prev, form]); toast.success('Form created'); }, []);
   const updateForm = useCallback((id: string, patch: Partial<Form>) => { setForms(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f)); toast.success('Form updated'); }, []);
@@ -3299,7 +3262,7 @@ export function useFlowDeckStore(): FlowDeckState {
     /* #49 */
     savedFilters, saveFilter, deleteSavedFilter, renameSavedFilter, toggleSavedFilterPin, applySavedFilter,
     /* Automations */
-    automations, addAutomation, updateAutomation, deleteAutomation, executeAutomation,
+    automations, addAutomation, updateAutomation, deleteAutomation,
     /* Forms */
     forms, submissions, addForm, updateForm, deleteForm, addSubmission,
     /* Approvals */
