@@ -115,17 +115,13 @@ export interface FlowDeckState {
   currentProjectId: string | null;
   setCurrentProjectId: React.Dispatch<React.SetStateAction<string | null>>;
   activeView: string;
-  selectedTaskId: string | null;
   selectedIds: Set<string>;
   searchQuery: string;
   showNewTask: boolean;
-  showNewProject: boolean;
   projectMenuOpen: boolean;
-  shareOpen: boolean;
   sidebarOpen: boolean;
   moreMenuOpen: boolean;
   durationUnit: string;
-  viewingFileId: string | null;
   setViewingFileId: React.Dispatch<React.SetStateAction<string | null>>;
   setActiveView: React.Dispatch<React.SetStateAction<string>>;
   setSelectedTaskId: React.Dispatch<React.SetStateAction<string | null>>;
@@ -152,8 +148,6 @@ export interface FlowDeckState {
   raidItems: RaidItem[];
   customCols: CustomColumn[];
   filteredTasks: Task[];
-  selectedTask: Task | null;
-  viewingFile: FileItem | null;
   tags: Tag[];
   taskComments: Comment[];
   taskActivity: ActivityEntry[];
@@ -209,10 +203,8 @@ export interface FlowDeckState {
   addTask: (projectId: string, input: CreateTaskInput | Task) => void;
   removeTask: (projectId: string, taskId: string) => void;
   removeTasksBulk: (projectId: string, ids: Set<string>) => void;
-  duplicateTask: (projectId: string, id: string) => void;
   moveStatus: (projectId: string, taskId: string, status: string) => void;
   toggleComplete: (projectId: string, taskId: string) => void;
-  addFiles: (projectId: string, files: FileItem[]) => void;
   removeFile: (projectId: string, fileId: string) => void;
   linkFile: (projectId: string, fileId: string, taskId: string, linked?: boolean) => void;
   addRaidItem: (projectId: string, item: RaidItem) => void;
@@ -223,7 +215,6 @@ export interface FlowDeckState {
   addColumn: (projectId: string, def: CustomColumn) => void;
   removeColumn: (projectId: string, key: string) => void;
   renameColumn: (projectId: string, key: string, label: string) => void;
-  openFileViewer: (fileId: string) => void;
   /* Tags */
   addTag: (projectId: string, tag: Tag) => void;
   removeTag: (projectId: string, tagId: string) => void;
@@ -271,7 +262,6 @@ export interface FlowDeckState {
   renameSection: (projectId: string, sectionId: string, name: string) => void;
   deleteSection: (projectId: string, sectionId: string) => void;
   toggleSectionCollapsed: (projectId: string, sectionId: string) => void;
-  reorderSection: (projectId: string, sectionId: string, toIndex: number) => void;
   setTaskSection: (projectId: string, taskId: string, sectionId: string | null) => void;
   /* Batch 7: Project management */
   updateProject: (projectId: string, patch: Partial<Project>) => void;
@@ -279,14 +269,12 @@ export interface FlowDeckState {
   archiveProject: (projectId: string) => void;
   restoreProject: (projectId: string) => void;
   setProjectMembers: (projectId: string, members: string[]) => void;
-  projectStatusUpdates: ProjectStatusUpdate[];
   addProjectStatusUpdate: (projectId: string, text: string, color: 'green' | 'yellow' | 'red') => void;
   deleteProjectStatusUpdate: (projectId: string, id: string) => void;
   saveProjectAsTemplate: (projectId: string, name: string, includeTasks: boolean) => void;
   /* #47: Goals / OKRs */
   goals: Goal[];
   keyResults: KeyResult[];
-  addGoal: (goal: Goal) => void;
   updateGoal: (id: string, patch: Partial<Goal>) => void;
   deleteGoal: (id: string) => void;
   addKeyResult: (kr: KeyResult) => void;
@@ -294,41 +282,27 @@ export interface FlowDeckState {
   deleteKeyResult: (id: string) => void;
   /* #49: Saved Filters */
   savedFilters: SavedFilter[];
-  saveFilter: (name: string, filters: SearchFilters) => void;
   deleteSavedFilter: (id: string) => void;
-  renameSavedFilter: (id: string, name: string) => void;
-  toggleSavedFilterPin: (id: string) => void;
-  applySavedFilter: (id: string) => void;
   /* Automations */
   automations: AutomationRule[];
-  addAutomation: (rule: AutomationRule) => void;
-  updateAutomation: (id: string, patch: Partial<AutomationRule>) => void;
   deleteAutomation: (id: string) => void;
   /* Forms */
   forms: Form[];
   submissions: FormSubmission[];
-  addForm: (form: Form) => void;
-  updateForm: (id: string, patch: Partial<Form>) => void;
   deleteForm: (id: string) => void;
   addSubmission: (submission: FormSubmission) => void;
   /* Approvals */
   approvals: ApprovalRequest[];
-  addApproval: (approval: ApprovalRequest) => void;
   resolveApproval: (id: string, approved: boolean, comment?: string) => void;
   deleteApproval: (id: string) => void;
   /* Budget & Expense */
   budgets: Budget[];
   expenses: Expense[];
-  addBudget: (budget: Budget) => void;
   updateBudget: (id: string, patch: Partial<Budget>) => void;
   deleteBudget: (id: string) => void;
-  addExpense: (expense: Expense) => void;
   deleteExpense: (id: string) => void;
   /* Timesheets */
   timesheets: TimesheetEntry[];
-  addTimesheetEntry: (entry: TimesheetEntry) => void;
-  updateTimesheetEntry: (id: string, patch: Partial<TimesheetEntry>) => void;
-  deleteTimesheetEntry: (id: string) => void;
 }
 
 export function useFlowDeckStore(): FlowDeckState {
@@ -552,7 +526,6 @@ export function useFlowDeckStore(): FlowDeckState {
   const [timesheets, setTimesheets] = useState<TimesheetEntry[]>([]);
 
   /* Batch 7: derived */
-  const projectStatusUpdates = currentProjectId ? (statusUpdatesByProject[currentProjectId] || []) : [];
 
   /* Debounced save to localStorage (must come after all state declarations) */
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1661,11 +1634,6 @@ export function useFlowDeckStore(): FlowDeckState {
     });
   }, [customColsByProject]);
 
-  const addFiles = useCallback((projectId: string, newFiles: FileItem[]) => {
-    if (!projectId) return;
-    setFilesByProject(prev => ({ ...prev, [projectId]: [...newFiles, ...(prev[projectId] || [])] }));
-  }, []);
-
   const removeFile = useCallback((projectId: string, id: string) => {
     if (!projectId) return;
     setFilesByProject(prev => ({ ...prev, [projectId]: (prev[projectId] || []).filter(f => f.id !== id) }));
@@ -2198,13 +2166,6 @@ export function useFlowDeckStore(): FlowDeckState {
       for (const log of logs) byId.set(log.id, log);
       return { ...prev, [projectId]: [...byId.values()].sort((a, b) => a.loggedAt.localeCompare(b.loggedAt)) };
     });
-  }, []);
-
-  const selectedTask = tasks.find(t => t.id === selectedTaskId) || null;
-  const viewingFile = files.find(f => f.id === viewingFileId) || null;
-
-  const openFileViewer = useCallback((fileId: string) => {
-    setViewingFileId(fileId);
   }, []);
 
   const filteredTasks = useMemo(() => {
@@ -2891,28 +2852,6 @@ export function useFlowDeckStore(): FlowDeckState {
     }));
   }, []);
 
-  const reorderSection = useCallback((projectId: string, sectionId: string, toIndex: number) => {
-    if (!projectId) return;
-    const currentSections = [...(sectionsByProject[projectId] || [])];
-    const idx = currentSections.findIndex(s => s.id === sectionId);
-    if (idx === -1 || idx === toIndex) return;
-    const [removed] = currentSections.splice(idx, 1);
-    currentSections.splice(toIndex, 0, removed);
-    /* Re-number positions */
-    const renumbered = currentSections.map((s, i) => ({ ...s, position: i }));
-    const snapshot = sectionsByProject[projectId] || [];
-    // Optimistic local update.
-    setSectionsByProject(prev => ({ ...prev, [projectId]: renumbered }));
-    // Persist the new position of the moved section. (Siblings keep their
-    // server-side positions; only the moved section needs an update here.
-    // The server's `updateSection` accepts a position int.)
-    apiUpdateSection(projectId, sectionId, { position: toIndex }).then((res) => {
-      if (res.ok) return;
-      setSectionsByProject(prev => ({ ...prev, [projectId]: snapshot }));
-      toast.error('Failed to reorder section', { description: res.error });
-    });
-  }, [sectionsByProject]);
-
   const setTaskSection = useCallback((projectId: string, taskId: string, sectionId: string | null) => {
     const projectTasks = tasksByProject[projectId] || [];
     // Optimistic local update.
@@ -3102,7 +3041,6 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [projects, tasksByProject, tagsByProject, customColsByProject]);
 
   /* ---- #47: Goals / OKRs ---- */
-  const addGoal = useCallback((goal: Goal) => { setGoals(prev => [...prev, goal]); toast.success('Goal added'); }, []);
   const updateGoal = useCallback((id: string, patch: Partial<Goal>) => { setGoals(prev => prev.map(g => g.id === id ? { ...g, ...patch } : g)); }, []);
   const deleteGoal = useCallback((id: string) => { setGoals(prev => prev.filter(g => g.id !== id)); setKeyResults(prev => prev.filter(kr => kr.goalId !== id)); toast.success('Goal deleted'); }, []);
   const addKeyResult = useCallback((kr: KeyResult) => { setKeyResults(prev => [...prev, kr]); }, []);
@@ -3110,29 +3048,11 @@ export function useFlowDeckStore(): FlowDeckState {
   const deleteKeyResult = useCallback((id: string) => { setKeyResults(prev => prev.filter(kr => kr.id !== id)); }, []);
 
   /* ---- #49: Saved Filters ---- */
-  const saveFilter = useCallback((name: string, filters: SearchFilters) => {
-    const sf: SavedFilter = { id: defaultIdGenerator.generate('sf'), name, filters, createdAt: new Date().toISOString() };
-    setSavedFilters(prev => [...prev, sf]);
-    toast.success(`Filter "${name}" saved`);
-  }, []);
   const deleteSavedFilter = useCallback((id: string) => { setSavedFilters(prev => prev.filter(f => f.id !== id)); }, []);
-  const renameSavedFilter = useCallback((id: string, name: string) => { setSavedFilters(prev => prev.map(f => f.id === id ? { ...f, name } : f)); }, []);
-  const toggleSavedFilterPin = useCallback((id: string) => { setSavedFilters(prev => prev.map(f => f.id === id ? { ...f, isPinned: !f.isPinned } : f)); }, []);
-  const applySavedFilter = useCallback((id: string) => {
-    const sf = savedFilters.find(f => f.id === id);
-    if (sf) setSearchFilters(sf.filters);
-  }, [savedFilters, setSearchFilters]);
 
   /* ---- Automations ---- */
-  const addAutomation = useCallback((rule: AutomationRule) => { setAutomations(prev => [...prev, rule]); toast.success('Automation created'); }, []);
-  const updateAutomation = useCallback((id: string, patch: Partial<AutomationRule>) => {
-    setAutomations(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
-    toast.success('Automation updated');
-  }, []);
   const deleteAutomation = useCallback((id: string) => { setAutomations(prev => prev.filter(r => r.id !== id)); toast.success('Automation deleted'); }, []);
   /* ---- Forms ---- */
-  const addForm = useCallback((form: Form) => { setForms(prev => [...prev, form]); toast.success('Form created'); }, []);
-  const updateForm = useCallback((id: string, patch: Partial<Form>) => { setForms(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f)); toast.success('Form updated'); }, []);
   const deleteForm = useCallback((id: string) => { setForms(prev => prev.filter(f => f.id !== id)); toast.success('Form deleted'); }, []);
   const addSubmission = useCallback((submission: FormSubmission) => {
     setSubmissions(prev => [...prev, submission]);
@@ -3164,7 +3084,6 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [forms, tasksByProject, addTask]);
 
   /* ---- Approvals ---- */
-  const addApproval = useCallback((approval: ApprovalRequest) => { setApprovals(prev => [...prev, approval]); toast.success('Approval requested'); }, []);
   const resolveApproval = useCallback((id: string, approved: boolean, comment?: string) => {
     // Optimistic update
     const snapshot = approvals;
@@ -3195,15 +3114,8 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [approvals]);
 
   /* ---- Budget & Expense ---- */
-  const addBudget = useCallback((budget: Budget) => { setBudgets(prev => [...prev, budget]); toast.success('Budget created'); }, []);
   const updateBudget = useCallback((id: string, patch: Partial<Budget>) => { setBudgets(prev => prev.map(b => b.id === id ? { ...b, ...patch } : b)); }, []);
   const deleteBudget = useCallback((id: string) => { setBudgets(prev => prev.filter(b => b.id !== id)); setExpenses(prev => prev.filter(e => e.budgetId !== id)); toast.success('Budget deleted'); }, []);
-  const addExpense = useCallback((expense: Expense) => {
-    setExpenses(prev => [...prev, expense]);
-    // Update spent on parent budget
-    setBudgets(prev => prev.map(b => b.id === expense.budgetId ? { ...b, spent: b.spent + expense.amount } : b));
-    toast.success('Expense added');
-  }, []);
   const deleteExpense = useCallback((id: string) => {
     const exp = expenses.find(e => e.id === id);
     if (exp) {
@@ -3213,19 +3125,6 @@ export function useFlowDeckStore(): FlowDeckState {
   }, [expenses]);
 
   /* ---- Timesheets ---- */
-  const addTimesheetEntry = useCallback((entry: TimesheetEntry) => {
-    setTimesheets(prev => {
-      const existing = prev.find(e => e.userId === entry.userId && e.projectId === entry.projectId && e.taskId === entry.taskId && e.date === entry.date);
-      if (existing) {
-        return prev.map(e => e.id === existing.id ? { ...e, hours: entry.hours, note: entry.note || e.note } : e);
-      }
-      return [...prev, entry];
-    });
-  }, []);
-  const updateTimesheetEntry = useCallback((id: string, patch: Partial<TimesheetEntry>) => {
-    setTimesheets(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
-  }, []);
-  const deleteTimesheetEntry = useCallback((id: string) => { setTimesheets(prev => prev.filter(e => e.id !== id)); }, []);
 
   return {
     projects, tasksByProject, filesByProject, raidByProject, customColsByProject,
@@ -3237,44 +3136,44 @@ export function useFlowDeckStore(): FlowDeckState {
     setCurrentUserName,
     membersById,
     registerMembers,
-    currentProjectId, activeView, selectedTaskId, selectedIds, searchQuery,
-    showNewTask, showNewProject, projectMenuOpen, shareOpen, sidebarOpen, moreMenuOpen,
+    currentProjectId, activeView, selectedIds, searchQuery,
+    showNewTask, projectMenuOpen, sidebarOpen, moreMenuOpen,
     durationUnit, clipboard,
-    viewingFileId, setViewingFileId,
-    project, tasks, files, raidItems, customCols, filteredTasks, selectedTask, viewingFile,
+     setViewingFileId,
+    project, tasks, files, raidItems, customCols, filteredTasks,
     tags, taskComments, taskActivity,
     searchFilters, setSearchFilters, activeFilterCount, clearFilters,
     timeLogs, taskTimeLogs,
     gridActions,
     openProject, syncProjectFromRoute, syncProjectTasks, syncProjectTags, syncProjectCustomCols, syncProjectComments, syncProjectFiles, syncProjectMembers, syncProjectStatusUpdates, syncProjects, upsertProject, removeProjectFromCache, goToPortfolio, createProject, createProjectFromTemplate, deleteProject,
     updateTask, addTask, removeTask, removeTasksBulk, moveStatus, toggleComplete,
-    duplicateTask, duplicateTaskWithOptions, duplicateTasksBulk,
+     duplicateTaskWithOptions, duplicateTasksBulk,
     moveTaskToProject, moveTasksToProjectBulk,
     promoteSubtask, demoteToSubtask,
     bulkSetDueDate, bulkAddTag, bulkRemoveTag, bulkSetStatus, bulkAssign, bulkSetPriority, bulkComplete,
     sections,
-    addSection, renameSection, deleteSection, toggleSectionCollapsed, reorderSection, setTaskSection,
+    addSection, renameSection, deleteSection, toggleSectionCollapsed, setTaskSection,
     /* Batch 7 */
     updateProject, toggleProjectFavorite, archiveProject, restoreProject,
-    setProjectMembers, projectStatusUpdates, addProjectStatusUpdate, deleteProjectStatusUpdate,
+    setProjectMembers, addProjectStatusUpdate, deleteProjectStatusUpdate,
     saveProjectAsTemplate,
     /* #47 */
-    goals, keyResults, addGoal, updateGoal, deleteGoal, addKeyResult, updateKeyResult, deleteKeyResult,
+    goals, keyResults, updateGoal, deleteGoal, addKeyResult, updateKeyResult, deleteKeyResult,
     /* #49 */
-    savedFilters, saveFilter, deleteSavedFilter, renameSavedFilter, toggleSavedFilterPin, applySavedFilter,
+    savedFilters, deleteSavedFilter,
     /* Automations */
-    automations, addAutomation, updateAutomation, deleteAutomation,
+    automations, deleteAutomation,
     /* Forms */
-    forms, submissions, addForm, updateForm, deleteForm, addSubmission,
+    forms, submissions, deleteForm, addSubmission,
     /* Approvals */
-    approvals, addApproval, resolveApproval, deleteApproval,
+    approvals, resolveApproval, deleteApproval,
     /* Budget & Expense */
-    budgets, expenses, addBudget, updateBudget, deleteBudget, addExpense, deleteExpense,
+    budgets, expenses, updateBudget, deleteBudget, deleteExpense,
     /* Timesheets */
-    timesheets, addTimesheetEntry, updateTimesheetEntry, deleteTimesheetEntry,
-    addFiles, removeFile, linkFile,
+    timesheets,
+     removeFile, linkFile,
     addRaidItem, updateRaidItem, removeRaidItem, syncRaidItems,
-    addColumn, removeColumn, renameColumn, openFileViewer,
+    addColumn, removeColumn, renameColumn,
     addTag, removeTag, toggleTaskTag,
     addComment, deleteComment, editComment, toggleReaction,
     toggleFollower,
