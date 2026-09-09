@@ -80,6 +80,11 @@ export default function ProjectTasksPage() {
       onDemoteToSubtask={(id, parentId) => state.demoteToSubtask(projectId, id, parentId)}
       onAddSection={(name) => state.addSection(projectId, name)}
       onDeleteSection={(id) => state.deleteSection(projectId, id)}
+      // Audit Table 5.1: the collapse chevron and rename affordances were
+      // rendered but optional-chained to no-ops — the store actions existed
+      // and were simply never passed down.
+      onRenameSection={(id, name) => state.renameSection(projectId, id, name)}
+      onToggleSectionCollapsed={(id) => state.toggleSectionCollapsed(projectId, id)}
     />
   );
 }
