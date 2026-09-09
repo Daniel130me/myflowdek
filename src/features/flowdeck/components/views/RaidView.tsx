@@ -100,11 +100,13 @@ export function RaidView({ items, onAdd, onUpdate, onRemove, projectId }: { item
           <button onClick={submit} disabled={!draft.description.trim()} style={{ background: draft.description.trim() ? COLORS.accent : COLORS.line, color: '#FFFFFF', border: 'none', borderRadius: 10, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: draft.description.trim() ? 'pointer' : 'not-allowed', fontFamily: FF }}>Add to log</button>
         </div>
       )}
-      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: 12, overflowX: 'auto' }}>
+      {/* Bounded panel: the log scrolls inside while its header row stays
+          pinned (documents.module.css pattern, audit Table 6.1). */}
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: 12, overflow: 'auto', maxHeight: 'min(600px, 70dvh)' }}>
         <div style={{ minWidth: 700 }}>
           {/* Sticky TYPE column keeps the row's category pinned while the
               700px grid is panned (audit Table 6.1). */}
-          <div style={{ display: 'grid', gridTemplateColumns: '110px 2.2fr 1fr 100px 1fr 36px', padding: '10px 16px', fontSize: 11.5, fontWeight: 700, color: COLORS.gray, borderBottom: `1px solid ${COLORS.line}`, letterSpacing: 0.8 }}><div style={{ position: 'sticky', left: 0, background: COLORS.card, zIndex: 1, boxShadow: `inset -1px 0 0 ${COLORS.line}` }}>TYPE</div><div>DESCRIPTION</div><div>OWNER</div><div>IMPACT</div><div>STATUS</div><div /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '110px 2.2fr 1fr 100px 1fr 36px', padding: '10px 16px', fontSize: 11.5, fontWeight: 700, color: COLORS.gray, borderBottom: `1px solid ${COLORS.line}`, letterSpacing: 0.8, position: 'sticky', top: 0, zIndex: 2, background: COLORS.card }}><div style={{ position: 'sticky', left: 0, background: COLORS.card, zIndex: 1, boxShadow: `inset -1px 0 0 ${COLORS.line}` }}>TYPE</div><div>DESCRIPTION</div><div>OWNER</div><div>IMPACT</div><div>STATUS</div><div /></div>
           {shown.map(item => {
             const meta = RAID_META[item.type];
             return (

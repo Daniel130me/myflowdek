@@ -539,9 +539,11 @@ export function TaskListView({ tasks, tags = [], projects, currentProjectId, all
   return (
     <div>
       <SectionHeader title="Tasks" subtitle={`${filteredByTag.length}${filteredByTag.length !== tasks.length ? ` of ${tasks.length}` : ''} tasks`} right={headerRight} />
-      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: 12, overflowX: 'auto' }}>
+      {/* Bounded panel: long task lists scroll inside while the column labels
+          stay pinned (documents.module.css pattern, audit Table 6.1). */}
+      <div style={{ background: COLORS.card, border: `1px solid ${COLORS.line}`, borderRadius: 12, overflow: 'auto', maxHeight: 'min(600px, 70dvh)' }}>
         <div style={{ minWidth: 720 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '28px 36px 2.4fr 1fr 1fr 1fr 1.3fr 40px', padding: '10px 16px', fontSize: 11.5, fontWeight: 700, color: COLORS.gray, borderBottom: `1px solid ${COLORS.line}`, letterSpacing: 0.8 }}><div /><div /><div style={{ position: 'sticky', left: 64, background: COLORS.card, zIndex: 1, boxShadow: `inset -1px 0 0 ${COLORS.line}` }}>TASK</div><div>ASSIGNEE</div><div>DUE DATE</div><div>PRIORITY</div><div>STATUS</div><div /></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '28px 36px 2.4fr 1fr 1fr 1fr 1.3fr 40px', padding: '10px 16px', fontSize: 11.5, fontWeight: 700, color: COLORS.gray, borderBottom: `1px solid ${COLORS.line}`, letterSpacing: 0.8, position: 'sticky', top: 0, zIndex: 2, background: COLORS.card }}><div /><div /><div style={{ position: 'sticky', left: 64, background: COLORS.card, zIndex: 1, boxShadow: `inset -1px 0 0 ${COLORS.line}` }}>TASK</div><div>ASSIGNEE</div><div>DUE DATE</div><div>PRIORITY</div><div>STATUS</div><div /></div>
           {desktopSectionsContent || sorted.map((t, idx) => renderDesktopRow(t, idx))}
           {sorted.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: COLORS.gray, fontSize: 13, fontFamily: FF }}>No tasks match your search.</div>}
           <QuickAddRow onQuickAdd={onQuickAdd} placeholder="Type a task name and press Enter..." isDesktop />

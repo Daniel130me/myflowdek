@@ -118,8 +118,13 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
   /* Sticky first column: solid bg + inset shadow replace the cell border,
      which border-collapse does not paint on sticky cells (audit Table 6.1). */
   const stickyFirstHeader: React.CSSProperties = {
-    position: 'sticky', left: 0, zIndex: 2, textAlign: 'left' as const,
+    position: 'sticky', left: 0, zIndex: 3, textAlign: 'left' as const,
     boxShadow: `inset -1px 0 0 ${COLORS.line}`,
+  };
+  /* Sticky header row: long project lists scroll inside a bounded panel, so
+     column labels stay visible (documents.module.css pattern, audit Table 6.1). */
+  const stickyThead: React.CSSProperties = {
+    position: 'sticky', top: 0, zIndex: 2,
   };
   const stickyFirstCell: React.CSSProperties = {
     position: 'sticky', left: 0, zIndex: 1, background: COLORS.card,
@@ -232,7 +237,7 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
   function renderTable(list: Project[], archived: boolean, showRollup: boolean) {
     if (list.length === 0) return null;
     return (
-      <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${COLORS.line}`, background: COLORS.card }}>
+      <div style={{ overflow: 'auto', maxHeight: 'min(600px, 70dvh)', borderRadius: 12, border: `1px solid ${COLORS.line}`, background: COLORS.card }}>
         {/* Keep the pinned first cell in sync with the row's JS hover tint. */}
         <style>{`.fd-portfolio-row:hover .fd-portfolio-sticky { background: ${COLORS.lineLight} !important; }`}</style>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
@@ -240,13 +245,13 @@ export function PortfolioView({ projects, searchQuery, onOpen, onDelete, onNew, 
             <tr>
               {/* Sticky first column keeps the project name pinned while the
                   680px table is panned on a phone (audit Table 6.1). */}
-              <th style={{ ...thStyle, ...stickyFirstHeader }} onClick={() => handleSort('name')}>Project {renderSortIcon('name')}</th>
-              <th style={{ ...thStyle, textAlign: 'left' }} onClick={() => handleSort('progress')}>Status {renderSortIcon('progress')}</th>
-              <th style={{ ...thStyle, textAlign: 'left' }} onClick={() => handleSort('members')}>Members {renderSortIcon('members')}</th>
-              <th style={{ ...thStyle, textAlign: 'left' }} onClick={() => handleSort('due')}>Due Date {renderSortIcon('due')}</th>
-              <th style={{ ...thStyle, textAlign: 'center' }} onClick={() => handleSort('tasks')}>Tasks {renderSortIcon('tasks')}</th>
-              <th style={{ ...thStyle, textAlign: 'center' }} onClick={() => handleSort('overdue')}>Overdue {renderSortIcon('overdue')}</th>
-              {!archived && <th style={{ ...thStyle, cursor: 'default', width: isMobile ? 60 : 90 }} />}
+              <th style={{ ...thStyle, ...stickyFirstHeader, ...stickyThead, zIndex: 3 }} onClick={() => handleSort('name')}>Project {renderSortIcon('name')}</th>
+              <th style={{ ...thStyle, ...stickyThead, textAlign: 'left' }} onClick={() => handleSort('progress')}>Status {renderSortIcon('progress')}</th>
+              <th style={{ ...thStyle, ...stickyThead, textAlign: 'left' }} onClick={() => handleSort('members')}>Members {renderSortIcon('members')}</th>
+              <th style={{ ...thStyle, ...stickyThead, textAlign: 'left' }} onClick={() => handleSort('due')}>Due Date {renderSortIcon('due')}</th>
+              <th style={{ ...thStyle, ...stickyThead, textAlign: 'center' }} onClick={() => handleSort('tasks')}>Tasks {renderSortIcon('tasks')}</th>
+              <th style={{ ...thStyle, ...stickyThead, textAlign: 'center' }} onClick={() => handleSort('overdue')}>Overdue {renderSortIcon('overdue')}</th>
+              {!archived && <th style={{ ...thStyle, ...stickyThead, cursor: 'default', width: isMobile ? 60 : 90 }} />}
             </tr>
           </thead>
           <tbody>

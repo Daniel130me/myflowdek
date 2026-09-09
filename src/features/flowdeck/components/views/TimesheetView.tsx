@@ -433,8 +433,14 @@ export function TimesheetView({
      name must stay pinned (audit Table 6.1). Solid bg + inset shadow replace
      the cell border, which border-collapse does not paint on sticky cells. */
   const stickyFirstHeader: React.CSSProperties = {
-    position: 'sticky', left: 0, zIndex: 2, background: COLORS.graySoft,
+    position: 'sticky', left: 0, zIndex: 3, background: COLORS.graySoft,
     boxShadow: `inset -1px 0 0 ${COLORS.line}`,
+  };
+  /* Sticky header row: the grid scrolls inside a bounded panel once it outgrows
+     the viewport, so the day labels stay visible (documents.module.css pattern,
+     audit Table 6.1). z-index 2 sits under the corner cell (3) but above rows. */
+  const stickyThead: React.CSSProperties = {
+    position: 'sticky', top: 0, zIndex: 2, background: COLORS.graySoft,
   };
   const stickyFirstCell: React.CSSProperties = {
     position: 'sticky', left: 0, zIndex: 1, background: COLORS.card,
@@ -447,16 +453,17 @@ export function TimesheetView({
       boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
       overflow: 'hidden',
     }}>
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ overflow: 'auto', maxHeight: 'min(600px, 70dvh)' }}>
         <table style={{ borderCollapse: 'collapse', width: '100%', fontFamily: FF, minWidth: 680 }}>
           <thead>
             <tr style={{ background: COLORS.graySoft }}>
-              <th style={{ ...headerCellStyle, ...stickyFirstHeader, textAlign: 'left', paddingLeft: isMobile ? 12 : 16, width: isMobile ? 120 : 220 }}>Task</th>
+              <th style={{ ...headerCellStyle, ...stickyFirstHeader, ...stickyThead, zIndex: 3, textAlign: 'left', paddingLeft: isMobile ? 12 : 16, width: isMobile ? 120 : 220 }}>Task</th>
               {weekDays.map((d, i) => (
                 <th key={i} style={{
                   ...headerCellStyle,
+                  ...stickyThead,
                   color: isToday(d) ? COLORS.accent : COLORS.gray,
-                  position: 'relative',
+                  position: 'sticky',
                 }}>
                   {DAY_LABELS[i]} {d.getDate()}
                   {isToday(d) && (
@@ -467,7 +474,7 @@ export function TimesheetView({
                   )}
                 </th>
               ))}
-              <th style={{ ...headerCellStyle, color: COLORS.ink, fontWeight: 800 }}>Total</th>
+              <th style={{ ...headerCellStyle, ...stickyThead, color: COLORS.ink, fontWeight: 800 }}>Total</th>
             </tr>
           </thead>
           <tbody>
