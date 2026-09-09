@@ -5,8 +5,11 @@ import { useParams, useRouter, notFound } from 'next/navigation';
 import ProjectTasksPage from '../../page';
 import { DuplicateTaskDialog } from '@/features/flowdeck/components/ui';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
+import { useTaskForRoute } from '@/features/flowdeck/hooks/useTaskForRoute';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
+import { TaskDetailSkeleton } from '@/components/ui/skeleton';
+import { TaskLoadError } from '@/components/ui/task-load-error';
 
 export default function DuplicateTaskRoutePage() {
   const params = useParams();
@@ -15,21 +18,29 @@ export default function DuplicateTaskRoutePage() {
   const taskId = getSingleParam(params.taskId);
   const state = useFlowDeck();
 
-  if (!projectId || !taskId) {
+  // Direct URLs / bookmarks start with an empty store, so resolve the task
+  // through the fetch-then-404 contract instead of store-only lookup
+  // (audit Table 5.1: this page used to notFound() immediately).
+  const { task, projectTasks: fetchedTasks, loading, error, refetch, confirmedMiss } =
+    useTaskForRoute(projectId ?? '', taskId ?? '');
+
+  if (!projectId || !taskId || confirmedMiss) {
     notFound();
   }
 
   const close = () => router.push(routes.projectTasks(projectId));
 
-  const projectTasks = state.tasksByProject[projectId] ?? [];
+  if (!task) {
+    return error
+      ? <TaskLoadError onRetry={() => void refetch()} />
+      : <TaskDetailSkeleton />;
+  }
+
+  // Fetched list wins when present (fresh from the server); store cache as
+  // fallback keeps subtask/attachment introspection working after edits.
+  const projectTasks = fetchedTasks.length > 0 ? fetchedTasks : (state.tasksByProject[projectId] ?? []);
   const projectFiles = state.filesByProject[projectId] ?? [];
   const projectComments = state.commentsByProject[projectId] ?? [];
-
-  const task = projectTasks.find(t => t.id === taskId);
-
-  if (!task) {
-    notFound();
-  }
 
   return (
     <>

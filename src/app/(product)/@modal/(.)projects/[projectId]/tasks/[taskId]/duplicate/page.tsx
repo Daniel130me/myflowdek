@@ -5,8 +5,11 @@ import { useParams, notFound } from 'next/navigation';
 import { DuplicateTaskDialog } from '@/features/flowdeck/components/ui';
 import { useFlowDeck } from '@/features/flowdeck/store/useFlowDeck';
 import { useCloseOverlay } from '@/shared/navigation/useCloseOverlay';
+import { useTaskForRoute } from '@/features/flowdeck/hooks/useTaskForRoute';
 import { routes } from '@/shared/navigation/routes';
 import { getSingleParam } from '@/shared/utils/routeParams';
+import { TaskDetailSkeleton } from '@/components/ui/skeleton';
+import { TaskLoadError } from '@/components/ui/task-load-error';
 
 export default function InterceptedDuplicateTaskPage() {
   const params = useParams();
@@ -14,20 +17,27 @@ export default function InterceptedDuplicateTaskPage() {
   const taskId = getSingleParam(params.taskId);
   const state = useFlowDeck();
 
-  if (!projectId || !taskId) {
+  // Same fetch-then-404 contract as the non-intercepted route (audit
+  // Table 5.1): resolve through useTaskForRoute so soft navigation never
+  // 404s merely because the store has not finished hydrating.
+  const { task, projectTasks: fetchedTasks, loading, error, refetch, confirmedMiss } =
+    useTaskForRoute(projectId ?? '', taskId ?? '');
+
+  if (!projectId || !taskId || confirmedMiss) {
     notFound();
   }
 
   const close = useCloseOverlay(routes.projectTasks(projectId));
 
-  const projectTasks = state.tasksByProject[projectId] ?? [];
+  if (!task) {
+    return error
+      ? <TaskLoadError onRetry={() => void refetch()} />
+      : <TaskDetailSkeleton />;
+  }
+
+  const projectTasks = fetchedTasks.length > 0 ? fetchedTasks : (state.tasksByProject[projectId] ?? []);
   const projectFiles = state.filesByProject[projectId] ?? [];
   const projectComments = state.commentsByProject[projectId] ?? [];
-
-  const task = projectTasks.find(t => t.id === taskId);
-  if (!task) {
-    notFound();
-  }
 
   return (
     <DuplicateTaskDialog
