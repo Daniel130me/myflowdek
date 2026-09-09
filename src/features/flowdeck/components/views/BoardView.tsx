@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { PRIORITY_META, COLORS, STATUS_META, STATUS_ORDER, getDueDateStatus, DUE_STATUS, dueDateOffsetLabel, type Task, type FileItem, type Tag, type Project } from '@/features/flowdeck/model';
+import { loadWipLimits, saveWipLimits, type WipLimitMap } from './wipLimits';
 import { Avatar, PriorityFlag, SectionHeader, FileThumbnailGrid, TaskCheckbox, TagPills, TagFilterBar, FF, TaskContextMenu, InlineTaskName, useMemberDirectory } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 
@@ -206,8 +207,21 @@ export function BoardView({
   const [overCol, setOverCol] = useState<string | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number>(-1);
 
-  /* ---------- WIP limit state ---------- */
-  const [wipLimits, setWipLimits] = useState<Record<string, number>>({});
+  /* ---------- WIP limit state (persisted per project — audit Low) ---------- */
+  const [wipLimitsByProject, setWipLimitsByProject] = useState<WipLimitMap>(() => loadWipLimits());
+  const wipLimits = wipLimitsByProject[currentProjectId ?? ''] ?? {};
+  const setProjectWip = useCallback(
+    (updater: (prev: Record<string, number>) => Record<string, number>) => {
+      const pid = currentProjectId;
+      if (!pid) return;
+      setWipLimitsByProject(prev => {
+        const next = { ...prev, [pid]: updater(prev[pid] ?? {}) };
+        saveWipLimits(next);
+        return next;
+      });
+    },
+    [currentProjectId],
+  );
   const [editingWip, setEditingWip] = useState<string | null>(null);
 
   /* ---------- quick-add state ---------- */
@@ -455,7 +469,7 @@ export function BoardView({
           {editingWip === status && (
             <input
               autoFocus type="number" min={1} defaultValue={wipLimits[status] || ''}
-              onBlur={e => { const val = Number(e.target.value); if (val > 0) { setWipLimits(prev => ({ ...prev, [status]: val })); } else { setWipLimits(prev => { const n = { ...prev }; delete n[status]; return n; }); } setEditingWip(null); }}
+              onBlur={e => { const val = Number(e.target.value); if (val > 0) { setProjectWip(prev => ({ ...prev, [status]: val })); } else { setProjectWip(prev => { const n = { ...prev }; delete n[status]; return n; }); } setEditingWip(null); }}
               onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setEditingWip(null); } }}
               style={{ width: 48, border: `1.5px solid ${COLORS.accent}`, borderRadius: 6, fontSize: 12, fontFamily: FF, padding: '2px 6px', outline: 'none', boxShadow: '0 0 0 3px rgba(254,128,41,0.12)' }}
             />
