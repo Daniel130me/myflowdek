@@ -1,19 +1,24 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { ArrowRight, ShieldAlert, Link2, Filter } from 'lucide-react';
-import { COLORS, STATUS_META, TEAM, teamById, type Task } from '@/features/flowdeck/model';
-import { Avatar, StatusPill, PriorityFlag, SectionHeader, FF } from '../ui';
+import { ArrowRight, Link2, Filter } from 'lucide-react';
+import { COLORS, STATUS_META, type Task } from '@/features/flowdeck/model';
+import { Avatar, StatusPill, PriorityFlag, SectionHeader, FF, useMemberDirectory, useProjectMembers } from '../ui';
 import { useViewport } from '../../hooks/useViewport';
 
 interface DependenciesViewProps {
+  projectId?: string;
   tasks: Task[];
   onOpenTask: (id: string) => void;
 }
 
-export function DependenciesView({ tasks, onOpenTask }: DependenciesViewProps) {
+export function DependenciesView({ projectId, tasks, onOpenTask }: DependenciesViewProps) {
   const { isMobile } = useViewport();
   const [filter, setFilter] = useState<'all' | 'blocked' | 'blocking'>('all');
+  // Real project members — the mock teamById map rendered blank names for
+  // every real user id (audit Table 5.1).
+  useProjectMembers(projectId ?? null);
+  const { lookup } = useMemberDirectory();
 
   // Build reverse deps map: taskId -> array of task IDs that depend on it
   const reverseDeps = useMemo(() => {
@@ -101,7 +106,7 @@ export function DependenciesView({ tasks, onOpenTask }: DependenciesViewProps) {
         {depTasks.map(t => {
           const deps = t.deps.map(id => tasks.find(tk => tk.id === id)).filter(Boolean) as Task[];
           const blocking = (reverseDeps[t.id] || []).map(id => tasks.find(tk => tk.id === id)).filter(Boolean) as Task[];
-          const assignee = teamById[t.assignee];
+          const assigneeName = lookup(t.assignee)?.name ?? null;
           const isDone = t.status === 'done';
 
           return (
@@ -116,7 +121,7 @@ export function DependenciesView({ tasks, onOpenTask }: DependenciesViewProps) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                     <StatusPill status={t.status} />
                     <PriorityFlag priority={t.priority} />
-                    {assignee && <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF }}>{assignee.name}</span>}
+                    {assigneeName && <span style={{ fontSize: 12, color: COLORS.gray, fontFamily: FF }}>{assigneeName}</span>}
                   </div>
                 </div>
                 {deps.length > 0 && (
