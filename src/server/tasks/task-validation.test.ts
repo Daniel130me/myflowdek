@@ -8,7 +8,26 @@
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { createTaskSchema, updateTaskSchema } from './schemas';
+
+/**
+ * Keep database migrations aligned with fields selected by the task service.
+ * A missing migration plus a stale client previously turned every task
+ * creation into a 500 response.
+ */
+test('task formatting fields are backed by a database migration', () => {
+  const migrationsDirectory = join(process.cwd(), 'prisma', 'migrations');
+  const migrationSql = readdirSync(migrationsDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => readFileSync(join(migrationsDirectory, entry.name, 'migration.sql'), 'utf8'))
+    .join('\n');
+
+  for (const column of ['bold', 'color', 'level']) {
+    assert.match(migrationSql, new RegExp(`ADD COLUMN "${column}"`, 'i'));
+  }
+});
 
 /* --------------------------- createTaskSchema --------------------------- */
 
