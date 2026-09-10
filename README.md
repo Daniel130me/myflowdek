@@ -16,6 +16,9 @@ Use Node.js 20.9 or newer.
 The app runs at `http://localhost:3004`. `GET /api/health` checks both the web service
 and its database connection.
 
+For production deploys — required environment variables, fail-fast guards, migrations,
+and a post-deploy smoke checklist — see [DEPLOY.md](./DEPLOY.md).
+
 ## Backend API
 
 All request bodies are JSON. Create a user first, then use its returned `id` as a
